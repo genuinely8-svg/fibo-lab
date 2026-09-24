@@ -45,6 +45,7 @@
   .up{color:var(--up)} .down{color:var(--down)}
   .few{color:var(--warn)}
   #chartTitle{margin:0 0 8px;font-size:15px}
+  [hidden]{display:none!important}   /* hidden 속성이 display:flex 에 덮이지 않게 */
   #chart{width:100%;height:440px}
   #tv{width:100%;height:560px}
   .chead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
@@ -61,7 +62,7 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">바이낸스(달러) 캔들로 최근 하락 스윙의 피보나치 <b>-1 레벨</b>을 찾고, 과거에 -1을 찍었을 때 얼마나 반등했는지 통계를 냅니다.<br>
+  <p class="sub">바이낸스(달러) 캔들로 최근 하락 스윙의 <b>진입 가격</b>(피보나치 -1 레벨)을 찾고, 과거에 진입 가격에 닿았을 때 얼마나 반등했는지 통계를 냅니다.<br>
   참고용 통계이며 투자 판단의 근거가 아닙니다.</p>
 
   <div class="card">
@@ -112,7 +113,7 @@
   <div class="card tablewrap">
     <table>
       <thead><tr>
-        <th>코인</th><th>현재가</th><th>현재 -1 가격</th><th>-1까지 거리</th><th>상태</th>
+        <th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
         <th>과거 터치</th><th>평균 반등</th><th>평균 추가하락</th><th>반등 우세</th><th>예상 반등가</th>
       </tr></thead>
       <tbody id="tbody"><tr><td colspan="10" style="text-align:center;color:var(--muted)">‘분석하기’를 눌러주세요</td></tr></tbody>
@@ -132,8 +133,8 @@
     <div class="legend" id="legend">
       <span><i style="background:var(--up)"></i>H 스윙 고점</span>
       <span><i style="background:var(--down)"></i>L 스윙 저점</span>
-      <span><i style="background:var(--accent)"></i>-1 레벨 · 예상 반등가(점선)</span>
-      <span style="color:var(--accent)">▲ 과거 -1 터치</span>
+      <span><i style="background:var(--accent)"></i>진입 가격 · 예상 반등가(점선)</span>
+      <span style="color:var(--accent)">▲ 과거 진입가 터치</span>
       <span>마우스 휠로 확대, 드래그로 과거 보기</span>
     </div>
   </div>
@@ -141,12 +142,12 @@
   <div class="card">
     <details>
       <summary>숫자 읽는 법</summary>
-      <p><b>-1 레벨</b> = 저점 − (고점 − 저점). 고점 120, 저점 100이면 -1은 80이에요.<br>
-      <b>과거 터치</b>: 분석 기간 동안 하락 스윙이 고점을 다시 넘기 전에 -1까지 내려간 횟수. 5회 미만이면 <span class="few">주황색</span>으로 표시해요. 표본이 적으면 평균을 믿기 어려워요.<br>
-      <b>평균 반등</b>: 터치 후 관찰 봉 수 동안 -1 가격 대비 최대 몇 % 올랐는지의 평균. 작은 회색 숫자는 표준오차(±)예요.<br>
-      <b>평균 추가하락</b>: 같은 기간 -1 아래로 최대 몇 % 더 빠졌는지의 평균.<br>
+      <p><b>진입 가격</b> = 저점 − (고점 − 저점). 피보나치 -1 레벨이에요. 고점 120, 저점 100이면 진입 가격은 80이에요.<br>
+      <b>과거 터치</b>: 분석 기간 동안 하락 스윙이 고점을 다시 넘기 전에 진입 가격까지 내려간 횟수. 5회 미만이면 <span class="few">주황색</span>으로 표시해요. 표본이 적으면 평균을 믿기 어려워요.<br>
+      <b>평균 반등</b>: 터치 후 관찰 봉 수 동안 진입 가격 대비 최대 몇 % 올랐는지의 평균. 작은 회색 숫자는 표준오차(±)예요.<br>
+      <b>평균 추가하락</b>: 같은 기간 진입 가격 아래로 최대 몇 % 더 빠졌는지의 평균.<br>
       <b>반등 우세</b>: 반등 폭이 추가하락 폭보다 컸던 경우의 비율.<br>
-      <b>예상 반등가</b>: 현재 -1 가격 × (1 + 평균 반등%). 과거 평균일 뿐, 미래를 보장하지 않아요.</p>
+      <b>예상 반등가</b>: 진입 가격 × (1 + 평균 반등%). 과거 평균일 뿐, 미래를 보장하지 않아요.</p>
       <p>투자 판단의 근거가 아니라 공부용 도구예요.</p>
     </details>
   </div>
@@ -278,13 +279,13 @@ const err = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
 function badge(cur) {
   if (!cur) return `<span class="badge b-none">스윙 없음</span>`;
   if (cur.state === "신고점") return `<span class="badge b-none">신고점 갱신중</span>`;
-  if (cur.distance <= 0) return `<span class="badge b-under">-1 이하</span>`;
-  if (cur.distance <= 5) return `<span class="badge b-near">-1 근접</span>`;
+  if (cur.distance <= 0) return `<span class="badge b-under">진입가 이하</span>`;
+  if (cur.distance <= 5) return `<span class="badge b-near">진입 근접</span>`;
   return `<span class="badge b-wait">대기</span>`;
 }
 
 function renderTable() {
-  // -1까지 가까운 순으로 정렬
+  // 진입 가격까지 가까운 순으로 정렬
   const rows = [...results].sort((a, b) => (a.current?.distance ?? 1e9) - (b.current?.distance ?? 1e9));
   $("tbody").innerHTML = rows.map(r => {
     const name = `<span class="name">${r.market}<small>${r.market}USDT</small></span>`;
@@ -320,7 +321,7 @@ function tvSymbol(m) {
 function drawChart() {
   const r = results.find(x => x.market === selected);
   if (!r || r.error) return;
-  $("chartTitle").textContent = `${r.market} · ${EX[curEx].name} · 과거 -1 터치 ${r.stats.count}회`;
+  $("chartTitle").textContent = `${r.market} · ${EX[curEx].name} · 과거 진입가 터치 ${r.stats.count}회`;
   if (view === "lw") FiboChart.draw($("chart"), r, { krw: false });
   else FiboChart.tradingView($("tv"), tvSymbol(r.market), $("unit").value);
 }

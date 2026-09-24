@@ -2,7 +2,7 @@
   chart.js — 차트 그리기
   ---------------------------------------------------------------
   1) 분석 차트: 트레이딩뷰가 무료로 공개한 "Lightweight Charts" 라이브러리 사용
-     캔들 + 우리가 계산한 H / L / -1 / 예상 반등가 선 + 과거 -1 터치 표시(▲)
+     캔들 + 우리가 계산한 H / L / -1 / 예상 반등가 선 + 과거 진입가 터치 표시(▲)
   2) 트레이딩뷰 탭: 진짜 트레이딩뷰 차트를 통째로 넣음 (보조지표·그리기 도구 사용 가능)
 */
 (function () {
@@ -56,14 +56,14 @@
     if (cur && cur.H) add(cur.H, cssVar("--up"), "H", 2, 1);
     if (cur && cur.level) {
       add(cur.L, cssVar("--down"), "L", 2, 1);
-      add(cur.level, cssVar("--accent"), "-1", 0, 2);
+      add(cur.level, cssVar("--accent"), "진입", 0, 2);
       add(cur.expected, cssVar("--accent"), "예상 반등", 1, 1);
     }
 
     // 과거 -1 터치 지점 ▲ 표시 (시간 순서대로 넣어야 함)
     const seen = new Set();
     const markers = r.touches
-      .map(t => ({ time: T(cs[t.touchIdx]), position: "belowBar", color: cssVar("--accent"), shape: "arrowUp", text: "-1" }))
+      .map(t => ({ time: T(cs[t.touchIdx]), position: "belowBar", color: cssVar("--accent"), shape: "arrowUp", text: "진입" }))
       .filter(m => !seen.has(m.time) && seen.add(m.time))
       .sort((a, b) => a.time - b.time);
     series.setMarkers(markers);
