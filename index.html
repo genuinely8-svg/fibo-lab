@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>피보 -1 연구소</title>
+<title>ath TEST (참고용)</title>
 <style>
   :root{
     --bg:#f6f7f9; --card:#fff; --text:#1b1f24; --muted:#6b7280; --line:#e5e7eb;
@@ -60,23 +60,22 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>피보 -1 연구소</h1>
-  <p class="sub">업비트(원화) 또는 바이낸스(달러) 캔들로 최근 하락 스윙의 피보나치 <b>-1 레벨</b>을 찾고, 과거에 -1을 찍었을 때 얼마나 반등했는지 통계를 냅니다.<br>
-  계산은 브라우저에서 하고, 거래소 데이터는 내 컴퓨터의 작은 서버(<code>start.bat</code>)가 대신 받아와요.</p>
+  <h1>ath TEST (참고용)</h1>
+  <p class="sub">바이낸스(달러) 캔들로 최근 하락 스윙의 피보나치 <b>-1 레벨</b>을 찾고, 과거에 -1을 찍었을 때 얼마나 반등했는지 통계를 냅니다.<br>
+  참고용 통계이며 투자 판단의 근거가 아닙니다.</p>
 
   <div class="card">
     <div class="controls">
       <label>거래소
         <select id="ex">
-          <option value="upbit">업비트 (원화)</option>
-          <option value="binance">바이낸스 현물 (달러)</option>
-          <option value="futures">바이낸스 선물 (달러)</option>
+          <option value="binance">바이낸스 현물</option>
+          <option value="futures" selected>바이낸스 선물</option>
         </select>
       </label>
       <label>봉 단위
         <select id="unit">
           <option value="240">4시간</option>
-          <option value="120">2시간 (바이낸스만)</option>
+          <option value="120">2시간</option>
           <option value="60" selected>1시간</option>
           <option value="30">30분</option>
           <option value="15">15분</option>
@@ -96,7 +95,7 @@
         </select>
       </label>
       <label>코인 (쉼표로 구분)
-        <input id="coins" value="BTC,ETH,XRP,SOL,DOGE,ADA,SUI,LINK,AVAX,TRX">
+        <input id="coins" value="BTC,ETH,SOL,XRP,ARB,HYPE,UNI,ZEC,ONDO">
       </label>
       <label>자동 새로고침
         <select id="auto">
@@ -159,11 +158,8 @@
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
-// 내 컴퓨터 서버(node server.js)로 열었으면 서버를 거쳐서 요청,
-// 아니면 거래소에 직접 요청 (업비트는 브라우저 직접 요청을 10초에 1번만 허용해서 느림)
-const VIA_SERVER = ["localhost", "127.0.0.1"].includes(location.hostname);
+// 바이낸스는 브라우저에서 직접 요청 (서버 필요 없음)
 const EX = {
-  upbit:   { name: "업비트", cur: "KRW",  base: VIA_SERVER ? "/upbit"   : "https://api.upbit.com/v1" },
   // 바이낸스는 브라우저 직접 요청을 허용하고 제한도 넉넉해서 서버를 거치지 않음
   binance: { name: "바이낸스 현물", cur: "USDT", base: "https://api.binance.com/api/v3" },
   futures: { name: "바이낸스 선물", cur: "USDT", base: "https://fapi.binance.com/fapi/v1" },
@@ -171,11 +167,10 @@ const EX = {
 const BINANCE_INTERVAL = { 240: "4h", 120: "2h", 60: "1h", 30: "30m", 15: "15m" };
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let koNames = {};          // KRW-BTC → 비트코인 (업비트만)
 let results = [];          // 코인별 분석 결과
 let selected = null;       // 차트에 보여줄 코인
 let timer = null;
-let curEx = "upbit";       // 지금 표에 나온 결과의 거래소
+let curEx = "futures";       // 지금 표에 나온 결과의 거래소
 
 // ── 요청 (429 너무 많은 요청이면 잠깐 쉬고 다시) ─────────────────────
 async function getJSON(url, tries = 4) {
@@ -185,10 +180,10 @@ async function getJSON(url, tries = 4) {
     let res;
     try { res = await fetch(url); }
     catch (e) {
-      // 요청 자체가 실패: 서버가 꺼졌거나, 업비트 직접 모드에서 제한에 걸린 경우
+      // 요청 자체가 실패: 서버가 꺼졌거나 인터넷 문제
       if (!direct) throw new Error("내 컴퓨터 서버에 연결이 안 돼요. 까만 창(start.bat)이 켜져 있는지 확인하세요");
       last = "거래소에 연결이 안 돼요 (인터넷 또는 요청 제한)";
-      await sleep(url.includes("upbit") ? 11000 : 2000); continue;
+      await sleep(2000); continue;
     }
     if (res.status === 429 || res.status === 418) {
       last = `요청 제한에 걸렸어요 (${res.status}). 1~2분 뒤 다시 눌러주세요`;
@@ -200,24 +195,6 @@ async function getJSON(url, tries = 4) {
     return res.json();
   }
   throw new Error(last || "알 수 없는 오류");
-}
-
-// 업비트: 한 번에 200개씩, 최신→과거 순서로 줌
-async function upbitCandles(coin, unit, count) {
-  if (unit == 120) throw new Error("업비트는 2시간봉이 없어요 (바이낸스는 있어요)");
-  let all = [], to = "";
-  for (let p = 0; p < Math.ceil(count / 200); p++) {
-    const url = `${EX.upbit.base}/candles/minutes/${unit}?market=KRW-${coin}&count=200` + (to ? `&to=${to}` : "");
-    const rows = await getJSON(url);
-    if (!rows.length) break;
-    all = all.concat(rows);
-    to = encodeURIComponent(rows[rows.length - 1].candle_date_time_utc + "Z"); // 가장 오래된 봉 이전부터 다음 페이지
-    if (!VIA_SERVER) await sleep(10500);
-  }
-  return all.reverse().map(r => ({
-    t: Date.parse(r.candle_date_time_utc + "Z"),
-    o: r.opening_price, h: r.high_price, l: r.low_price, c: r.trade_price,
-  }));
 }
 
 // 바이낸스: 한 번에 최대 1000개(현물) / 1500개(선물), 과거→최신 순서로 줌
@@ -237,11 +214,11 @@ async function binanceCandles(ex, coin, unit, count) {
 }
 
 function fetchCandles(ex, coin, unit, count) {
-  return ex === "upbit" ? upbitCandles(coin, unit, count) : binanceCandles(ex, coin, unit, count);
+  return binanceCandles(ex, coin, unit, count);
 }
 
 // ── 캔들 저장소: 이미 받은 캔들은 기억해두고, 다음엔 새 캔들만 받아서 이어붙임 ──
-// 첫 분석: 2000개 전부 받음 (업비트는 10번 요청)
+// 첫 분석: 2000개 전부 받음 (2번 요청)
 // 그 다음부터: 최신 200개만 받음 (1번 요청) → 자동 새로고침해도 요청 제한에 안 걸림
 const store = new Map();
 async function getCandles(ex, coin, unit, count) {
@@ -260,28 +237,19 @@ async function getCandles(ex, coin, unit, count) {
   return candles.slice(-count);
 }
 
-async function loadNames() {
-  if (Object.keys(koNames).length) return;
-  try {
-    const list = await getJSON(`${EX.upbit.base}/market/all?isDetails=false`);
-    for (const m of list) koNames[m.market.replace("KRW-", "")] ??= m.korean_name;
-  } catch (e) { /* 이름 못 받아도 분석은 계속 */ }
-}
-
 // ── 실행 ─────────────────────────────────────────────────────────
 async function run() {
   const ex = $("ex").value, unit = $("unit").value, n = +$("n").value, k = +$("k").value;
-  const count = ex === "upbit" && !VIA_SERVER ? 200 : +$("count").value;   // 업비트 직접 모드는 코인당 200개만
-  const coins = $("coins").value.split(",").map(s => s.trim().toUpperCase().replace(/^KRW-|USDT$/g, "")).filter(Boolean);
+  const count = +$("count").value;
+  const coins = $("coins").value.split(",").map(s => s.trim().toUpperCase().replace(/USDT$/g, "")).filter(Boolean);
   $("run").disabled = true;
-  if (ex === "upbit" && VIA_SERVER) await loadNames();
   const out = [];
   for (let i = 0; i < coins.length; i++) {
     const m = coins[i];
-    $("status").textContent = `불러오는 중… ${EX[ex].name} ${m} (${i + 1}/${coins.length})` +
-      (ex === "upbit" && !VIA_SERVER ? " · 느린 모드: 코인당 약 10초. 빠르게 하려면 start.bat으로 여세요" : "");
+    $("status").textContent = `불러오는 중… ${EX[ex].name} ${m} (${i + 1}/${coins.length})`;
     try {
       const candles = await getCandles(ex, m, unit, count);
+      if (candles.length < 100) throw new Error(`상장된 지 얼마 안 돼서 데이터가 부족해요 (캔들 ${candles.length}개). 선물로 보면 될 수도 있어요`);
       const r = FibCore.analyze(candles, { n, k });
       out.push({ market: m, candles, ...r });
     } catch (e) {
@@ -301,7 +269,6 @@ async function run() {
 // 가격 표시: 원화는 정수, 달러는 소수점까지
 const won = v => {
   if (v == null) return "-";
-  if (EX[curEx].cur === "KRW") return v >= 100 ? Math.round(v).toLocaleString("ko-KR") : v.toLocaleString("ko-KR", { maximumSignificantDigits: 4 });
   return "$" + (v >= 1000 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 })
                           : v.toLocaleString("en-US", { maximumSignificantDigits: 5 }));
 };
@@ -320,7 +287,7 @@ function renderTable() {
   // -1까지 가까운 순으로 정렬
   const rows = [...results].sort((a, b) => (a.current?.distance ?? 1e9) - (b.current?.distance ?? 1e9));
   $("tbody").innerHTML = rows.map(r => {
-    const name = `<span class="name">${(curEx === "upbit" && koNames[r.market]) || r.market}<small>${curEx === "upbit" ? r.market : r.market + "USDT"}</small></span>`;
+    const name = `<span class="name">${r.market}<small>${r.market}USDT</small></span>`;
     if (r.error) return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const s = r.stats, c = r.current;
     const few = s.count < 5 ? "few" : "";
@@ -346,7 +313,6 @@ function renderTable() {
 let view = "lw";   // "lw" = 분석 차트, "tv" = 트레이딩뷰
 
 function tvSymbol(m) {
-  if (curEx === "upbit") return `UPBIT:${m}KRW`;
   if (curEx === "binance") return `BINANCE:${m}USDT`;
   return `BINANCE:${m}USDT.P`;            // .P = 무기한 선물
 }
@@ -354,8 +320,8 @@ function tvSymbol(m) {
 function drawChart() {
   const r = results.find(x => x.market === selected);
   if (!r || r.error) return;
-  $("chartTitle").textContent = `${(curEx === "upbit" && koNames[r.market]) || r.market} · ${EX[curEx].name} · 과거 -1 터치 ${r.stats.count}회`;
-  if (view === "lw") FiboChart.draw($("chart"), r, { krw: EX[curEx].cur === "KRW" });
+  $("chartTitle").textContent = `${r.market} · ${EX[curEx].name} · 과거 -1 터치 ${r.stats.count}회`;
+  if (view === "lw") FiboChart.draw($("chart"), r, { krw: false });
   else FiboChart.tradingView($("tv"), tvSymbol(r.market), $("unit").value);
 }
 
