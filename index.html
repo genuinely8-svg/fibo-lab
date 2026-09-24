@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>피보 -1 연구소</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --text:#1b1f24; --muted:#6b7280; --line:#e5e7eb;
+    --up:#d6453d; --down:#2f6fdb; --accent:#0f766e; --warn:#b45309;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1115; --card:#181b21; --text:#e8eaed; --muted:#9aa1ab; --line:#2a2f37;
+           --up:#f0625a; --down:#5b93f0; --accent:#2dd4bf; --warn:#f59e0b; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;font-size:14px}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 18px;line-height:1.5}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end}
+  label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  select,input{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+  input[type=number]{width:80px}
+  #coins{width:min(420px,100%)}
+  button{font:inherit;padding:8px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600}
+  button:disabled{opacity:.5;cursor:wait}
+  #status{color:var(--muted);font-size:12px;margin-top:10px;min-height:1em}
+  .tablewrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:900px}
+  th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th{font-size:12px;color:var(--muted);font-weight:600}
+  th:first-child,td:first-child{text-align:left}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  tbody tr.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .name small{color:var(--muted);margin-left:4px}
+  .err{color:var(--muted);font-size:11px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+  .b-near{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+  .b-under{background:color-mix(in srgb,var(--muted) 20%,transparent);color:var(--text)}
+  .b-wait{background:color-mix(in srgb,var(--down) 12%,transparent);color:var(--down)}
+  .b-none{color:var(--muted)}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .few{color:var(--warn)}
+  #chartTitle{margin:0 0 8px;font-size:15px}
+  #chart{width:100%;height:440px}
+  #tv{width:100%;height:560px}
+  .chead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .chead h2{margin:0}
+  .tabs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px}
+  .tabs button{background:transparent;color:var(--muted);padding:6px 12px;font-weight:600}
+  .tabs button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+  details{color:var(--muted);line-height:1.7}
+  summary{cursor:pointer;color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>피보 -1 연구소</h1>
+  <p class="sub">업비트(원화) 또는 바이낸스(달러) 캔들로 최근 하락 스윙의 피보나치 <b>-1 레벨</b>을 찾고, 과거에 -1을 찍었을 때 얼마나 반등했는지 통계를 냅니다.<br>
+  계산은 브라우저에서 하고, 거래소 데이터는 내 컴퓨터의 작은 서버(<code>start.bat</code>)가 대신 받아와요.</p>
+
+  <div class="card">
+    <div class="controls">
+      <label>거래소
+        <select id="ex">
+          <option value="upbit">업비트 (원화)</option>
+          <option value="binance">바이낸스 현물 (달러)</option>
+          <option value="futures">바이낸스 선물 (달러)</option>
+        </select>
+      </label>
+      <label>봉 단위
+        <select id="unit">
+          <option value="240">4시간</option>
+          <option value="120">2시간 (바이낸스만)</option>
+          <option value="60" selected>1시간</option>
+          <option value="30">30분</option>
+          <option value="15">15분</option>
+        </select>
+      </label>
+      <label>스윙 민감도 (좌우 봉 수)
+        <input id="n" type="number" min="2" max="30" value="5">
+      </label>
+      <label>터치 후 관찰 봉 수
+        <input id="k" type="number" min="3" max="100" value="20">
+      </label>
+      <label>분석할 캔들 수
+        <select id="count">
+          <option value="600">600개</option>
+          <option value="1000" selected>1000개</option>
+          <option value="2000">2000개</option>
+        </select>
+      </label>
+      <label>코인 (쉼표로 구분)
+        <input id="coins" value="BTC,ETH,XRP,SOL,DOGE,ADA,SUI,LINK,AVAX,TRX">
+      </label>
+      <label>자동 새로고침
+        <select id="auto">
+          <option value="0">끔</option>
+          <option value="60">1분</option>
+          <option value="300">5분</option>
+        </select>
+      </label>
+      <button id="run">분석하기</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="card tablewrap">
+    <table>
+      <thead><tr>
+        <th>코인</th><th>현재가</th><th>현재 -1 가격</th><th>-1까지 거리</th><th>상태</th>
+        <th>과거 터치</th><th>평균 반등</th><th>평균 추가하락</th><th>반등 우세</th><th>예상 반등가</th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="10" style="text-align:center;color:var(--muted)">‘분석하기’를 눌러주세요</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="chead">
+      <h2 id="chartTitle">표에서 코인을 누르면 차트가 나와요</h2>
+      <div class="tabs">
+        <button id="tabLw" class="on">분석 차트</button>
+        <button id="tabTv">트레이딩뷰</button>
+      </div>
+    </div>
+    <div id="chart"></div>
+    <div id="tv" hidden></div>
+    <div class="legend" id="legend">
+      <span><i style="background:var(--up)"></i>H 스윙 고점</span>
+      <span><i style="background:var(--down)"></i>L 스윙 저점</span>
+      <span><i style="background:var(--accent)"></i>-1 레벨 · 예상 반등가(점선)</span>
+      <span style="color:var(--accent)">▲ 과거 -1 터치</span>
+      <span>마우스 휠로 확대, 드래그로 과거 보기</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>숫자 읽는 법</summary>
+      <p><b>-1 레벨</b> = 저점 − (고점 − 저점). 고점 120, 저점 100이면 -1은 80이에요.<br>
+      <b>과거 터치</b>: 분석 기간 동안 하락 스윙이 고점을 다시 넘기 전에 -1까지 내려간 횟수. 5회 미만이면 <span class="few">주황색</span>으로 표시해요. 표본이 적으면 평균을 믿기 어려워요.<br>
+      <b>평균 반등</b>: 터치 후 관찰 봉 수 동안 -1 가격 대비 최대 몇 % 올랐는지의 평균. 작은 회색 숫자는 표준오차(±)예요.<br>
+      <b>평균 추가하락</b>: 같은 기간 -1 아래로 최대 몇 % 더 빠졌는지의 평균.<br>
+      <b>반등 우세</b>: 반등 폭이 추가하락 폭보다 컸던 경우의 비율.<br>
+      <b>예상 반등가</b>: 현재 -1 가격 × (1 + 평균 반등%). 과거 평균일 뿐, 미래를 보장하지 않아요.</p>
+      <p>투자 판단의 근거가 아니라 공부용 도구예요.</p>
+    </details>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="fib-core.js"></script>
+<script src="chart.js"></script>
+<script>
+"use strict";
+// ── 거래소 설정 ─────────────────────────────────────────────────
+// 내 컴퓨터 서버(node server.js)로 열었으면 서버를 거쳐서 요청,
+// 아니면 거래소에 직접 요청 (업비트는 브라우저 직접 요청을 10초에 1번만 허용해서 느림)
+const VIA_SERVER = ["localhost", "127.0.0.1"].includes(location.hostname);
+const EX = {
+  upbit:   { name: "업비트", cur: "KRW",  base: VIA_SERVER ? "/upbit"   : "https://api.upbit.com/v1" },
+  // 바이낸스는 브라우저 직접 요청을 허용하고 제한도 넉넉해서 서버를 거치지 않음
+  binance: { name: "바이낸스 현물", cur: "USDT", base: "https://api.binance.com/api/v3" },
+  futures: { name: "바이낸스 선물", cur: "USDT", base: "https://fapi.binance.com/fapi/v1" },
+};
+const BINANCE_INTERVAL = { 240: "4h", 120: "2h", 60: "1h", 30: "30m", 15: "15m" };
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let koNames = {};          // KRW-BTC → 비트코인 (업비트만)
+let results = [];          // 코인별 분석 결과
+let selected = null;       // 차트에 보여줄 코인
+let timer = null;
+let curEx = "upbit";       // 지금 표에 나온 결과의 거래소
+
+// ── 요청 (429 너무 많은 요청이면 잠깐 쉬고 다시) ─────────────────────
+async function getJSON(url, tries = 4) {
+  const direct = url.startsWith("http");            // 거래소에 직접 요청하는 중인지
+  let last = "";
+  for (let i = 0; i < tries; i++) {
+    let res;
+    try { res = await fetch(url); }
+    catch (e) {
+      // 요청 자체가 실패: 서버가 꺼졌거나, 업비트 직접 모드에서 제한에 걸린 경우
+      if (!direct) throw new Error("내 컴퓨터 서버에 연결이 안 돼요. 까만 창(start.bat)이 켜져 있는지 확인하세요");
+      last = "거래소에 연결이 안 돼요 (인터넷 또는 요청 제한)";
+      await sleep(url.includes("upbit") ? 11000 : 2000); continue;
+    }
+    if (res.status === 429 || res.status === 418) {
+      last = `요청 제한에 걸렸어요 (${res.status}). 1~2분 뒤 다시 눌러주세요`;
+      $("status").textContent += " · 거래소가 잠깐 멈추래요, 기다리는 중…";
+      await sleep(8000); continue;
+    }
+    if (res.status === 400) throw new Error("이 거래소에 없는 코인이에요");
+    if (!res.ok) throw new Error("거래소 응답 오류 " + res.status);
+    return res.json();
+  }
+  throw new Error(last || "알 수 없는 오류");
+}
+
+// 업비트: 한 번에 200개씩, 최신→과거 순서로 줌
+async function upbitCandles(coin, unit, count) {
+  if (unit == 120) throw new Error("업비트는 2시간봉이 없어요 (바이낸스는 있어요)");
+  let all = [], to = "";
+  for (let p = 0; p < Math.ceil(count / 200); p++) {
+    const url = `${EX.upbit.base}/candles/minutes/${unit}?market=KRW-${coin}&count=200` + (to ? `&to=${to}` : "");
+    const rows = await getJSON(url);
+    if (!rows.length) break;
+    all = all.concat(rows);
+    to = encodeURIComponent(rows[rows.length - 1].candle_date_time_utc + "Z"); // 가장 오래된 봉 이전부터 다음 페이지
+    if (!VIA_SERVER) await sleep(10500);
+  }
+  return all.reverse().map(r => ({
+    t: Date.parse(r.candle_date_time_utc + "Z"),
+    o: r.opening_price, h: r.high_price, l: r.low_price, c: r.trade_price,
+  }));
+}
+
+// 바이낸스: 한 번에 최대 1000개(현물) / 1500개(선물), 과거→최신 순서로 줌
+async function binanceCandles(ex, coin, unit, count) {
+  let all = [], end = "";
+  const limit = Math.min(count, 1000);
+  while (all.length < count) {
+    const url = `${EX[ex].base}/klines?symbol=${coin}USDT&interval=${BINANCE_INTERVAL[unit]}&limit=${limit}` + (end ? `&endTime=${end}` : "");
+    const rows = await getJSON(url);
+    if (!rows.length) break;
+    all = rows.concat(all);
+    end = rows[0][0] - 1;                 // 가장 오래된 봉 바로 전까지 다음 페이지
+    if (rows.length < limit) break;
+  }
+  // 바이낸스 캔들 = [시작시각, 시가, 고가, 저가, 종가, ...] (숫자가 글자로 옴)
+  return all.slice(-count).map(r => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4] }));
+}
+
+function fetchCandles(ex, coin, unit, count) {
+  return ex === "upbit" ? upbitCandles(coin, unit, count) : binanceCandles(ex, coin, unit, count);
+}
+
+// ── 캔들 저장소: 이미 받은 캔들은 기억해두고, 다음엔 새 캔들만 받아서 이어붙임 ──
+// 첫 분석: 2000개 전부 받음 (업비트는 10번 요청)
+// 그 다음부터: 최신 200개만 받음 (1번 요청) → 자동 새로고침해도 요청 제한에 안 걸림
+const store = new Map();
+async function getCandles(ex, coin, unit, count) {
+  const key = `${ex}|${coin}|${unit}`;
+  const old = store.get(key);
+  let candles = null;
+  if (old && old.length >= count) {
+    const fresh = await fetchCandles(ex, coin, unit, 200);
+    // 새로 받은 것의 첫 봉이 기존 데이터 안에 있으면(빈틈이 없으면) 이어붙임
+    if (fresh.length && fresh[0].t <= old[old.length - 1].t) {
+      candles = old.filter(c => c.t < fresh[0].t).concat(fresh);
+    }
+  }
+  if (!candles) candles = await fetchCandles(ex, coin, unit, count);   // 처음이거나 빈틈이 있으면 전부 새로
+  store.set(key, candles.slice(-Math.max(count, 2000)));
+  return candles.slice(-count);
+}
+
+async function loadNames() {
+  if (Object.keys(koNames).length) return;
+  try {
+    const list = await getJSON(`${EX.upbit.base}/market/all?isDetails=false`);
+    for (const m of list) koNames[m.market.replace("KRW-", "")] ??= m.korean_name;
+  } catch (e) { /* 이름 못 받아도 분석은 계속 */ }
+}
+
+// ── 실행 ─────────────────────────────────────────────────────────
+async function run() {
+  const ex = $("ex").value, unit = $("unit").value, n = +$("n").value, k = +$("k").value;
+  const count = ex === "upbit" && !VIA_SERVER ? 200 : +$("count").value;   // 업비트 직접 모드는 코인당 200개만
+  const coins = $("coins").value.split(",").map(s => s.trim().toUpperCase().replace(/^KRW-|USDT$/g, "")).filter(Boolean);
+  $("run").disabled = true;
+  if (ex === "upbit" && VIA_SERVER) await loadNames();
+  const out = [];
+  for (let i = 0; i < coins.length; i++) {
+    const m = coins[i];
+    $("status").textContent = `불러오는 중… ${EX[ex].name} ${m} (${i + 1}/${coins.length})` +
+      (ex === "upbit" && !VIA_SERVER ? " · 느린 모드: 코인당 약 10초. 빠르게 하려면 start.bat으로 여세요" : "");
+    try {
+      const candles = await getCandles(ex, m, unit, count);
+      const r = FibCore.analyze(candles, { n, k });
+      out.push({ market: m, candles, ...r });
+    } catch (e) {
+      out.push({ market: m, error: e.message });
+    }
+  }
+  results = out; curEx = ex;
+  renderTable();
+  const prev = selected;
+  if (!selected || !results.find(r => r.market === selected && !r.error)) selected = results.find(r => !r.error)?.market;
+  if (view === "lw" || prev !== selected) drawChart();   // 트레이딩뷰는 스스로 실시간 갱신됨
+  $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} (${EX[ex].cur}) · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개`;
+  $("run").disabled = false;
+}
+
+// ── 표 ───────────────────────────────────────────────────────────
+// 가격 표시: 원화는 정수, 달러는 소수점까지
+const won = v => {
+  if (v == null) return "-";
+  if (EX[curEx].cur === "KRW") return v >= 100 ? Math.round(v).toLocaleString("ko-KR") : v.toLocaleString("ko-KR", { maximumSignificantDigits: 4 });
+  return "$" + (v >= 1000 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 })
+                          : v.toLocaleString("en-US", { maximumSignificantDigits: 5 }));
+};
+const pct = v => v == null ? "-" : v.toFixed(2) + "%";
+const err = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
+
+function badge(cur) {
+  if (!cur) return `<span class="badge b-none">스윙 없음</span>`;
+  if (cur.state === "신고점") return `<span class="badge b-none">신고점 갱신중</span>`;
+  if (cur.distance <= 0) return `<span class="badge b-under">-1 이하</span>`;
+  if (cur.distance <= 5) return `<span class="badge b-near">-1 근접</span>`;
+  return `<span class="badge b-wait">대기</span>`;
+}
+
+function renderTable() {
+  // -1까지 가까운 순으로 정렬
+  const rows = [...results].sort((a, b) => (a.current?.distance ?? 1e9) - (b.current?.distance ?? 1e9));
+  $("tbody").innerHTML = rows.map(r => {
+    const name = `<span class="name">${(curEx === "upbit" && koNames[r.market]) || r.market}<small>${curEx === "upbit" ? r.market : r.market + "USDT"}</small></span>`;
+    if (r.error) return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
+    const s = r.stats, c = r.current;
+    const few = s.count < 5 ? "few" : "";
+    return `<tr data-m="${r.market}" class="${r.market === selected ? "sel" : ""}">
+      <td>${name}</td>
+      <td>${won(r.price)}</td>
+      <td>${won(c?.level)}</td>
+      <td>${pct(c?.distance)}</td>
+      <td>${badge(c)}</td>
+      <td class="${few}">${s.count}회</td>
+      <td class="up">${pct(s.reboundAvg)}${err(s.reboundErr)}</td>
+      <td class="down">${pct(s.fallAvg)}${err(s.fallErr)}</td>
+      <td>${pct(s.winRate)}</td>
+      <td>${won(c?.expected)}</td>
+    </tr>`;
+  }).join("");
+  for (const tr of $("tbody").querySelectorAll("tr[data-m]")) {
+    tr.onclick = () => { selected = tr.dataset.m; renderTable(); drawChart(); };
+  }
+}
+
+// ── 차트 (chart.js) ─────────────────────────────────────────────
+let view = "lw";   // "lw" = 분석 차트, "tv" = 트레이딩뷰
+
+function tvSymbol(m) {
+  if (curEx === "upbit") return `UPBIT:${m}KRW`;
+  if (curEx === "binance") return `BINANCE:${m}USDT`;
+  return `BINANCE:${m}USDT.P`;            // .P = 무기한 선물
+}
+
+function drawChart() {
+  const r = results.find(x => x.market === selected);
+  if (!r || r.error) return;
+  $("chartTitle").textContent = `${(curEx === "upbit" && koNames[r.market]) || r.market} · ${EX[curEx].name} · 과거 -1 터치 ${r.stats.count}회`;
+  if (view === "lw") FiboChart.draw($("chart"), r, { krw: EX[curEx].cur === "KRW" });
+  else FiboChart.tradingView($("tv"), tvSymbol(r.market), $("unit").value);
+}
+
+function setView(v) {
+  view = v;
+  $("tabLw").classList.toggle("on", v === "lw");
+  $("tabTv").classList.toggle("on", v === "tv");
+  $("chart").hidden = v !== "lw";
+  $("tv").hidden = v !== "tv";
+  $("legend").hidden = v !== "lw";
+  drawChart();
+}
+$("tabLw").onclick = () => setView("lw");
+$("tabTv").onclick = () => setView("tv");
+
+// ── 이벤트 ───────────────────────────────────────────────────────
+$("run").onclick = run;
+$("auto").onchange = () => {
+  clearInterval(timer);
+  const s = +$("auto").value;
+  if (s) timer = setInterval(() => { if (!$("run").disabled) run(); }, s * 1000);
+};
+</script>
+</body>
+</html>
