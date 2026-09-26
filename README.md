@@ -8,10 +8,22 @@
 ## 내 컴퓨터에서 열기
 `start.bat` 더블클릭 → http://localhost:3000 이 열립니다. (`index.html`을 더블클릭해도 됩니다)
 
-## 파일
-- `index.html` — 화면 (설정, 표)
-- `fib-core.js` — 계산 엔진 (스윙 찾기, -1 레벨, 반등/하락 통계)
-- `chart.js` — 차트 (Lightweight Charts 분석 차트 + 트레이딩뷰 탭)
+## 페이지 (위쪽 탭)
+| 탭 | 파일 | 데이터 |
+|---|---|---|
+| TEST 참고용 | `index.html` | 바이낸스 캔들 → 진입 가격(피보 -1) 통계 |
+| (코인 상세) | `coin.html` | 바이낸스 + 코인게코 |
+| 청산히트맵 | `liquidation.html` | 바이낸스 OI로 추정한 청산 지도 + 실시간 청산 |
+| OI | `oi.html` | 바이낸스 선물 OI·펀딩비·롱숏 비율 |
+| 코인순위 | `rank.html` | 코인게코 시가총액 순위 |
+| 24시간변동률 | `movers.html` | 비트겟 24시간 상승/하락 순위 |
+| 주요뉴스 | `news.html` | 블록미디어·토큰포스트·CoinDesk RSS, 비트겟 공지 |
+
+## 공통 파일
+- `nav.js` — 위쪽 탭 메뉴 (탭 추가는 이 파일의 TABS 목록에 한 줄)
+- `common.css`, `common.js` — 새 페이지들이 같이 쓰는 모양·도구
+- `fib-core.js` — 진입 가격 계산 엔진
+- `chart.js` — 진입 차트 + 트레이딩뷰 탭
 - `server.js`, `start.bat` — 내 컴퓨터에서 여는 작은 서버 (선택)
 
 ## 계산 방법

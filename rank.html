@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>코인순위 · ath TEST (참고용)</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .share{display:flex;height:28px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .share i{display:block;height:100%}
+  .shareLegend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--muted)}
+  .shareLegend b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  table{min-width:980px}
+  tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .spark{display:block}
+  #q{width:180px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ath TEST (참고용)</h1>
+  <p class="sub">시가총액 순위와 전체 시장 현황이에요. 코인을 누르면 상세 페이지로 가요.</p>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <h2>전체 시장</h2>
+    <div class="tiles" id="global"><div class="muted">불러오는 중…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>시가총액 비중 (상위 10개)</h2>
+    <div class="share" id="share"></div>
+    <div class="shareLegend" id="shareLegend"></div>
+  </div>
+
+  <div class="card">
+    <div class="controls" style="margin-bottom:12px">
+      <label>정렬
+        <select id="sort">
+          <option value="rank">시가총액 순위</option>
+          <option value="up24">24시간 상승률</option>
+          <option value="down24">24시간 하락률</option>
+          <option value="up7">7일 상승률</option>
+          <option value="vol">24시간 거래량</option>
+        </select>
+      </label>
+      <label>범위
+        <select id="page">
+          <option value="1">1 ~ 100위</option>
+          <option value="2">101 ~ 200위</option>
+        </select>
+      </label>
+      <label>검색
+        <input id="q" placeholder="BTC, 이더리움…">
+      </label>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th class="l">코인</th><th>가격</th><th>1시간</th><th>24시간</th><th>7일</th><th>시가총액</th><th>24시간 거래량</th><th>최근 7일</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="9" class="l muted">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="foot">데이터: 코인게코(CoinGecko) · 2분마다 새로 받아와요 · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
+</div>
+
+<script src="common.js"></script>
+<script src="nav.js"></script>
+<script>
+const CG = "https://api.coingecko.com/api/v3";
+const COLORS = ["#f59e0b", "#6366f1", "#10b981", "#ef4444", "#3b82f6", "#ec4899", "#14b8a6", "#8b5cf6", "#f97316", "#84cc16", "#9ca3af"];
+let list = [];
+
+async function loadGlobal() {
+  try {
+    const g = (await cached("cg-global", 120e3, () => getJSON(`${CG}/global`))).data;
+    const dom = g.market_cap_percentage;
+    $("global").innerHTML = [
+      ["전체 시가총액", bigUsd(g.total_market_cap.usd), `<span class="${cls(g.market_cap_change_percentage_24h_usd)}">${pct(g.market_cap_change_percentage_24h_usd)}</span> 24시간`],
+      ["24시간 전체 거래량", bigUsd(g.total_volume.usd), ""],
+      ["비트코인 도미넌스", (dom.btc || 0).toFixed(1) + "%", "전체 시총 중 비트코인 비중"],
+      ["이더리움 도미넌스", (dom.eth || 0).toFixed(1) + "%", ""],
+      ["거래되는 코인 수", (g.active_cryptocurrencies || 0).toLocaleString("ko-KR") + "개", `거래소 ${g.markets}곳`],
+    ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+    // 상위 10개 비중 막대
+    const top = Object.entries(dom).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const rest = Math.max(0, 100 - top.reduce((s, x) => s + x[1], 0));
+    const parts = [...top.map(([k, v]) => [k.toUpperCase(), v]), ["기타", rest]];
+    $("share").innerHTML = parts.map(([k, v], i) => `<i title="${esc(k)} ${v.toFixed(1)}%" style="width:${v}%;background:${COLORS[i]}"></i>`).join("");
+    $("shareLegend").innerHTML = parts.map(([k, v], i) => `<span><b style="background:${COLORS[i]}"></b>${esc(k)} ${v.toFixed(1)}%</span>`).join("");
+  } catch (e) { $("global").innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
+}
+
+async function loadList() {
+  const page = $("page").value;
+  $("status").textContent = "불러오는 중…";
+  try {
+    list = await cached("cg-markets-" + page, 120e3, () =>
+      getJSON(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=${page}&sparkline=true&price_change_percentage=1h,24h,7d`));
+    render();
+    $("status").textContent = `코인게코 기준 · ${new Date().toLocaleTimeString("ko-KR")}`;
+  } catch (e) { $("status").textContent = e.message; }
+}
+
+// 7일 가격 흐름을 작은 선 그래프(SVG)로
+function spark(prices, up) {
+  if (!prices || prices.length < 2) return "";
+  const step = Math.max(1, Math.floor(prices.length / 60));
+  const p = prices.filter((_, i) => i % step === 0);
+  const lo = Math.min(...p), hi = Math.max(...p), W = 120, H = 34;
+  const pts = p.map((v, i) => `${(i / (p.length - 1) * W).toFixed(1)},${(H - 2 - (v - lo) / (hi - lo || 1) * (H - 4)).toFixed(1)}`).join(" ");
+  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="${up ? "var(--up)" : "var(--down)"}" stroke-width="1.5" points="${pts}"/></svg>`;
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  let rows = list.filter(c => !q || c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.id.includes(q));
+  const k = $("sort").value;
+  const by = {
+    rank: (a, b) => (a.market_cap_rank ?? 1e9) - (b.market_cap_rank ?? 1e9),
+    up24: (a, b) => (b.price_change_percentage_24h_in_currency ?? -1e9) - (a.price_change_percentage_24h_in_currency ?? -1e9),
+    down24: (a, b) => (a.price_change_percentage_24h_in_currency ?? 1e9) - (b.price_change_percentage_24h_in_currency ?? 1e9),
+    up7: (a, b) => (b.price_change_percentage_7d_in_currency ?? -1e9) - (a.price_change_percentage_7d_in_currency ?? -1e9),
+    vol: (a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0),
+  }[k];
+  rows = rows.slice().sort(by);
+  $("rows").innerHTML = rows.map(c => {
+    const sym = c.symbol.toUpperCase();
+    const h1 = c.price_change_percentage_1h_in_currency, d1 = c.price_change_percentage_24h_in_currency, w1 = c.price_change_percentage_7d_in_currency;
+    const logo = { [sym]: c.image };
+    return `<tr>
+      <td class="muted">${c.market_cap_rank ?? "-"}</td>
+      <td class="l">${coinTag(sym, logo, c.name, "coin.html?s=" + encodeURIComponent(sym))}</td>
+      <td>${usd(c.current_price)}</td>
+      <td class="${cls(h1)}">${pct(h1)}</td>
+      <td class="${cls(d1)}">${pct(d1)}</td>
+      <td class="${cls(w1)}">${pct(w1)}</td>
+      <td>${shortUsd(c.market_cap)}</td>
+      <td>${shortUsd(c.total_volume)}</td>
+      <td>${spark(c.sparkline_in_7d?.price, (w1 ?? 0) >= 0)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="9" class="l muted">검색 결과가 없어요</td></tr>`;
+}
+
+$("sort").onchange = render;
+$("q").oninput = render;
+$("page").onchange = loadList;
+loadGlobal();
+loadList();
+setInterval(() => { loadGlobal(); loadList(); }, 120e3);
+</script>
+</body>
+</html>

@@ -38,6 +38,9 @@
   .name{color:var(--text);text-decoration:none;font-weight:600}
   .name:hover{text-decoration:underline}
   .name small{color:var(--muted);margin-left:4px;font-weight:400}
+  .name{display:inline-flex;align-items:center;gap:8px}
+  .name img,.name .ph{width:22px;height:22px;border-radius:50%;flex:none;background:var(--bg)}
+  .name .ph{display:inline-grid;place-items:center;font-size:10px;color:var(--muted);border:1px solid var(--line);font-weight:400}
   .name .go{font-size:11px;color:var(--accent);font-weight:600;margin-left:4px}
   .err{color:var(--muted);font-size:11px}
   .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
@@ -67,6 +70,7 @@
   <h1>ath TEST (참고용)</h1>
   <p class="sub">바이낸스(달러) 캔들로 최근 하락 스윙의 <b>진입 가격</b>(피보나치 -1 레벨)을 찾고, 과거에 진입 가격에 닿았을 때 얼마나 반등했는지 통계를 냅니다.<br>
   참고용 통계이며 투자 판단의 근거가 아닙니다.</p>
+  <nav id="nav"></nav>
 
   <div class="card">
     <div class="controls">
@@ -159,6 +163,7 @@
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="fib-core.js"></script>
 <script src="chart.js"></script>
+<script src="nav.js"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -241,6 +246,24 @@ async function getCandles(ex, coin, unit, count) {
   return candles.slice(-count);
 }
 
+// ── 코인 로고: 코인게코 시가총액 상위 250개 로고를 하루 동안 브라우저에 저장해두고 씀 ──
+let logos = {};
+async function loadLogos() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("cg-logos-v1") || "null");
+    if (saved && Date.now() - saved.at < 24 * 3600e3) { logos = saved.data; return; }
+  } catch (e) {}
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1");
+    if (!res.ok) return;
+    const m = {};
+    for (const c of await res.json()) { const s = c.symbol.toUpperCase(); if (!m[s]) m[s] = c.image.replace("/large/", "/small/"); }
+    logos = m;
+    try { localStorage.setItem("cg-logos-v1", JSON.stringify({ at: Date.now(), data: m })); } catch (e) {}
+  } catch (e) { /* 로고 못 받아도 괜찮음 */ }
+}
+const logosReady = loadLogos();
+
 // ── 실행 ─────────────────────────────────────────────────────────
 async function run() {
   const ex = $("ex").value, unit = $("unit").value, n = +$("n").value, k = +$("k").value;
@@ -260,6 +283,7 @@ async function run() {
       out.push({ market: m, error: e.message });
     }
   }
+  await logosReady;            // 로고가 준비될 때까지 (보통 즉시)
   results = out; curEx = ex;
   renderTable();
   const prev = selected;
@@ -293,7 +317,10 @@ function renderTable() {
   $("tbody").innerHTML = rows.map(r => {
     // 코인 이름을 누르면 상세 페이지로 (지금 설정 그대로 넘김)
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
-    const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${r.market}<small>${r.market}USDT</small> <span class="go">상세 ›</span></a>`;
+    const logo = logos[r.market]
+      ? `<img src="${logos[r.market]}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
+      : `<span class="ph">${r.market.slice(0, 3)}</span>`;
+    const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${logo}<span>${r.market}<small>${r.market}USDT</small></span><span class="go">상세 ›</span></a>`;
     if (r.error) return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const s = r.stats, c = r.current;
     const few = s.count < 5 ? "few" : "";

@@ -14,7 +14,8 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = 3000;
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".md": "text/plain; charset=utf-8" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+                ".json": "application/json; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".md": "text/plain; charset=utf-8" };
 
 // ── 업비트 요청 줄 세우기 ─────────────────────────────────────────
 // 여러 요청이 한꺼번에 와도 한 번에 하나씩, 최소 GAP ms 간격으로 보냄.

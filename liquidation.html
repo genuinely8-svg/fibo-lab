@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>청산히트맵 · ath TEST (참고용)</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  #heatWrap{position:relative;width:100%;height:500px;border-radius:10px;overflow:hidden;background:#0d0829}
+  #heat{width:100%;height:100%;display:block;cursor:crosshair}
+  #tip{position:absolute;pointer-events:none;background:rgba(15,17,21,.92);color:#e8eaed;border:1px solid #2a2f37;border-radius:8px;
+       padding:8px 10px;font-size:12px;line-height:1.5;white-space:nowrap}
+  .scale{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+  .scale .grad{width:160px;height:10px;border-radius:99px;background:linear-gradient(90deg,#0d0829,#3b0f70,#8c2981,#de4968,#fe9f6d,#fcfdbf)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:860px){ .cols{grid-template-columns:1fr} #heatWrap{height:380px} }
+  #live tr.new{animation:flash 1.2s}
+  @keyframes flash{from{background:color-mix(in srgb,var(--accent) 25%,transparent)}to{background:transparent}}
+  .note{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ath TEST (참고용)</h1>
+  <p class="sub">어느 가격에 청산 물량이 몰려 있을지 추정한 지도예요. 밝을수록 그 가격에 청산될 포지션이 많다는 뜻이에요.</p>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <div class="controls">
+      <label>코인
+        <input id="coin" list="coinList" value="BTC" style="width:110px">
+        <datalist id="coinList"></datalist>
+      </label>
+      <label>기간
+        <select id="range">
+          <option value="15m|480">약 5일 (15분봉)</option>
+          <option value="1h|500" selected>약 3주 (1시간봉)</option>
+          <option value="4h|180">30일 (4시간봉)</option>
+        </select>
+      </label>
+      <label>밝기
+        <input id="gain" type="range" min="0.3" max="3" step="0.1" value="1" style="width:130px;padding:0">
+      </label>
+      <button id="run">보기</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="title">청산 히트맵 (추정)</h2>
+    <div id="heatWrap"><canvas id="heat"></canvas><div id="tip" hidden></div></div>
+    <div class="scale">
+      <span>청산 물량 적음</span><span class="grad"></span><span>많음</span>
+      <span style="margin-left:12px">흰 선: 가격 · 오른쪽 막대: 지금 남아 있는 청산 물량 (<span style="color:#f0625a">■ 롱 청산</span> 아래 / <span style="color:#22c55e">■ 숏 청산</span> 위)</span>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h2 style="color:#22c55e">위쪽 · 숏 청산이 몰린 가격</h2>
+      <div class="small muted" style="margin:-6px 0 8px">가격이 여기까지 오르면 숏 포지션이 강제로 정리(= 시장가 매수)돼요</div>
+      <table><thead><tr><th class="l">가격</th><th>지금보다</th><th>추정 물량</th></tr></thead><tbody id="above"></tbody></table>
+    </div>
+    <div class="card">
+      <h2 style="color:#f0625a">아래쪽 · 롱 청산이 몰린 가격</h2>
+      <div class="small muted" style="margin:-6px 0 8px">가격이 여기까지 내리면 롱 포지션이 강제로 정리(= 시장가 매도)돼요</div>
+      <table><thead><tr><th class="l">가격</th><th>지금보다</th><th>추정 물량</th></tr></thead><tbody id="below"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="controls" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">실시간 청산 (바이낸스 선물, 실제 데이터)</h2>
+      <span class="seg" id="liveMode">
+        <button data-v="coin" class="on">선택 코인만</button>
+        <button data-v="all">전체 코인</button>
+      </span>
+    </div>
+    <div class="tiles" id="liveSum" style="margin-bottom:12px"></div>
+    <div class="tablewrap" style="max-height:420px;overflow-y:auto">
+      <table>
+        <thead><tr><th class="l">시간</th><th class="l">코인</th><th class="l">종류</th><th>가격</th><th>금액</th></tr></thead>
+        <tbody id="live"><tr><td colspan="5" class="l muted">연결 중… 청산이 생기면 여기에 바로 떠요</td></tr></tbody>
+      </table>
+    </div>
+    <div class="small muted" style="margin-top:8px" id="liveStatus"></div>
+  </div>
+
+  <div class="note">
+    <b>이 히트맵은 어떻게 만들었나요?</b><br>
+    진짜 청산 지도(코인글래스 등)는 유료라서, 바이낸스 공개 데이터로 비슷하게 <b>추정</b>했어요.
+    ① 봉마다 OI(열린 포지션)가 늘어난 만큼 그 가격에 새 포지션이 생겼다고 보고,
+    ② 그 중 절반은 롱, 절반은 숏, 레버리지는 5·10·25·50·100배가 섞여 있다고 가정해서 각각의 청산 가격을 계산해요.
+    ③ 이후 가격이 그 청산 가격을 지나가면 "청산됐다"고 보고 지도에서 지워요. OI가 줄어든 봉에서는 남은 물량도 그만큼 줄여요.
+    그래서 실제 청산 물량과는 다를 수 있어요. 정확한 유료 버전은 <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener noreferrer">코인글래스 ↗</a>에서 볼 수 있어요.
+  </div>
+  <div class="foot" style="margin-top:14px">데이터: 바이낸스 선물 공개 API · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
+</div>
+
+<script src="common.js"></script>
+<script src="nav.js"></script>
+<script>
+const F = "https://fapi.binance.com";
+const LEV = [[5, .10], [10, .30], [25, .25], [50, .20], [100, .15]];   // [레버리지, 비중]
+const ROWS = 150;                 // 가격을 몇 칸으로 나눌지
+$("coinList").innerHTML = DEFAULT_COINS.map(c => `<option value="${c}">`).join("");
+let model = null, sym = "BTC", logos = {};
+
+// ── 1) 모델 계산 ─────────────────────────────────────────────────
+function buildModel(kl, oi) {
+  // OI를 캔들 시간에 맞추기 (같은 시각이 없으면 직전 값)
+  const oiByT = new Map(oi.map(r => [r.timestamp, +r.sumOpenInterestValue]));
+  let lastOi = null;
+  const bars = kl.map(r => {
+    const t = r[0];
+    if (oiByT.has(t)) lastOi = oiByT.get(t);
+    return { t, o: +r[1], h: +r[2], l: +r[3], c: +r[4], oi: lastOi };
+  }).filter(b => b.oi != null);
+
+  const price = bars[bars.length - 1].c;
+  let lo = Math.min(...bars.map(b => b.l)), hi = Math.max(...bars.map(b => b.h));
+  lo = Math.max(lo * 0.93, price * 0.6); hi = Math.min(hi * 1.07, price * 1.4);   // 너무 먼 가격은 잘라냄
+  const step = (hi - lo) / ROWS;
+  const rowOf = p => Math.floor((p - lo) / step);
+
+  let alive = [];   // 아직 청산 안 된 청산 가격들 {p, amt, side}
+  const grid = [];  // grid[봉][칸] = 그 시점 그 가격대에 남아 있는 추정 청산 물량
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    // (1) 이 봉에서 가격이 지나간 청산 가격은 지움
+    alive = alive.filter(x => x.side === "long" ? x.p < b.l : x.p > b.h);
+    // (2) OI가 줄었으면 남은 물량도 같은 비율로 줄임
+    if (i > 0) {
+      const d = b.oi - bars[i - 1].oi;
+      if (d < 0 && bars[i - 1].oi > 0) { const k = Math.max(0, 1 + d / bars[i - 1].oi); for (const x of alive) x.amt *= k; }
+      // (3) OI가 늘었으면 그만큼 새 포지션 → 청산 가격 추가
+      if (d > 0) {
+        const entry = (b.o + b.h + b.l + b.c) / 4;
+        for (const [L, w] of LEV) {
+          alive.push({ p: entry * (1 - 1 / L), amt: d * w / 2, side: "long" });
+          alive.push({ p: entry * (1 + 1 / L), amt: d * w / 2, side: "short" });
+        }
+      }
+    }
+    const row = new Float64Array(ROWS);
+    for (const x of alive) { const r = rowOf(x.p); if (r >= 0 && r < ROWS) row[r] += x.amt; }
+    grid.push(row);
+  }
+  // 지금 남아 있는 물량 (오른쪽 막대 + 표)
+  const nowLong = new Float64Array(ROWS), nowShort = new Float64Array(ROWS);
+  for (const x of alive) { const r = rowOf(x.p); if (r >= 0 && r < ROWS) (x.side === "long" ? nowLong : nowShort)[r] += x.amt; }
+  // 색 기준: 상위 1% 값 (너무 큰 값 하나 때문에 전부 어두워지지 않게)
+  const vals = [];
+  for (const row of grid) for (const v of row) if (v > 0) vals.push(v);
+  vals.sort((a, b) => a - b);
+  const ref = vals.length ? vals[Math.floor(vals.length * 0.99)] : 1;
+  return { bars, grid, lo, hi, step, price, nowLong, nowShort, ref };
+}
+
+// ── 2) 그리기 ───────────────────────────────────────────────────
+// 색: 어두운 보라 → 빨강 → 주황 → 연노랑 (magma 계열)
+const STOPS = [[13, 8, 41], [59, 15, 112], [140, 41, 129], [222, 73, 104], [254, 159, 109], [252, 253, 191]];
+function color(t) {
+  t = Math.max(0, Math.min(1, t));
+  const x = t * (STOPS.length - 1), i = Math.min(STOPS.length - 2, Math.floor(x)), f = x - i;
+  const a = STOPS[i], b = STOPS[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+}
+const SIDE = 110, AXIS = 72;   // 오른쪽 막대 폭, 가격 눈금 폭
+
+function draw() {
+  if (!model) return;
+  const cv = $("heat"), dpr = devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr);
+  const { bars, grid, lo, hi, step, ref, nowLong, nowShort, price } = model;
+  const gain = +$("gain").value;
+  const mapW = W - SIDE - AXIS;
+  const y = p => H - (p - lo) / (hi - lo) * H;
+  const cw = mapW / bars.length, ch = H / ROWS;
+
+  // 히트맵 (칸 하나하나 칠하기)
+  const img = g.createImageData(Math.max(1, Math.round(mapW * dpr)), Math.round(H * dpr));
+  const IW = img.width, IH = img.height;
+  for (let px = 0; px < IW; px++) {
+    const bi = Math.min(bars.length - 1, Math.floor(px / IW * bars.length));
+    const row = grid[bi];
+    for (let py = 0; py < IH; py++) {
+      const r = ROWS - 1 - Math.floor(py / IH * ROWS);
+      const v = row[r];
+      const [R, G, B] = color(v > 0 ? Math.pow(v / ref * gain, 0.6) : 0);
+      const k = (py * IW + px) * 4;
+      img.data[k] = R; img.data[k + 1] = G; img.data[k + 2] = B; img.data[k + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 가격 선
+  g.strokeStyle = "rgba(255,255,255,.9)"; g.lineWidth = 1.4; g.beginPath();
+  bars.forEach((b, i) => { const X = (i + 0.5) * cw, Y = y(b.c); i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+  g.stroke();
+
+  // 오른쪽: 지금 남은 청산 물량 막대
+  g.fillStyle = "#0f1115"; g.fillRect(mapW, 0, SIDE + AXIS, H);
+  let mx = 0; for (let r = 0; r < ROWS; r++) mx = Math.max(mx, nowLong[r], nowShort[r]);
+  for (let r = 0; r < ROWS; r++) {
+    const Y = H - (r + 1) * ch;
+    if (nowShort[r] > 0) { g.fillStyle = "#22c55e"; g.fillRect(mapW + 4, Y, (SIDE - 8) * nowShort[r] / mx, Math.max(1, ch - 0.5)); }
+    if (nowLong[r] > 0) { g.fillStyle = "#f0625a"; g.fillRect(mapW + 4, Y, (SIDE - 8) * nowLong[r] / mx, Math.max(1, ch - 0.5)); }
+  }
+  // 현재가 가로선
+  g.strokeStyle = "#fff"; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(0, y(price)); g.lineTo(mapW + SIDE, y(price)); g.stroke(); g.setLineDash([]);
+
+  // 가격 눈금
+  g.fillStyle = "#9aa1ab"; g.font = "11px system-ui, 'Malgun Gothic', sans-serif";
+  for (let i = 0; i <= 6; i++) {
+    const p = lo + (hi - lo) * i / 6, Y = y(p);
+    g.fillText(usd(p), mapW + SIDE + 6, Math.min(H - 4, Math.max(10, Y + 4)));
+  }
+  g.fillStyle = "#fff"; g.fillRect(mapW + SIDE, y(price) - 9, AXIS, 18);
+  g.fillStyle = "#0f1115"; g.font = "bold 11px system-ui"; g.fillText(usd(price), mapW + SIDE + 6, y(price) + 4);
+  // 날짜 눈금
+  g.fillStyle = "rgba(232,234,237,.75)"; g.font = "11px system-ui";
+  for (let i = 1; i < 6; i++) {
+    const bi = Math.floor(bars.length * i / 6), X = (bi + 0.5) * cw;
+    const d = new Date(bars[bi].t);
+    g.fillText(`${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}시`, X - 28, H - 6);
+  }
+}
+
+// 마우스를 올리면 그 칸의 추정 물량 표시
+$("heat").onmousemove = e => {
+  if (!model) return;
+  const r = $("heat").getBoundingClientRect(), x = e.clientX - r.left, yy = e.clientY - r.top;
+  const mapW = r.width - SIDE - AXIS;
+  if (x > mapW) { $("tip").hidden = true; return; }
+  const bi = Math.min(model.bars.length - 1, Math.floor(x / mapW * model.bars.length));
+  const row = ROWS - 1 - Math.floor(yy / r.height * ROWS);
+  const p = model.lo + (row + 0.5) * model.step;
+  const b = model.bars[bi];
+  $("tip").innerHTML = `${new Date(b.t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}<br>
+    가격대 <b>${usd(p)}</b><br>추정 청산 물량 <b>${shortUsd(model.grid[bi][row] || 0)}</b><br>그때 가격 ${usd(b.c)}`;
+  $("tip").hidden = false;
+  $("tip").style.left = Math.min(x + 14, r.width - 190) + "px";
+  $("tip").style.top = Math.min(yy + 14, r.height - 90) + "px";
+};
+$("heat").onmouseleave = () => $("tip").hidden = true;
+
+// 위/아래 청산 몰린 가격 표
+function renderTables() {
+  const { nowLong, nowShort, lo, step, price } = model;
+  const pick = (arr, above) => {
+    const out = [];
+    for (let r = 0; r < ROWS; r++) {
+      const p = lo + (r + 0.5) * step;
+      if (arr[r] > 0 && (above ? p > price : p < price)) out.push({ p, v: arr[r] });
+    }
+    return out.sort((a, b) => b.v - a.v).slice(0, 6).sort((a, b) => above ? a.p - b.p : b.p - a.p);
+  };
+  const rows = list => list.map(x => `<tr><td class="l"><b>${usd(x.p)}</b></td><td class="${cls((x.p - price) / price)}">${pct((x.p - price) / price * 100)}</td><td>${shortUsd(x.v)}</td></tr>`).join("")
+    || `<tr><td colspan="3" class="l muted">없어요</td></tr>`;
+  $("above").innerHTML = rows(pick(nowShort, true));
+  $("below").innerHTML = rows(pick(nowLong, false));
+}
+
+async function load() {
+  sym = $("coin").value.trim().toUpperCase().replace(/USDT$/, "").replace(/[^A-Z0-9]/g, "") || "BTC";
+  $("coin").value = sym;
+  const [iv, limit] = $("range").value.split("|");
+  $("run").disabled = true; $("status").textContent = `${sym} 계산 중…`;
+  try {
+    const [kl, oi] = await Promise.all([
+      getJSON(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${iv}&limit=${limit}`),
+      getJSON(`${F}/futures/data/openInterestHist?symbol=${sym}USDT&period=${iv}&limit=${limit}`),
+    ]);
+    if (oi.length < 10) throw new Error("OI 데이터가 부족해요");
+    model = buildModel(kl, oi);
+    $("title").textContent = `${sym} 청산 히트맵 (추정)`;
+    draw(); renderTables();
+    $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${sym}USDT 무기한 선물 · 봉 ${model.bars.length}개`;
+    recount(); renderLive();       // 실시간 목록은 지우지 않고, 선택 코인 기준으로 다시 보여줌
+  } catch (e) { $("status").textContent = `${sym}: ${e.message}`; }
+  $("run").disabled = false;
+}
+
+// ── 3) 실시간 청산 (웹소켓) ─────────────────────────────────────
+let liveMode = "coin", ws = null, liveRows = [], sums = { long: 0, short: 0, big: null };
+function renderLive(newOne) {
+  const shown = liveRows.filter(x => liveMode === "all" || x.s === sym).slice(0, 60);
+  $("live").innerHTML = shown.map((x, i) => `<tr class="${i === 0 && newOne === x ? "new" : ""}">
+    <td class="l muted">${new Date(x.t).toLocaleTimeString("ko-KR")}</td>
+    <td class="l">${coinTag(x.s, logos)}</td>
+    <td class="l ${x.side === "long" ? "up" : ""}" style="${x.side === "short" ? "color:#22c55e" : ""}">${x.side === "long" ? "롱 청산" : "숏 청산"}</td>
+    <td>${usd(x.p)}</td><td><b>${shortUsd(x.v)}</b></td></tr>`).join("")
+    || `<tr><td colspan="5" class="l muted">${liveMode === "coin" ? sym + " 청산을 기다리는 중… (조용한 장에서는 한동안 없을 수 있어요)" : "청산을 기다리는 중…"}</td></tr>`;
+  $("liveSum").innerHTML = [
+    ["롱 청산 합계", `<span class="up">${shortUsd(sums.long)}</span>`, `페이지를 연 뒤부터 · ${liveMode === "coin" ? sym : "전체"}`],
+    ["숏 청산 합계", `<span style="color:#22c55e">${shortUsd(sums.short)}</span>`, ""],
+    ["가장 큰 청산", sums.big ? shortUsd(sums.big.v) : "-", sums.big ? `${sums.big.s} ${sums.big.side === "long" ? "롱" : "숏"} · ${usd(sums.big.p)}` : ""],
+  ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+}
+function recount() {
+  sums = { long: 0, short: 0, big: null };
+  for (const x of liveRows) if (liveMode === "all" || x.s === sym) {
+    sums[x.side] += x.v;
+    if (!sums.big || x.v > sums.big.v) sums.big = x;
+  }
+}
+function connect() {
+  // 바이낸스 선물 시장 데이터 주소 (/market/ws)
+  ws = new WebSocket("wss://fstream.binance.com/market/ws/!forceOrder@arr");
+  ws.onopen = () => $("liveStatus").textContent = "실시간 연결됨 · 바이낸스는 코인마다 1초에 가장 큰 청산 1건만 보내줘요";
+  ws.onmessage = e => {
+    const o = JSON.parse(e.data).o;
+    if (!o || !o.s.endsWith("USDT")) return;
+    const x = { t: o.T, s: o.s.slice(0, -4), side: o.S === "SELL" ? "long" : "short", p: +o.ap || +o.p, v: (+o.ap || +o.p) * +o.z };
+    liveRows.unshift(x); if (liveRows.length > 500) liveRows.pop();
+    recount(); renderLive(x);
+  };
+  ws.onclose = () => { $("liveStatus").textContent = "연결이 끊겼어요. 5초 뒤 다시 연결해요…"; setTimeout(connect, 5000); };
+}
+for (const b of $("liveMode").querySelectorAll("button")) b.onclick = () => {
+  liveMode = b.dataset.v;
+  for (const x of $("liveMode").querySelectorAll("button")) x.classList.toggle("on", x === b);
+  recount(); renderLive();
+};
+
+$("run").onclick = load;
+$("coin").onkeydown = e => { if (e.key === "Enter") load(); };
+$("range").onchange = load;
+$("gain").oninput = draw;
+addEventListener("resize", draw);
+const q = new URLSearchParams(location.search);
+if (q.get("s")) $("coin").value = q.get("s");
+logoMap().then(l => { logos = l; renderLive(); });
+load();
+connect();
+setInterval(() => { if (!document.hidden && !$("run").disabled) load(); }, 5 * 60e3);
+</script>
+</body>
+</html>

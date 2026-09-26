@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>24시간변동률 · ath TEST (참고용)</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:860px){ .cols{grid-template-columns:1fr} }
+  .cols table{min-width:420px}
+  td.bar{width:34%;min-width:110px}
+  .barwrap{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+  .barwrap i{display:block;height:100%;border-radius:99px}
+  .rk{color:var(--muted);width:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ath TEST (참고용)</h1>
+  <p class="sub">비트겟(Bitget) 기준 24시간 동안 가장 많이 오르고 내린 코인이에요. 거래량이 너무 적은 코인은 빼고 보여줘요.</p>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <div class="controls">
+      <label>시장
+        <span class="seg" id="mkt">
+          <button data-v="futures" class="on">선물 (USDT)</button>
+          <button data-v="spot">현물 (USDT)</button>
+        </span>
+      </label>
+      <label>최소 24시간 거래량
+        <select id="minVol">
+          <option value="100000">10만 달러 이상</option>
+          <option value="1000000" selected>100만 달러 이상</option>
+          <option value="10000000">1,000만 달러 이상</option>
+          <option value="100000000">1억 달러 이상</option>
+        </select>
+      </label>
+      <label>개수
+        <select id="count">
+          <option>10</option><option selected>20</option><option>30</option><option>50</option>
+        </select>
+      </label>
+      <button id="run">새로고침</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <div class="tiles" id="summary"></div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h2 class="up">▲ 상승 TOP</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th class="l">#</th><th class="l">코인</th><th>가격</th><th>24시간</th><th class="l"></th><th>거래량</th></tr></thead>
+        <tbody id="gainers"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2 class="down">▼ 하락 TOP</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th class="l">#</th><th class="l">코인</th><th>가격</th><th>24시간</th><th class="l"></th><th>거래량</th></tr></thead>
+        <tbody id="losers"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="foot">데이터: 비트겟 공개 API · 1분마다 새로고침 · 코인을 누르면 비트겟 거래 화면이 새 창으로 열려요 · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
+</div>
+
+<script src="common.js"></script>
+<script src="nav.js"></script>
+<script>
+let mkt = "futures", logos = {};
+const URLS = {
+  futures: "https://api.bitget.com/api/v2/mix/market/tickers?productType=USDT-FUTURES",
+  spot: "https://api.bitget.com/api/v2/spot/market/tickers",
+};
+
+async function load() {
+  $("run").disabled = true; $("status").textContent = "불러오는 중…";
+  try {
+    const [j, lg] = await Promise.all([getJSON(URLS[mkt]), logoMap()]);
+    logos = lg;
+    const minVol = +$("minVol").value, n = +$("count").value;
+    const all = (j.data || [])
+      .filter(x => x.symbol.endsWith("USDT"))
+      .map(x => ({ sym: x.symbol.slice(0, -4), price: +x.lastPr, chg: +x.change24h * 100, vol: +(x.usdtVolume || x.quoteVolume), hi: +x.high24h, lo: +x.low24h }))
+      .filter(x => isFinite(x.chg) && x.vol >= minVol && x.price > 0);
+    const up = all.filter(x => x.chg > 0).sort((a, b) => b.chg - a.chg).slice(0, n);
+    const down = all.filter(x => x.chg < 0).sort((a, b) => a.chg - b.chg).slice(0, n);
+    const maxAbs = Math.max(1, ...up.map(x => x.chg), ...down.map(x => -x.chg));
+    const link = s => mkt === "futures" ? `https://www.bitget.com/futures/usdt/${s}USDT` : `https://www.bitget.com/spot/${s}USDT`;
+    const row = (x, i, color) => `<tr>
+      <td class="l rk">${i + 1}</td>
+      <td class="l">${coinTag(x.sym, logos, null, link(x.sym)).replace("<a ", '<a target="_blank" rel="noopener noreferrer" ')}</td>
+      <td>${usd(x.price)}</td>
+      <td class="${cls(x.chg)}"><b>${pct(x.chg)}</b></td>
+      <td class="l bar"><div class="barwrap"><i style="width:${Math.abs(x.chg) / maxAbs * 100}%;background:${color}"></i></div></td>
+      <td class="muted">${shortUsd(x.vol)}</td>
+    </tr>`;
+    $("gainers").innerHTML = up.map((x, i) => row(x, i, "var(--up)")).join("") || `<tr><td colspan="6" class="l muted">없어요</td></tr>`;
+    $("losers").innerHTML = down.map((x, i) => row(x, i, "var(--down)")).join("") || `<tr><td colspan="6" class="l muted">없어요</td></tr>`;
+
+    const ups = all.filter(x => x.chg > 0).length, downs = all.filter(x => x.chg < 0).length;
+    const avg = all.reduce((s, x) => s + x.chg, 0) / (all.length || 1);
+    const btc = all.find(x => x.sym === "BTC");
+    $("summary").innerHTML = [
+      ["조건에 맞는 코인", all.length + "개", `${mkt === "futures" ? "선물" : "현물"} · 거래량 ${shortUsd(minVol)} 이상`],
+      ["오른 코인 / 내린 코인", `<span class="up">${ups}</span> / <span class="down">${downs}</span>`, `오른 비율 ${(ups / (all.length || 1) * 100).toFixed(0)}%`],
+      ["평균 변동률", `<span class="${cls(avg)}">${pct(avg)}</span>`, "조건에 맞는 코인 전체 평균"],
+      ["비트코인", btc ? `<span class="${cls(btc.chg)}">${pct(btc.chg)}</span>` : "-", btc ? usd(btc.price) : ""],
+    ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+    $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · 비트겟 ${mkt === "futures" ? "USDT 무기한 선물" : "USDT 현물"}`;
+  } catch (e) { $("status").textContent = e.message; }
+  $("run").disabled = false;
+}
+
+for (const b of $("mkt").querySelectorAll("button")) b.onclick = () => {
+  mkt = b.dataset.v;
+  for (const x of $("mkt").querySelectorAll("button")) x.classList.toggle("on", x === b);
+  load();
+};
+$("minVol").onchange = load;
+$("count").onchange = load;
+$("run").onclick = load;
+load();
+setInterval(() => { if (!document.hidden) load(); }, 60e3);
+</script>
+</body>
+</html>

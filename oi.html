@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OI · ath TEST (참고용)</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  #priceChart{width:100%;height:420px}
+  #ratioChart{width:100%;height:220px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+  #sumTable tbody tr{cursor:pointer}
+  #sumTable tbody tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ath TEST (참고용)</h1>
+  <p class="sub">바이낸스 선물 미결제약정(OI)·펀딩비·롱숏 비율을 봅니다. OI는 아직 청산되지 않고 열려 있는 선물 포지션의 총량이에요.</p>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <div class="controls">
+      <label>코인
+        <input id="coin" list="coinList" value="BTC" style="width:110px">
+        <datalist id="coinList"></datalist>
+      </label>
+      <label>기간
+        <select id="period">
+          <option value="5m">5분봉 (약 1.7일)</option>
+          <option value="15m">15분봉 (약 5일)</option>
+          <option value="1h" selected>1시간봉 (약 3주)</option>
+          <option value="4h">4시간봉 (30일)</option>
+          <option value="1d">1일봉 (30일)</option>
+        </select>
+      </label>
+      <button id="run">보기</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="title">OI 요약</h2>
+    <div class="tiles" id="tiles"><div class="muted">불러오는 중…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>가격 + OI</h2>
+    <div id="priceChart"></div>
+    <div class="legend">
+      <span>캔들: 가격 (오른쪽 축)</span>
+      <span><i style="background:#f59e0b"></i>OI 달러 가치 (왼쪽 축)</span>
+      <span>가격이 오르는데 OI도 늘면 새 돈이 들어오는 중, 가격이 빠지며 OI가 줄면 포지션이 정리(청산)되는 중인 경우가 많아요.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>롱/숏 비율 · 펀딩비</h2>
+    <div id="ratioChart"></div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>전체 계정 롱/숏 비율 (1보다 크면 롱이 더 많음)</span>
+      <span><i style="background:#a78bfa"></i>탑 트레이더 포지션 롱/숏 비율</span>
+      <span><i style="background:var(--up)"></i>펀딩비 % (왼쪽 축, 8시간마다)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>코인별 OI 한눈에 보기</h2>
+    <div class="tablewrap">
+      <table id="sumTable">
+        <thead><tr><th class="l">코인</th><th>OI (달러)</th><th>OI 24시간 변화</th><th>가격 24시간 변화</th><th>펀딩비</th><th>롱/숏 비율</th></tr></thead>
+        <tbody id="sum"><tr><td colspan="6" class="l muted">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="small muted" style="margin-top:8px">줄을 누르면 위 차트가 그 코인으로 바뀌어요.</div>
+  </div>
+
+  <div class="foot">데이터: 바이낸스 선물 공개 API · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="common.js"></script>
+<script src="nav.js"></script>
+<script>
+const F = "https://fapi.binance.com";
+const LIMIT = { "5m": 500, "15m": 500, "1h": 500, "4h": 180, "1d": 30 };
+const KST = 9 * 3600;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let logos = {};
+$("coinList").innerHTML = DEFAULT_COINS.map(c => `<option value="${c}">`).join("");
+
+// 차트 두 개 만들기 (Lightweight Charts)
+function mkChart(el) {
+  return LightweightCharts.createChart(el, {
+    autoSize: true,
+    layout: { background: { color: css("--card") }, textColor: css("--muted"), fontFamily: "system-ui, 'Malgun Gothic', sans-serif" },
+    grid: { vertLines: { color: css("--line") }, horzLines: { color: css("--line") } },
+    rightPriceScale: { borderColor: css("--line") },
+    leftPriceScale: { visible: true, borderColor: css("--line") },
+    timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
+  });
+}
+let c1, c2, candle, oiLine, lsLine, topLine, fundHist;
+function initCharts() {
+  if (c1 || !window.LightweightCharts) return;
+  c1 = mkChart($("priceChart"));
+  candle = c1.addCandlestickSeries({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down"), borderVisible: false });
+  oiLine = c1.addAreaSeries({ priceScaleId: "left", lineColor: "#f59e0b", topColor: "rgba(245,158,11,.25)", bottomColor: "rgba(245,158,11,0)", lineWidth: 2,
+    priceFormat: { type: "custom", formatter: v => shortUsd(v) } });
+  c2 = mkChart($("ratioChart"));
+  lsLine = c2.addLineSeries({ color: css("--accent"), lineWidth: 2 });
+  topLine = c2.addLineSeries({ color: "#a78bfa", lineWidth: 2 });
+  fundHist = c2.addHistogramSeries({ priceScaleId: "left", priceFormat: { type: "custom", formatter: v => v.toFixed(4) + "%" } });
+  // 두 차트의 시간축을 같이 움직이게
+  c1.timeScale().subscribeVisibleTimeRangeChange(r => { if (r) try { c2.timeScale().setVisibleRange(r); } catch (e) {} });
+}
+
+const T = ms => Math.floor(ms / 1000) + KST;
+
+async function loadOne() {
+  const sym = $("coin").value.trim().toUpperCase().replace(/USDT$/, "").replace(/[^A-Z0-9]/g, "") || "BTC";
+  $("coin").value = sym;
+  const period = $("period").value, limit = LIMIT[period];
+  $("run").disabled = true; $("status").textContent = `${sym} 불러오는 중…`;
+  try {
+    const P = `symbol=${sym}USDT&period=${period}&limit=${limit}`;
+    const [oi, kl, ls, top, fund, prem, tick] = await Promise.all([
+      getJSON(`${F}/futures/data/openInterestHist?${P}`),
+      getJSON(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${period}&limit=${limit}`),
+      getJSON(`${F}/futures/data/globalLongShortAccountRatio?${P}`),
+      getJSON(`${F}/futures/data/topLongShortPositionRatio?${P}`),
+      getJSON(`${F}/fapi/v1/fundingRate?symbol=${sym}USDT&limit=100`),
+      getJSON(`${F}/fapi/v1/premiumIndex?symbol=${sym}USDT`),
+      getJSON(`${F}/fapi/v1/ticker/24hr?symbol=${sym}USDT`),
+    ]);
+    initCharts();
+    // 차트
+    if (c1) {
+      candle.setData(kl.map(r => ({ time: T(r[0]), open: +r[1], high: +r[2], low: +r[3], close: +r[4] })));
+      oiLine.setData(oi.map(r => ({ time: T(r.timestamp), value: +r.sumOpenInterestValue })));
+      lsLine.setData(ls.map(r => ({ time: T(r.timestamp), value: +r.longShortRatio })));
+      topLine.setData(top.map(r => ({ time: T(r.timestamp), value: +r.longShortRatio })));
+      const t0 = kl.length ? kl[0][0] : 0;
+      fundHist.setData(fund.filter(r => r.fundingTime >= t0).map(r => {
+        const v = +r.fundingRate * 100;
+        return { time: T(Math.floor(r.fundingTime / 1000) * 1000), value: v, color: v >= 0 ? css("--up") : css("--down") };
+      }));
+      c1.timeScale().fitContent(); c2.timeScale().fitContent();
+    }
+    // 요약 카드
+    const last = oi[oi.length - 1];
+    const perDay = { "5m": 288, "15m": 96, "1h": 24, "4h": 6, "1d": 1 }[period];
+    const prev = oi[Math.max(0, oi.length - 1 - perDay)];
+    const oiChg = prev ? (+last.sumOpenInterestValue - +prev.sumOpenInterestValue) / +prev.sumOpenInterestValue * 100 : null;
+    const fr = +prem.lastFundingRate * 100;
+    const mins = Math.max(0, Math.round((prem.nextFundingTime - Date.now()) / 60000));
+    const lsNow = ls[ls.length - 1], topNow = top[top.length - 1];
+    $("title").textContent = `${sym} OI 요약`;
+    $("tiles").innerHTML = [
+      ["현재 OI", bigUsd(+last.sumOpenInterestValue), `${(+last.sumOpenInterest).toLocaleString("en-US", { maximumFractionDigits: 0 })} ${sym}`],
+      ["OI 24시간 변화", `<span class="${cls(oiChg)}">${pct(oiChg)}</span>`, "하루 전 대비 열린 포지션 증감"],
+      ["가격 24시간 변화", `<span class="${cls(+tick.priceChangePercent)}">${pct(+tick.priceChangePercent)}</span>`, usd(+tick.lastPrice)],
+      ["현재 펀딩비", `<span class="${cls(fr)}">${fr.toFixed(4)}%</span>`, `다음 정산까지 ${Math.floor(mins / 60)}시간 ${mins % 60}분 · 양수면 롱이 숏에게 지불`],
+      ["롱/숏 비율 (전체 계정)", lsNow ? (+lsNow.longShortRatio).toFixed(2) : "-", lsNow ? `롱 ${(+lsNow.longAccount * 100).toFixed(1)}% · 숏 ${(+lsNow.shortAccount * 100).toFixed(1)}%` : ""],
+      ["롱/숏 비율 (탑 트레이더)", topNow ? (+topNow.longShortRatio).toFixed(2) : "-", topNow ? `롱 ${(+topNow.longAccount * 100).toFixed(1)}% · 숏 ${(+topNow.shortAccount * 100).toFixed(1)}%` : ""],
+    ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+    $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${sym}USDT 무기한 선물`;
+  } catch (e) {
+    $("status").textContent = `${sym}: ${e.message}`;
+  }
+  $("run").disabled = false;
+}
+
+async function loadSummary() {
+  logos = await logoMap();
+  const rows = [];
+  for (const sym of DEFAULT_COINS) {
+    try {
+      const [oi, tick, prem, ls] = await Promise.all([
+        getJSON(`${F}/futures/data/openInterestHist?symbol=${sym}USDT&period=1h&limit=25`),
+        getJSON(`${F}/fapi/v1/ticker/24hr?symbol=${sym}USDT`),
+        getJSON(`${F}/fapi/v1/premiumIndex?symbol=${sym}USDT`),
+        getJSON(`${F}/futures/data/globalLongShortAccountRatio?symbol=${sym}USDT&period=1h&limit=1`),
+      ]);
+      const a = +oi[0].sumOpenInterestValue, b = +oi[oi.length - 1].sumOpenInterestValue;
+      rows.push({ sym, oi: b, oiChg: (b - a) / a * 100, pChg: +tick.priceChangePercent, fr: +prem.lastFundingRate * 100, ls: ls[0] ? +ls[0].longShortRatio : null });
+    } catch (e) { rows.push({ sym, err: e.message }); }
+  }
+  rows.sort((x, y) => (y.oi || 0) - (x.oi || 0));
+  $("sum").innerHTML = rows.map(r => r.err
+    ? `<tr><td class="l">${coinTag(r.sym, logos)}</td><td colspan="5" class="l muted">${esc(r.err)}</td></tr>`
+    : `<tr data-s="${r.sym}"><td class="l">${coinTag(r.sym, logos)}</td><td>${shortUsd(r.oi)}</td>
+       <td class="${cls(r.oiChg)}">${pct(r.oiChg)}</td><td class="${cls(r.pChg)}">${pct(r.pChg)}</td>
+       <td class="${cls(r.fr)}">${r.fr.toFixed(4)}%</td><td>${r.ls != null ? r.ls.toFixed(2) : "-"}</td></tr>`).join("");
+  for (const tr of $("sum").querySelectorAll("tr[data-s]")) tr.onclick = () => { $("coin").value = tr.dataset.s; loadOne(); scrollTo({ top: 0, behavior: "smooth" }); };
+}
+
+$("run").onclick = loadOne;
+$("coin").onkeydown = e => { if (e.key === "Enter") loadOne(); };
+$("period").onchange = loadOne;
+const q = new URLSearchParams(location.search);
+if (q.get("s")) $("coin").value = q.get("s");
+loadOne().then(loadSummary);
+</script>
+</body>
+</html>
