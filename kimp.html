@@ -84,6 +84,7 @@
 
 <script src="common.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
 <script>
 let kx = "upbit", basis = "fx", logos = {}, data = null;
 
@@ -152,6 +153,7 @@ function render() {
   let rows = [];
   for (const [sym, d] of Object.entries(dom)) {
     if (sym === "USDT" || sym === "USDC" || !usdPrice[sym] || !(d.price > 0)) continue;
+    if (CoinMeta.type(sym) === "COMMODITY_TOKEN") continue;          // 금·은 담보 토큰은 코인이 아니라서 뺌
     const abroad = usdPrice[sym] * rate;                          // 바이낸스 가격을 원화로
     const kp = (d.price / abroad - 1) * 100;
     rows.push({ sym, ...d, usd: usdPrice[sym], abroad, kp, diff: d.price - abroad, odd: Math.abs(kp) > 25 });

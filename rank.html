@@ -68,6 +68,7 @@
 
 <script src="common.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
 <script>
 const CG = "https://api.coingecko.com/api/v3";
 const COLORS = ["#f59e0b", "#6366f1", "#10b981", "#ef4444", "#3b82f6", "#ec4899", "#14b8a6", "#8b5cf6", "#f97316", "#84cc16", "#9ca3af"];
@@ -116,7 +117,7 @@ function spark(prices, up) {
 
 function render() {
   const q = $("q").value.trim().toLowerCase();
-  let rows = list.filter(c => !q || c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.id.includes(q));
+  let rows = list.filter(c => CoinMeta.type(c.symbol) !== "COMMODITY_TOKEN").filter(c => !q || c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.id.includes(q));
   const k = $("sort").value;
   const by = {
     rank: (a, b) => (a.market_cap_rank ?? 1e9) - (b.market_cap_rank ?? 1e9),

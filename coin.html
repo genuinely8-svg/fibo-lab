@@ -30,7 +30,9 @@
   .head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
   .head img{width:48px;height:48px;border-radius:50%;background:var(--bg)}
   .head h1{font-size:22px;margin:0}
-  .rank{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:middle}
+  .rank{display:inline-block;font-size:13px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--bg);border:1px solid var(--line);color:var(--muted);margin-left:8px;vertical-align:middle}
+  .rank.tf{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent);border-color:transparent}
+  .tick{font-size:15px;font-weight:600;color:var(--muted);margin-left:8px}
   .price{margin-left:auto;text-align:right}
   .price b{font-size:26px;display:block;font-variant-numeric:tabular-nums}
   .chg{font-weight:700}
@@ -101,7 +103,7 @@
     <div class="head">
       <img id="logo" alt="" hidden>
       <div>
-        <h1><span id="name">불러오는 중…</span><span class="rank" id="rank" hidden></span></h1>
+        <h1><span id="name">불러오는 중…</span><span class="tick" id="tick"></span><span class="rank" id="rank" hidden></span></h1>
         <div class="muted" id="sub"></div>
       </div>
       <div class="price">
@@ -180,6 +182,7 @@
 <script src="fib-core.js"></script>
 <script src="chart.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
 <script>
 "use strict";
 // ── 주소에서 설정 읽기: coin.html?s=BTC&ex=futures&n=5&k=20 ─────────
@@ -272,11 +275,12 @@ async function loadTicker() {
 // ── 2) 코인게코: 코인 정보 ────────────────────────────────────
 // 기호(BTC) → 코인게코 id(bitcoin). 같은 기호가 여러 개면 시가총액 순위가 가장 높은 것
 async function geckoId() {
-  const key = "cg-id-" + SYM;
+  const B = CoinMeta.base(SYM);                    // 1000PEPE → PEPE
+  const key = "cg-id-" + B;
   const hit = cacheGet(key, 7 * 24 * 3600e3);
   if (hit) return hit;
-  const j = await getJSON(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(SYM)}`);
-  const list = (j.coins || []).filter(c => (c.symbol || "").toUpperCase() === SYM);
+  const j = await getJSON(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(B)}`);
+  const list = (j.coins || []).filter(c => (c.symbol || "").toUpperCase() === B);
   list.sort((a, b) => (a.market_cap_rank ?? 1e9) - (b.market_cap_rank ?? 1e9));
   if (!list.length) throw new Error("코인게코에서 찾지 못했어요");
   cacheSet(key, list[0].id);
@@ -306,11 +310,21 @@ async function geckoCoin() {
 }
 
 function renderHeader(cg) {
-  if (cg?.img) { $("logo").src = cg.img; $("logo").hidden = false; }
-  const ko = cg?.ko && cg.ko !== cg.name ? cg.ko : "";
-  $("name").textContent = ko || cg?.name || SYM;
-  $("sub").textContent = [cg?.name && ko ? cg.name : "", SYM, EXNAME[ex]].filter(Boolean).join(" · ");
-  if (cg?.rank) { $("rank").textContent = `시가총액 ${cg.rank}위`; $("rank").hidden = false; }
+  const img = cg?.img || CoinMeta.logo(SYM);
+  if (img) { $("logo").src = img; $("logo").hidden = false; }
+  const ko = cg?.ko && cg.ko !== cg.name ? cg.ko : (CoinMeta.ko(SYM) || "");
+  const en = cg?.name || CoinMeta.name(SYM) || "";
+  $("name").textContent = ko || en || SYM;
+  $("tick").textContent = (ko || en) ? SYM : "";                  // 이름 옆에 티커
+  $("sub").textContent = [ko && en ? en : "", `${SYM}USDT`, EXNAME[ex]].filter(Boolean).join(" · ");
+  // 티커 옆 시가총액 순위 (#1) · 주식·원자재면 그 표시
+  const tf = CoinMeta.typeLabel(SYM);
+  const rank = cg?.rank || CoinMeta.rank(SYM);
+  $("rank").className = "rank" + (tf ? " tf" : "");
+  $("rank").title = tf ? "바이낸스 선물의 전통 금융 상품이에요" : "코인게코 시가총액 순위";
+  if (tf) { $("rank").textContent = tf; $("rank").hidden = false; }
+  else if (rank) { $("rank").textContent = `#${rank}`; $("rank").hidden = false; }
+  else if (CoinMeta.hasTop()) { $("rank").textContent = "#1000+"; $("rank").hidden = false; }
 }
 
 function tile(k, v, s, bar) {
@@ -341,7 +355,13 @@ function renderTiles(cg, t) {
 }
 
 function renderAbout(cg) {
-  if (!cg) { $("desc").textContent = "코인게코 정보를 불러오지 못했어요. 잠시 후 새로고침해 보세요."; return; }
+  if (!cg) {
+    const tf = CoinMeta.typeLabel(SYM);
+    $("desc").textContent = tf
+      ? `${SYM}USDT는 ${tf} 가격을 따라가는 바이낸스 선물 상품이에요(코인이 아니에요). 24시간 이용 가능하고, 가격·차트·진입 분석은 위에서 똑같이 볼 수 있어요.`
+      : "코인게코 정보를 불러오지 못했어요. 잠시 후 새로고침해 보세요.";
+    return;
+  }
   // 소개글은 외부 데이터라 HTML을 그대로 넣지 않고 글자만 꺼내서 씀
   const text = new DOMParser().parseFromString(cg.desc || "", "text/html").body.textContent.trim();
   const paras = text.split(/\r?\n\s*\r?\n|\r\n/).map(s => s.trim()).filter(Boolean);
@@ -474,7 +494,13 @@ async function main() {
   renderHeader(null);
 
   // 코인게코는 따로 돌림 (느리거나 실패해도 나머지는 보이게)
-  const cgPromise = geckoCoin().catch(e => { $("cgNote").textContent = "코인게코 정보: " + e.message + " (잠시 후 새로고침)"; return null; });
+  await CoinMeta.load();
+  renderHeader(null);
+  // 금·은·주식 같은 전통 금융 선물은 코인게코에 같은 이름의 다른 코인이 있을 수 있어서 코인 정보를 안 가져옴
+  const tf = CoinMeta.typeLabel(SYM);
+  const cgPromise = tf
+    ? (($("cgNote").textContent = `${SYM}는 바이낸스의 ${tf} 선물이라 시가총액·발행량 같은 코인 정보가 없어요.`), Promise.resolve(null))
+    : geckoCoin().catch(e => { $("cgNote").textContent = "코인게코 정보: " + e.message + " (잠시 후 새로고침)"; return null; });
 
   let t = null;
   try { t = await loadTicker(); }

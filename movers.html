@@ -18,7 +18,7 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">비트겟(Bitget) 기준 24시간 동안 가장 많이 오르고 내린 코인이에요. 거래량이 너무 적은 코인은 빼고 보여줘요.</p>
+  <p class="sub">비트겟(Bitget) 기준 24시간 동안 가장 많이 오르고 내린 코인이에요. 거래량이 너무 적은 코인과 주식·원자재 상품은 빼고 보여줘요.</p>
   <nav id="nav"></nav>
 
   <div class="card">
@@ -73,6 +73,7 @@
 
 <script src="common.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
 <script>
 let mkt = "futures", logos = {};
 const URLS = {
@@ -83,13 +84,15 @@ const URLS = {
 async function load() {
   $("run").disabled = true; $("status").textContent = "불러오는 중…";
   try {
-    const [j, lg] = await Promise.all([getJSON(URLS[mkt]), logoMap()]);
+    const [j, lg, rwa] = await Promise.all([getJSON(URLS[mkt]), logoMap(),
+      mkt === "futures" ? CoinMeta.bitgetRwa().catch(() => new Set()) : new Set()]);   // 비트겟 실물자산(주식·원자재) 목록
     logos = lg;
     const minVol = +$("minVol").value, n = +$("count").value;
     const all = (j.data || [])
       .filter(x => x.symbol.endsWith("USDT"))
       .map(x => ({ sym: x.symbol.slice(0, -4), price: +x.lastPr, chg: +x.change24h * 100, vol: +(x.usdtVolume || x.quoteVolume), hi: +x.high24h, lo: +x.low24h }))
-      .filter(x => isFinite(x.chg) && x.vol >= minVol && x.price > 0);
+      .filter(x => isFinite(x.chg) && x.vol >= minVol && x.price > 0)
+      .filter(x => !rwa.has(x.sym) && CoinMeta.type(x.sym) !== "COMMODITY_TOKEN");      // 코인만
     const up = all.filter(x => x.chg > 0).sort((a, b) => b.chg - a.chg).slice(0, n);
     const down = all.filter(x => x.chg < 0).sort((a, b) => a.chg - b.chg).slice(0, n);
     const maxAbs = Math.max(1, ...up.map(x => x.chg), ...down.map(x => -x.chg));

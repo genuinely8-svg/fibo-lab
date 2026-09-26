@@ -90,6 +90,9 @@
   .summary{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin:0 0 10px}
   .summary b{font-size:15px}
   td.rk{color:var(--muted);width:32px}
+  .mc,.tf{font-size:11px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px;white-space:nowrap}
+  .mc{color:var(--muted);background:var(--bg);border:1px solid var(--line)}
+  .tf{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
   summary{cursor:pointer;color:var(--text);font-weight:600}
 </style>
 </head>
@@ -216,6 +219,7 @@
 <script src="fib-core.js"></script>
 <script src="chart.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -298,33 +302,20 @@ async function getCandles(ex, coin, unit, count) {
   return candles.slice(-count);
 }
 
-// ── 코인 로고·이름: 코인게코 상위 250개(로고, 영문 이름) + 업비트(한글 이름) · 하루 동안 저장 ──
-let logos = {}, enNames = {}, koNames = {};
+// ── 코인 로고·이름·시가총액 순위·주식/원자재 구분 (meta.js) ──────────────
 function saved(key) { try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && Date.now() - v.at < 24 * 3600e3) return v.data; } catch (e) {} return null; }
-function save(key, data) { try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} }
-async function loadLogos() {
-  logos = saved("cg-logos-v1") || {}; enNames = saved("cg-names-v1") || {}; koNames = saved("upbit-ko-v1") || {};
-  const jobs = [];
-  if (!Object.keys(logos).length || !Object.keys(enNames).length) jobs.push((async () => {
-    const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1");
-    if (!res.ok) return;
-    const L = {}, N = {};
-    for (const c of await res.json()) { const s = c.symbol.toUpperCase(); if (!L[s]) { L[s] = c.image.replace("/large/", "/small/"); N[s] = c.name; } }
-    logos = L; enNames = N; save("cg-logos-v1", L); save("cg-names-v1", N);
-  })().catch(() => {}));
-  if (!Object.keys(koNames).length) jobs.push((async () => {
-    const res = await fetch("https://api.upbit.com/v1/market/all?isDetails=false");   // 한글 이름 검색용 (하루 한 번)
-    if (!res.ok) return;
-    const K = {};
-    for (const m of await res.json()) if (m.market.startsWith("KRW-")) K[m.market.slice(4)] = m.korean_name;
-    koNames = K; save("upbit-ko-v1", K);
-  })().catch(() => {}));
-  await Promise.all(jobs);
+const logosReady = CoinMeta.load();
+const logoHtml = sym => CoinMeta.logo(sym)
+  ? `<img src="${CoinMeta.logo(sym)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
+  : `<span class="ph">${CoinMeta.base(sym).slice(0, 3)}</span>`;
+// 티커 옆 꼬리표: 시가총액 순위(#1) 또는 주식·원자재 표시
+function rankTag(sym) {
+  const t = CoinMeta.typeLabel(sym);
+  if (t) return `<span class="tf">${t}</span>`;
+  const r = CoinMeta.rank(sym);
+  if (r) return `<span class="mc">#${r}</span>`;
+  return CoinMeta.hasTop() ? `<span class="mc">#1000+</span>` : "";
 }
-const logosReady = loadLogos();
-const logoHtml = sym => logos[sym]
-  ? `<img src="${logos[sym]}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
-  : `<span class="ph">${sym.slice(0, 3)}</span>`;
 
 // ── 거래되는 코인 목록 (24시간 거래량 포함) ──────────────────────────
 const STABLES = new Set(["USDC", "FDUSD", "TUSD", "BUSD", "USDP", "DAI", "EUR", "AEUR", "USDE", "XUSD", "BFUSD", "RLUSD", "USD1", "PYUSD", "EURI"]);
@@ -333,11 +324,12 @@ async function universe(ex) {
   const c = uniCache[ex];
   if (c && Date.now() - c.at < 60e3) return c.list;               // 1분 안에는 다시 안 받음
   const rows = await getJSON(`${EX[ex].base}/ticker/24hr`);
+  await CoinMeta.typesLoaded();                                  // 주식·원자재 구분 정보만 기다림 (meta.js)
   const dayAgo = Date.now() - 86400e3;
   const list = rows
     .filter(x => x.symbol.endsWith("USDT") && !x.symbol.includes("_") && +x.quoteVolume > 0 && x.closeTime > dayAgo)
     .map(x => ({ sym: x.symbol.slice(0, -4), vol: +x.quoteVolume, chg: +x.priceChangePercent }))
-    .filter(x => !STABLES.has(x.sym))
+    .filter(x => !STABLES.has(x.sym) && CoinMeta.isCrypto(x.sym))   // 코인만 (금·은·원유·주식 상품은 뺌)
     .sort((a, b) => b.vol - a.vol);
   uniCache[ex] = { at: Date.now(), list };
   return list;
@@ -469,7 +461,7 @@ function renderTable() {
     // 코인 이름을 누르면 상세 페이지로 (지금 설정 그대로 넘김)
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
     const logo = logoHtml(r.market);
-    const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${logo}<span>${r.market}<small>${r.market}USDT</small></span><span class="go">상세 ›</span></a>`;
+    const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="go">상세 ›</span></a>`;
     if (r.error) return `<tr><td class="rk">-</td><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const s = r.stats, c = r.current;
     const few = s.count < 5 ? "few" : "";
@@ -523,7 +515,7 @@ $("tabTv").onclick = () => setView("tv");
 // ── 관심목록: 칩 + 검색 자동완성 ──────────────────────────────────
 function renderChips() {
   const list = activeWatch();
-  $("chips").innerHTML = list.map(sym => `<span class="chip">${logoHtml(sym)}${sym}<button data-s="${sym}" title="빼기">×</button></span>`).join("")
+  $("chips").innerHTML = list.map(sym => `<span class="chip">${logoHtml(sym)}${sym}${rankTag(sym)}<button data-s="${sym}" title="빼기">×</button></span>`).join("")
     || `<span class="small" style="color:var(--muted)">아래에서 코인을 검색해서 추가하세요</span>`;
   for (const b of $("chips").querySelectorAll("button")) b.onclick = () => {
     const l = activeWatch(); l.splice(l.indexOf(b.dataset.s), 1);
@@ -532,7 +524,15 @@ function renderChips() {
   };
   $("sharedNote").hidden = !shared;
 }
-function addCoins(syms) {
+async function addCoins(syms) {
+  // 이 거래소에서 거래되는 "코인"만 추가 (원자재·주식 상품이나 없는 기호는 빼고 알려줌)
+  let ok = null;
+  try { ok = new Set((await universe($("ex").value)).map(u => u.sym)); } catch (e) {}
+  if (ok) {
+    const bad = syms.filter(s => s && !ok.has(s));
+    if (bad.length) $("status").textContent = `추가 못 한 것: ${bad.join(", ")} (이 거래소에 없거나 코인이 아닌 상품이에요)`;
+    syms = syms.filter(s => ok.has(s));
+  }
   const l = activeWatch();
   let added = 0;
   for (const s of syms) if (s && !l.includes(s)) { l.push(s); added++; }
@@ -547,12 +547,12 @@ async function acShow() {
   let uni = [];
   try { uni = await universe($("ex").value); } catch (e) {}
   const Q = raw.toUpperCase(), lower = raw.toLowerCase(), have = new Set(activeWatch());
-  const score = u => (u.sym === Q ? 0 : u.sym.startsWith(Q) ? 1 : (koNames[u.sym] || "").startsWith(raw) ? 2 : 3);
-  acItems = uni.filter(u => !have.has(u.sym) && (u.sym.includes(Q) || (koNames[u.sym] || "").includes(raw) || (enNames[u.sym] || "").toLowerCase().includes(lower)))
+  const score = u => (u.sym === Q ? 0 : u.sym.startsWith(Q) ? 1 : (CoinMeta.ko(u.sym) || "").startsWith(raw) ? 2 : 3);
+  acItems = uni.filter(u => !have.has(u.sym) && (u.sym.includes(Q) || (CoinMeta.ko(u.sym) || "").includes(raw) || (CoinMeta.name(u.sym) || "").toLowerCase().includes(lower)))
     .sort((a, b) => score(a) - score(b) || b.vol - a.vol).slice(0, 8);
   acIdx = 0;
   $("acList").innerHTML = acItems.map((u, i) => `<div data-i="${i}" class="${i === 0 ? "on" : ""}">${logoHtml(u.sym)}<b>${u.sym}</b>
-      <span style="color:var(--muted);font-size:12px">${koNames[u.sym] || enNames[u.sym] || ""}</span><small>${shortVol(u.vol)}</small></div>`).join("")
+      <span style="color:var(--muted);font-size:12px">${CoinMeta.ko(u.sym) || CoinMeta.name(u.sym) || ""}</span> ${rankTag(u.sym)}<small>${shortVol(u.vol)}</small></div>`).join("")
     || `<div style="color:var(--muted);cursor:default">${EX[$("ex").value].name}에 없는 코인이에요</div>`;
   $("acList").hidden = false;
   for (const d of $("acList").querySelectorAll("div[data-i]")) d.onmousedown = e => { e.preventDefault(); pick(+d.dataset.i); };
