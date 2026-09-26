@@ -28,8 +28,11 @@
   button:disabled{opacity:.5;cursor:wait}
   #status{color:var(--muted);font-size:12px;margin-top:10px;min-height:1em}
   .tablewrap{overflow-x:auto}
-  table{border-collapse:collapse;width:100%;min-width:900px}
-  th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  table{border-collapse:collapse;width:100%}
+  th,td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  /* PC 최적화: 칸 제목은 두 줄까지 허용, ±오차는 숫자 아래 작은 글씨로 → 표 폭을 줄여 좁은 화면에서도 안 잘리게 */
+  thead th{white-space:normal;line-height:1.25;vertical-align:bottom;min-width:48px}
+  td{font-variant-numeric:tabular-nums}
   th{font-size:12px;color:var(--muted);font-weight:600}
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
   tbody tr{cursor:pointer}
@@ -37,12 +40,12 @@
   tbody tr.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
   .name{color:var(--text);text-decoration:none;font-weight:600}
   .name:hover{text-decoration:underline}
-  .name small{color:var(--muted);margin-left:4px;font-weight:400}
+  .name small{display:none}   /* BTCUSDT 같은 뒷부분은 표에서는 생략 (폭 절약) */
   .name{display:inline-flex;align-items:center;gap:8px}
   .name img,.name .ph{width:22px;height:22px;border-radius:50%;flex:none;background:var(--bg)}
   .name .ph{display:inline-grid;place-items:center;font-size:10px;color:var(--muted);border:1px solid var(--line);font-weight:400}
   .name .go{font-size:11px;color:var(--accent);font-weight:600;margin-left:4px}
-  .err{color:var(--muted);font-size:11px}
+  .err{display:block;color:var(--muted);font-size:10.5px;line-height:1.1;margin-top:1px}
   .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
   .b-near{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
   .b-under{background:color-mix(in srgb,var(--muted) 20%,transparent);color:var(--text)}
@@ -112,6 +115,58 @@
   .mc{color:var(--muted);background:var(--bg);border:1px solid var(--line)}
   .tf{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
   summary{cursor:pointer;color:var(--text);font-weight:600}
+  /* ─────────── 휴대폰 화면 (가로 700px 이하) ─────────── */
+  .setbar,#cards{display:none}
+  @media (max-width:700px){
+    .wrap{padding:14px 12px 50px}
+    h1{font-size:20px}
+    .sub{font-size:12.5px;margin-bottom:10px}
+    /* 설정: 한 줄로 접기 */
+    .setbar{display:flex;align-items:center;gap:8px;width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);
+            padding:10px 12px;border-radius:10px;font-weight:700;text-align:left}
+    .setbar .setsum{flex:1;min-width:0;font-weight:500;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .setbar .chev{color:var(--muted);transition:transform .15s}
+    #setCard:not(.collapsed) .setbar .chev{transform:rotate(180deg)}
+    #setCard.collapsed .controls{display:none}
+    #setCard.collapsed #scanOpts{display:none!important}
+    #setCard .controls{margin-top:12px}
+    .controls label{flex:1 1 calc(50% - 16px)}
+    .controls select,.controls input{width:100%}
+    #run{width:100%}
+    .modebar{margin-top:10px;padding-top:10px}
+    #setCard.collapsed .modebar{border-top:0;padding-top:0}
+    #mode{width:100%} #mode button{flex:1}
+    #acInput{width:100%} .ac{flex:1}
+    /* 표 대신 카드 */
+    .tablewrap > table{display:none}
+    #cards{display:block}
+    .summary{font-size:12.5px;gap:4px 12px}
+    .card.tablewrap{padding:12px 10px}
+    .ccard{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:8px;background:var(--bg);cursor:pointer}
+    .ccard.open{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+    .ccard .c1{display:flex;align-items:center;gap:6px}
+    .ccard .c1 .rk{color:var(--muted);font-size:12px;width:18px}
+    .ccard .c1 img,.ccard .c1 .ph{width:22px;height:22px;border-radius:50%;flex:none}
+    .ccard .c1 .ph{display:inline-grid;place-items:center;font-size:9px;color:var(--muted);border:1px solid var(--line)}
+    .ccard .c1 b{font-size:15px}
+    .ccard .c1 .badge{margin-left:auto}
+    .ccard .c2{margin:7px 0 0 24px;font-size:13.5px;font-variant-numeric:tabular-nums}
+    .ccard .c2 .arrow{color:var(--muted);margin:0 4px}
+    .ccard .c2 .dist{font-weight:700;margin-left:4px}
+    .ccard .c3{display:flex;align-items:center;gap:6px;margin:5px 0 0 24px;font-size:12.5px;color:var(--muted)}
+    .ccard .c3 a.more{margin-left:auto}
+    .ccard .cdet{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:12px}
+    .ccard .cdet div{background:var(--card);border-radius:8px;padding:7px 8px}
+    .ccard .cdet span{display:block;color:var(--muted);font-size:11px;margin-bottom:2px}
+    .ccard .cchart{margin-top:10px;cursor:default}
+    .muted-c{color:var(--muted);text-align:center;padding:20px 0}
+    /* 차트 */
+    #chartPanel{position:static}
+    #chartPanel #chart{height:320px}
+    .chead{flex-wrap:wrap} .chead h2{font-size:13px;flex-basis:100%}
+    .tabs button{padding:5px 9px;font-size:12px}
+    .legend{font-size:11px;gap:4px 10px}
+  }
 </style>
 </head>
 <body>
@@ -121,7 +176,9 @@
   참고용 통계이며 투자 판단의 근거가 아닙니다.</p>
   <nav id="nav"></nav>
 
-  <div class="card">
+  <div class="card collapsed" id="setCard">
+    <!-- 휴대폰에서만 보이는 한 줄 요약: 누르면 설정이 펼쳐짐 -->
+    <button class="setbar" id="setBar" type="button"><span>⚙ 설정</span><span class="setsum" id="setSum"></span><span class="chev">▾</span></button>
     <div class="controls">
       <label>거래소
         <select id="ex">
@@ -198,6 +255,8 @@
       </tr></thead>
       <tbody id="tbody"><tr><td colspan="11" style="text-align:center;color:var(--muted)">분석 준비 중…</td></tr></tbody>
     </table>
+    <!-- 휴대폰에서는 표 대신 카드 목록 -->
+    <div id="cards"><div class="muted-c">분석 준비 중…</div></div>
   </div>
 
   <!-- 차트 묶음: 평소엔 숨겨져 있다가, 코인을 누르면 그 줄 바로 아래로 옮겨져서 펼쳐짐 -->
@@ -504,13 +563,44 @@ function renderTable() {
     return r.market === openCoin ? row + `<tr class="exp"><td colspan="11" id="expCell"></td></tr>` : row;
   }).join("");
   // 차트 묶음을 펼친 줄 안으로 옮기기 (없으면 숨김 보관함으로)
-  if ($("expCell")) { $("expCell").appendChild(chartPanel); fitPanel(); }
+  renderCards(rows);
+  if (isMobile()) { if ($("expCard")) $("expCard").appendChild(chartPanel); }
+  else if ($("expCell")) { $("expCell").appendChild(chartPanel); fitPanel(); }
   for (const tr of $("tbody").querySelectorAll("tr[data-m]")) {
     tr.onclick = () => toggleCoin(tr.dataset.m);
   }
 }
+// ── 휴대폰: 카드 목록 ────────────────────────────────────────────
+const mq = matchMedia("(max-width:700px)");
+const isMobile = () => mq.matches;
+mq.addEventListener("change", () => { chartPanel.style.width = ""; renderTable(); if (openCoin) drawChart(); });
+function renderCards(rows) {
+  let rank = 0;
+  $("cards").innerHTML = rows.filter(r => !r.error || mode === "watch").map(r => {
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+    const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
+    if (r.error) return `<div class="ccard"><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
+      <div class="c3">${r.error}${more}</div></div>`;
+    const s = r.stats, c = r.current, open = r.market === openCoin;
+    const dist = c?.level ? `<span class="dist ${c.distance <= 5 ? "up" : ""}">(${pct(c.distance)})</span>` : "";
+    return `<div class="ccard${open ? " open" : ""}" data-m="${r.market}">
+      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}${badge(c)}</div>
+      <div class="c2">${won(r.price)}<span class="arrow">→</span>진입 ${won(c?.level)}${dist}</div>
+      <div class="c3">평균 반등 <span class="up">${pct(s.reboundAvg)}</span> · 터치 <span class="${s.count < 5 ? "few" : ""}">${s.count}회</span>${more}</div>
+      ${open ? `<div class="cdet">
+          <div><span>평균 추가하락</span><b class="down">${pct(s.fallAvg)}</b></div>
+          <div><span>반등 우세</span><b>${pct(s.winRate)}</b></div>
+          <div><span>예상 반등가</span><b>${won(c?.expected)}</b></div>
+        </div>
+        <div class="cchart" id="expCard" onclick="event.stopPropagation()"></div>` : ""}
+    </div>`;
+  }).join("") || `<div class="muted-c">결과가 없어요</div>`;
+  for (const el of $("cards").querySelectorAll(".ccard[data-m]")) el.onclick = () => toggleCoin(el.dataset.m);
+}
+
 // 펼친 차트 폭 = 표가 보이는 영역 폭 (표가 옆으로 스크롤돼도 차트는 화면 안에)
 function fitPanel() {
+  if (isMobile()) { chartPanel.style.width = ""; return; }
   const box = document.querySelector(".tablewrap");
   if (box && chartPanel.parentElement && chartPanel.parentElement.id === "expCell") chartPanel.style.width = (box.clientWidth - 48) + "px";
 }
@@ -521,7 +611,7 @@ function toggleCoin(m) {
   renderTable();
   if (openCoin) {
     drawChart();
-    const tr = $("tbody").querySelector(`tr[data-m="${openCoin}"]`);
+    const tr = isMobile() ? $("cards").querySelector(`.ccard[data-m="${openCoin}"]`) : $("tbody").querySelector(`tr[data-m="${openCoin}"]`);
     if (tr) { const y = tr.getBoundingClientRect().top; if (y < 0 || y > innerHeight * 0.6) tr.scrollIntoView({ behavior: "smooth", block: "start" }); }
   }
 }
@@ -636,6 +726,13 @@ $("saveShared").onclick = () => {
   renderChips();
 };
 
+// ── 휴대폰: 설정 한 줄 요약 (누르면 펼치기/접기) ─────────────────────────
+function updateSetSum() {
+  const t = id => $(id).selectedOptions[0].text;
+  $("setSum").textContent = `${t("ex")} · ${t("unit")}봉 · 캔들 ${t("count")}` + (mode === "scan" ? ` · 상위 ${t("topN")}` : " · 관심목록");
+}
+$("setBar").onclick = () => $("setCard").classList.toggle("collapsed");
+
 // ── 모드 전환 ────────────────────────────────────────────────────
 function setMode(m) {
   mode = m;
@@ -643,7 +740,7 @@ function setMode(m) {
   $("scanOpts").style.display = m === "scan" ? "contents" : "none";
   $("watchBox").hidden = m !== "watch";
   if (m === "watch") renderChips();
-  saveSettings();
+  saveSettings(); updateSetSum();
 }
 for (const b of $("mode").querySelectorAll("button")) b.onclick = () => { if (b.dataset.v !== mode) { setMode(b.dataset.v); run(); } };
 
@@ -655,7 +752,7 @@ function setAuto() {
   if (s) timer = setInterval(() => { if (!running && !document.hidden) run(); }, s * 1000);
 }
 $("auto").onchange = () => { setAuto(); saveSettings(); };
-for (const id of ["ex", "unit", "n", "k", "count", "topN"]) $(id).addEventListener("change", () => { saveSettings(); run(); });
+for (const id of ["ex", "unit", "n", "k", "count", "topN"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); run(); });
 
 // ── 시작: 설정 불러오고 바로 분석 ─────────────────────────────────
 loadSettings();

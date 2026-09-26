@@ -20,7 +20,12 @@
     .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;
                border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
     .navtabs a:hover{color:var(--text)}
-    .navtabs a.on{color:var(--text);border-bottom-color:var(--accent)}`;
+    .navtabs a.on{color:var(--text);border-bottom-color:var(--accent)}
+    /* 탭이 화면보다 넓으면 가장자리를 흐리게 해서 "옆으로 더 있어요" 표시 */
+    .navtabs.more-r{-webkit-mask-image:linear-gradient(90deg,#000 80%,transparent);mask-image:linear-gradient(90deg,#000 80%,transparent)}
+    .navtabs.more-l{-webkit-mask-image:linear-gradient(90deg,transparent,#000 20%);mask-image:linear-gradient(90deg,transparent,#000 20%)}
+    .navtabs.more-l.more-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
+    @media (max-width:700px){ .navtabs a{padding:9px 11px;font-size:13px} }`;
   document.head.appendChild(style);
 
   const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
@@ -29,4 +34,15 @@
   el.className = "navtabs";
   el.innerHTML = TABS.map(([href, label]) =>
     `<a href="${href}"${href === here ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("");
+  // 옆으로 더 있는지 확인해서 가장자리 흐림 표시
+  const edges = () => {
+    el.classList.toggle("more-l", el.scrollLeft > 4);
+    el.classList.toggle("more-r", el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+  el.addEventListener("scroll", edges, { passive: true });
+  addEventListener("resize", edges);
+  // 지금 보고 있는 탭이 화면 밖이면 보이는 곳으로
+  const on = el.querySelector("a.on");
+  if (on && on.offsetLeft + on.offsetWidth > el.clientWidth) el.scrollLeft = on.offsetLeft - 16;
+  edges();
 })();
