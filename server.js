@@ -71,11 +71,11 @@ http.createServer(async (req, res) => {
       return;
     }
     // 2) 나머지는 이 폴더의 파일(index.html, fib-core.js)을 보내줌
-    const file = req.url === "/" ? "index.html" : decodeURIComponent(req.url.split("?")[0]).slice(1);
+    const file = decodeURIComponent(req.url.split("?")[0]).slice(1) || "index.html";   // "/?watch=..." 도 index.html
     const full = path.join(__dirname, file);
-    if (!full.startsWith(__dirname) || !fs.existsSync(full)) { res.writeHead(404); res.end("없는 파일"); return; }
+    if (!full.startsWith(__dirname) || !fs.existsSync(full) || !fs.statSync(full).isFile()) { res.writeHead(404); res.end("없는 파일"); return; }
     res.writeHead(200, { "content-type": TYPES[path.extname(full)] || "application/octet-stream" });
-    fs.createReadStream(full).pipe(res);
+    fs.createReadStream(full).on("error", () => res.end()).pipe(res);
   } catch (e) {
     res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
     res.end("서버 오류: " + e.message);

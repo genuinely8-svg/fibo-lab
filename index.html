@@ -31,7 +31,7 @@
   table{border-collapse:collapse;width:100%;min-width:900px}
   th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   th{font-size:12px;color:var(--muted);font-weight:600}
-  th:first-child,td:first-child{text-align:left}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
   tbody tr{cursor:pointer}
   tbody tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
   tbody tr.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
@@ -62,6 +62,34 @@
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
   .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
   details{color:var(--muted);line-height:1.7}
+  /* 자동 스캔 / 관심목록 */
+  .modebar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px}
+  .seg button{background:transparent;color:var(--muted);padding:7px 14px;border-radius:6px}
+  .seg button.on{background:var(--accent);color:#fff}
+  .inl{flex-direction:row;align-items:center;gap:6px}
+  #watchBox{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:260px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 8px;border:1px solid var(--line);border-radius:99px;background:var(--bg);font-weight:600;font-size:13px}
+  .chip img,.chip .ph{width:18px;height:18px;border-radius:50%}
+  .chip .ph{display:inline-grid;place-items:center;font-size:9px;color:var(--muted);border:1px solid var(--line)}
+  .chip button{background:none;color:var(--muted);padding:0 4px;font-size:15px;line-height:1}
+  .chip button:hover{color:var(--up)}
+  .ac{position:relative}
+  #acInput{width:220px}
+  .aclist{position:absolute;z-index:20;top:calc(100% + 4px);left:0;width:300px;max-height:320px;overflow:auto;background:var(--card);
+          border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .aclist div{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer}
+  .aclist div.on,.aclist div:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .aclist img,.aclist .ph{width:20px;height:20px;border-radius:50%;flex:none}
+  .aclist .ph{display:inline-grid;place-items:center;font-size:9px;color:var(--muted);border:1px solid var(--line)}
+  .aclist small{color:var(--muted);margin-left:auto;font-size:11px}
+  .ghost{background:var(--bg);color:var(--text);border:1px solid var(--line);padding:7px 12px}
+  #sharedNote{font-size:12px;color:var(--warn)}
+  #sharedNote button{padding:4px 10px;font-size:12px;margin-left:6px}
+  .summary{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin:0 0 10px}
+  .summary b{font-size:15px}
+  td.rk{color:var(--muted);width:32px}
   summary{cursor:pointer;color:var(--text);font-weight:600}
 </style>
 </head>
@@ -102,28 +130,52 @@
           <option value="2000">2000개</option>
         </select>
       </label>
-      <label>코인 (쉼표로 구분)
-        <input id="coins" value="BTC,ETH,SOL,XRP,ARB,HYPE,UNI,ZEC,ONDO">
-      </label>
       <label>자동 새로고침
         <select id="auto">
           <option value="0">끔</option>
           <option value="60">1분</option>
-          <option value="300">5분</option>
+          <option value="300" selected>5분</option>
         </select>
       </label>
       <button id="run">분석하기</button>
+    </div>
+
+    <div class="modebar">
+      <span class="seg" id="mode">
+        <button data-v="scan" class="on">자동 스캔</button>
+        <button data-v="watch">관심목록</button>
+      </span>
+      <span id="scanOpts" style="display:contents">
+        <label class="inl">거래량 상위
+          <select id="topN">
+            <option value="30">30개</option>
+            <option value="50" selected>50개</option>
+            <option value="100">100개</option>
+          </select>
+        </label>
+        <span class="small" style="color:var(--muted)">바이낸스 24시간 거래량이 많은 코인을 자동으로 골라서 분석해요</span>
+      </span>
+      <div id="watchBox" hidden>
+        <div class="chips" id="chips"></div>
+        <div class="ac">
+          <input id="acInput" placeholder="코인 검색해서 추가 (예: 비트, SOL)" autocomplete="off">
+          <div class="aclist" id="acList" hidden></div>
+        </div>
+        <button class="ghost" id="shareBtn">목록 링크 복사</button>
+        <span id="sharedNote" hidden>공유받은 목록이에요<button id="saveShared">내 관심목록으로 저장</button></span>
+      </div>
     </div>
     <div id="status"></div>
   </div>
 
   <div class="card tablewrap">
+    <div class="summary" id="summary"></div>
     <table>
       <thead><tr>
-        <th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
+        <th style="text-align:left">#</th><th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
         <th>과거 터치</th><th>평균 반등</th><th>평균 추가하락</th><th>반등 우세</th><th>예상 반등가</th>
       </tr></thead>
-      <tbody id="tbody"><tr><td colspan="10" style="text-align:center;color:var(--muted)">‘분석하기’를 눌러주세요</td></tr></tbody>
+      <tbody id="tbody"><tr><td colspan="11" style="text-align:center;color:var(--muted)">분석 준비 중…</td></tr></tbody>
     </table>
   </div>
 
@@ -246,50 +298,133 @@ async function getCandles(ex, coin, unit, count) {
   return candles.slice(-count);
 }
 
-// ── 코인 로고: 코인게코 시가총액 상위 250개 로고를 하루 동안 브라우저에 저장해두고 씀 ──
-let logos = {};
+// ── 코인 로고·이름: 코인게코 상위 250개(로고, 영문 이름) + 업비트(한글 이름) · 하루 동안 저장 ──
+let logos = {}, enNames = {}, koNames = {};
+function saved(key) { try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && Date.now() - v.at < 24 * 3600e3) return v.data; } catch (e) {} return null; }
+function save(key, data) { try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} }
 async function loadLogos() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("cg-logos-v1") || "null");
-    if (saved && Date.now() - saved.at < 24 * 3600e3) { logos = saved.data; return; }
-  } catch (e) {}
-  try {
+  logos = saved("cg-logos-v1") || {}; enNames = saved("cg-names-v1") || {}; koNames = saved("upbit-ko-v1") || {};
+  const jobs = [];
+  if (!Object.keys(logos).length || !Object.keys(enNames).length) jobs.push((async () => {
     const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1");
     if (!res.ok) return;
-    const m = {};
-    for (const c of await res.json()) { const s = c.symbol.toUpperCase(); if (!m[s]) m[s] = c.image.replace("/large/", "/small/"); }
-    logos = m;
-    try { localStorage.setItem("cg-logos-v1", JSON.stringify({ at: Date.now(), data: m })); } catch (e) {}
-  } catch (e) { /* 로고 못 받아도 괜찮음 */ }
+    const L = {}, N = {};
+    for (const c of await res.json()) { const s = c.symbol.toUpperCase(); if (!L[s]) { L[s] = c.image.replace("/large/", "/small/"); N[s] = c.name; } }
+    logos = L; enNames = N; save("cg-logos-v1", L); save("cg-names-v1", N);
+  })().catch(() => {}));
+  if (!Object.keys(koNames).length) jobs.push((async () => {
+    const res = await fetch("https://api.upbit.com/v1/market/all?isDetails=false");   // 한글 이름 검색용 (하루 한 번)
+    if (!res.ok) return;
+    const K = {};
+    for (const m of await res.json()) if (m.market.startsWith("KRW-")) K[m.market.slice(4)] = m.korean_name;
+    koNames = K; save("upbit-ko-v1", K);
+  })().catch(() => {}));
+  await Promise.all(jobs);
 }
 const logosReady = loadLogos();
+const logoHtml = sym => logos[sym]
+  ? `<img src="${logos[sym]}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
+  : `<span class="ph">${sym.slice(0, 3)}</span>`;
+
+// ── 거래되는 코인 목록 (24시간 거래량 포함) ──────────────────────────
+const STABLES = new Set(["USDC", "FDUSD", "TUSD", "BUSD", "USDP", "DAI", "EUR", "AEUR", "USDE", "XUSD", "BFUSD", "RLUSD", "USD1", "PYUSD", "EURI"]);
+const uniCache = {};
+async function universe(ex) {
+  const c = uniCache[ex];
+  if (c && Date.now() - c.at < 60e3) return c.list;               // 1분 안에는 다시 안 받음
+  const rows = await getJSON(`${EX[ex].base}/ticker/24hr`);
+  const dayAgo = Date.now() - 86400e3;
+  const list = rows
+    .filter(x => x.symbol.endsWith("USDT") && !x.symbol.includes("_") && +x.quoteVolume > 0 && x.closeTime > dayAgo)
+    .map(x => ({ sym: x.symbol.slice(0, -4), vol: +x.quoteVolume, chg: +x.priceChangePercent }))
+    .filter(x => !STABLES.has(x.sym))
+    .sort((a, b) => b.vol - a.vol);
+  uniCache[ex] = { at: Date.now(), list };
+  return list;
+}
+
+// ── 설정 기억하기 (새로고침해도 유지) ────────────────────────────────
+const DEFAULT_WATCH = ["BTC", "ETH", "SOL", "XRP", "ARB", "HYPE", "UNI", "ZEC", "ONDO"];
+let mode = "scan";
+let watch = DEFAULT_WATCH.slice();
+let shared = null;                 // 링크로 공유받은 목록 (저장 전)
+const SETTINGS = ["ex", "unit", "n", "k", "count", "auto", "topN"];
+function saveSettings() {
+  const o = { mode }; for (const id of SETTINGS) o[id] = $(id).value;
+  try { localStorage.setItem("main-settings-v1", JSON.stringify(o)); } catch (e) {}
+}
+function loadSettings() {
+  try {
+    const o = JSON.parse(localStorage.getItem("main-settings-v1") || "null");
+    if (o) { for (const id of SETTINGS) if (o[id] != null) $(id).value = o[id]; if (o.mode) mode = o.mode; }
+    const w = JSON.parse(localStorage.getItem("watch-v1") || "null");
+    if (Array.isArray(w) && w.length) watch = w;
+  } catch (e) {}
+  const q = new URLSearchParams(location.search).get("watch");      // ?watch=BTC,ETH 로 들어온 경우
+  if (q) {
+    shared = q.split(",").map(x => x.trim().toUpperCase().replace(/[^A-Z0-9]/g, "")).filter(Boolean).slice(0, 60);
+    if (shared.length) mode = "watch"; else shared = null;
+  }
+}
+function saveWatch() { try { localStorage.setItem("watch-v1", JSON.stringify(watch)); } catch (e) {} }
+const activeWatch = () => shared || watch;
+
 
 // ── 실행 ─────────────────────────────────────────────────────────
+let lastSkipped = 0, running = false, again = false;
+// 분석 중에 설정을 바꾸면, 지금 분석이 끝난 뒤 한 번 더 돌림 (동시에 두 번 돌지 않게)
 async function run() {
+  if (running) { again = true; return; }
+  running = true;
+  try { await runOnce(); } finally {
+    running = false;
+    if (again) { again = false; run(); }
+  }
+}
+async function runOnce() {
   const ex = $("ex").value, unit = $("unit").value, n = +$("n").value, k = +$("k").value;
   const count = +$("count").value;
-  const coins = $("coins").value.split(",").map(s => s.trim().toUpperCase().replace(/USDT$/g, "")).filter(Boolean);
   $("run").disabled = true;
-  const out = [];
-  for (let i = 0; i < coins.length; i++) {
-    const m = coins[i];
-    $("status").textContent = `불러오는 중… ${EX[ex].name} ${m} (${i + 1}/${coins.length})`;
-    try {
-      const candles = await getCandles(ex, m, unit, count);
-      if (candles.length < 100) throw new Error(`상장된 지 얼마 안 돼서 데이터가 부족해요 (캔들 ${candles.length}개). 선물로 보면 될 수도 있어요`);
-      const r = FibCore.analyze(candles, { n, k });
-      out.push({ market: m, candles, ...r });
-    } catch (e) {
-      out.push({ market: m, error: e.message });
+  let coins;
+  try {
+    if (mode === "scan") {
+      $("status").textContent = "거래량 상위 코인 고르는 중…";
+      coins = (await universe(ex)).slice(0, +$("topN").value).map(x => x.sym);
+    } else {
+      coins = activeWatch().slice();
+    }
+  } catch (e) {
+    $("status").textContent = e.message; $("run").disabled = false; return;   // (run()이 running을 풀어줌)
+  }
+  const out = new Array(coins.length);
+  let done = 0, next = 0;
+  // 4개씩 동시에 분석 (너무 많이 한꺼번에 보내면 요청 제한에 걸림)
+  async function worker() {
+    while (next < coins.length) {
+      const i = next++, m = coins[i];
+      try {
+        const candles = await getCandles(ex, m, unit, count);
+        if (candles.length < 100) throw new Error(`상장된 지 얼마 안 돼서 데이터가 부족해요 (캔들 ${candles.length}개)`);
+        out[i] = { market: m, candles, ...FibCore.analyze(candles, { n, k }) };
+      } catch (e) {
+        out[i] = { market: m, error: e.message };
+      }
+      done++;
+      $("status").textContent = `분석 중… ${done}/${coins.length} · ${EX[ex].name}`;
     }
   }
+  await Promise.all([worker(), worker(), worker(), worker()]);
   await logosReady;            // 로고가 준비될 때까지 (보통 즉시)
-  results = out; curEx = ex;
+  // 자동 스캔에서는 데이터가 부족한 코인은 조용히 빼고 개수만 알려줌
+  lastSkipped = mode === "scan" ? out.filter(r => r.error).length : 0;
+  results = mode === "scan" ? out.filter(r => !r.error) : out;
+  curEx = ex;
   renderTable();
   const prev = selected;
-  if (!selected || !results.find(r => r.market === selected && !r.error)) selected = results.find(r => !r.error)?.market;
+  if (!selected || !results.find(r => r.market === selected && !r.error)) selected = sortedRows()[0]?.market;
   if (view === "lw" || prev !== selected) drawChart();   // 트레이딩뷰는 스스로 실시간 갱신됨
-  $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} (${EX[ex].cur}) · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개`;
+  $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개 · `
+    + (mode === "scan" ? `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`);
   $("run").disabled = false;
 }
 
@@ -311,20 +446,35 @@ function badge(cur) {
   return `<span class="badge b-wait">대기</span>`;
 }
 
+// 순위: ① 아직 진입가 위에 있는 코인 중 가까운 순 → ② 이미 진입가 아래로 내려간 코인(가까운 순) → ③ 신고점·스윙 없음 → ④ 오류
+function rankKey(r) {
+  if (r.error) return 4e9;
+  const d = r.current?.level ? r.current.distance : null;
+  if (d == null) return 3e9;
+  return d >= 0 ? d : 1e9 - d;
+}
+const sortedRows = () => [...results].sort((a, b) => rankKey(a) - rankKey(b));
+
 function renderTable() {
-  // 진입 가격까지 가까운 순으로 정렬
-  const rows = [...results].sort((a, b) => (a.current?.distance ?? 1e9) - (b.current?.distance ?? 1e9));
+  const rows = sortedRows();
+  const ok = results.filter(r => !r.error && r.current?.level);
+  const near = ok.filter(r => r.current.distance > 0 && r.current.distance <= 5).length;
+  const under = ok.filter(r => r.current.distance <= 0).length;
+  $("summary").innerHTML = `<span>분석 <b>${results.length}</b>개</span>
+    <span>진입 근접(5% 이내) <b class="up">${near}</b>개</span>
+    <span>진입가 이하 <b>${under}</b>개</span>
+    <span style="color:var(--muted)">진입 가격에 가까운 순서</span>`;
+  let rank = 0;
   $("tbody").innerHTML = rows.map(r => {
     // 코인 이름을 누르면 상세 페이지로 (지금 설정 그대로 넘김)
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
-    const logo = logos[r.market]
-      ? `<img src="${logos[r.market]}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
-      : `<span class="ph">${r.market.slice(0, 3)}</span>`;
+    const logo = logoHtml(r.market);
     const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${logo}<span>${r.market}<small>${r.market}USDT</small></span><span class="go">상세 ›</span></a>`;
-    if (r.error) return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
+    if (r.error) return `<tr><td class="rk">-</td><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const s = r.stats, c = r.current;
     const few = s.count < 5 ? "few" : "";
     return `<tr data-m="${r.market}" class="${r.market === selected ? "sel" : ""}">
+      <td class="rk">${++rank}</td>
       <td>${name}</td>
       <td>${won(r.price)}</td>
       <td>${won(c?.level)}</td>
@@ -370,13 +520,106 @@ function setView(v) {
 $("tabLw").onclick = () => setView("lw");
 $("tabTv").onclick = () => setView("tv");
 
+// ── 관심목록: 칩 + 검색 자동완성 ──────────────────────────────────
+function renderChips() {
+  const list = activeWatch();
+  $("chips").innerHTML = list.map(sym => `<span class="chip">${logoHtml(sym)}${sym}<button data-s="${sym}" title="빼기">×</button></span>`).join("")
+    || `<span class="small" style="color:var(--muted)">아래에서 코인을 검색해서 추가하세요</span>`;
+  for (const b of $("chips").querySelectorAll("button")) b.onclick = () => {
+    const l = activeWatch(); l.splice(l.indexOf(b.dataset.s), 1);
+    if (!shared) saveWatch();
+    renderChips(); run();
+  };
+  $("sharedNote").hidden = !shared;
+}
+function addCoins(syms) {
+  const l = activeWatch();
+  let added = 0;
+  for (const s of syms) if (s && !l.includes(s)) { l.push(s); added++; }
+  if (!added) return;
+  if (!shared) saveWatch();
+  renderChips(); run();
+}
+let acItems = [], acIdx = 0;
+async function acShow() {
+  const raw = $("acInput").value.trim();
+  if (!raw) { $("acList").hidden = true; return; }
+  let uni = [];
+  try { uni = await universe($("ex").value); } catch (e) {}
+  const Q = raw.toUpperCase(), lower = raw.toLowerCase(), have = new Set(activeWatch());
+  const score = u => (u.sym === Q ? 0 : u.sym.startsWith(Q) ? 1 : (koNames[u.sym] || "").startsWith(raw) ? 2 : 3);
+  acItems = uni.filter(u => !have.has(u.sym) && (u.sym.includes(Q) || (koNames[u.sym] || "").includes(raw) || (enNames[u.sym] || "").toLowerCase().includes(lower)))
+    .sort((a, b) => score(a) - score(b) || b.vol - a.vol).slice(0, 8);
+  acIdx = 0;
+  $("acList").innerHTML = acItems.map((u, i) => `<div data-i="${i}" class="${i === 0 ? "on" : ""}">${logoHtml(u.sym)}<b>${u.sym}</b>
+      <span style="color:var(--muted);font-size:12px">${koNames[u.sym] || enNames[u.sym] || ""}</span><small>${shortVol(u.vol)}</small></div>`).join("")
+    || `<div style="color:var(--muted);cursor:default">${EX[$("ex").value].name}에 없는 코인이에요</div>`;
+  $("acList").hidden = false;
+  for (const d of $("acList").querySelectorAll("div[data-i]")) d.onmousedown = e => { e.preventDefault(); pick(+d.dataset.i); };
+}
+const shortVol = v => v >= 1e9 ? "$" + (v / 1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(0) + "M" : "$" + (v / 1e3).toFixed(0) + "K";
+function pick(i) {
+  const u = acItems[i]; if (!u) return;
+  $("acInput").value = ""; $("acList").hidden = true;
+  addCoins([u.sym]);
+}
+$("acInput").oninput = acShow;
+$("acInput").onkeydown = e => {
+  const items = $("acList").querySelectorAll("div[data-i]");
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault(); if (!items.length) return;
+    acIdx = (acIdx + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items.forEach((d, i) => d.classList.toggle("on", i === acIdx));
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    const raw = $("acInput").value;
+    if (raw.includes(",")) {                                   // "BTC,ETH,SOL" 붙여넣기도 됨
+      addCoins(raw.split(",").map(x => x.trim().toUpperCase().replace(/USDT$/, "").replace(/[^A-Z0-9]/g, "")));
+      $("acInput").value = ""; $("acList").hidden = true;
+    } else pick(acIdx);
+  } else if (e.key === "Escape") $("acList").hidden = true;
+};
+$("acInput").onblur = () => setTimeout(() => $("acList").hidden = true, 150);
+
+$("shareBtn").onclick = async () => {
+  const url = `${location.origin}${location.pathname}?watch=${activeWatch().join(",")}`;
+  try { await navigator.clipboard.writeText(url); $("shareBtn").textContent = "복사됐어요! 카톡에 붙여넣기"; }
+  catch (e) { prompt("아래 링크를 복사하세요", url); }
+  setTimeout(() => $("shareBtn").textContent = "목록 링크 복사", 2500);
+};
+$("saveShared").onclick = () => {
+  watch = shared.slice(); shared = null; saveWatch();
+  history.replaceState(null, "", location.pathname);        // 주소에서 ?watch= 지우기
+  renderChips();
+};
+
+// ── 모드 전환 ────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  for (const b of $("mode").querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === m);
+  $("scanOpts").style.display = m === "scan" ? "contents" : "none";
+  $("watchBox").hidden = m !== "watch";
+  if (m === "watch") renderChips();
+  saveSettings();
+}
+for (const b of $("mode").querySelectorAll("button")) b.onclick = () => { if (b.dataset.v !== mode) { setMode(b.dataset.v); run(); } };
+
 // ── 이벤트 ───────────────────────────────────────────────────────
 $("run").onclick = run;
-$("auto").onchange = () => {
+function setAuto() {
   clearInterval(timer);
   const s = +$("auto").value;
-  if (s) timer = setInterval(() => { if (!$("run").disabled) run(); }, s * 1000);
-};
+  if (s) timer = setInterval(() => { if (!running && !document.hidden) run(); }, s * 1000);
+}
+$("auto").onchange = () => { setAuto(); saveSettings(); };
+for (const id of ["ex", "unit", "n", "k", "count", "topN"]) $(id).addEventListener("change", () => { saveSettings(); run(); });
+
+// ── 시작: 설정 불러오고 바로 분석 ─────────────────────────────────
+loadSettings();
+setMode(mode);
+logosReady.then(() => { if (mode === "watch") renderChips(); });
+setAuto();
+run();
 </script>
 </body>
 </html>
