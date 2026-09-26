@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>김치프리미엄 · ath TEST (참고용)</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  table{min-width:960px}
+  tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .kp{font-weight:700}
+  .kbar{position:relative;height:8px;width:120px;background:var(--line);border-radius:99px;display:inline-block;vertical-align:middle;margin-left:8px}
+  .kbar i{position:absolute;top:0;height:100%;border-radius:99px}
+  .kbar b{position:absolute;left:50%;top:-3px;width:1px;height:14px;background:var(--muted)}
+  .warn{color:var(--warn);font-size:11px;margin-left:4px}
+  #q{width:150px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ath TEST (참고용)</h1>
+  <p class="sub">김치프리미엄(김프) = 국내 거래소 가격이 해외(바이낸스) 가격보다 몇 % 비싼지예요. 플러스면 국내가 더 비싸고, 마이너스(역프)면 국내가 더 싸요.</p>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <div class="controls">
+      <label>국내 거래소
+        <span class="seg" id="kx">
+          <button data-v="upbit" class="on">업비트</button>
+          <button data-v="bithumb">빗썸</button>
+        </span>
+      </label>
+      <label>기준 환율
+        <span class="seg" id="basis">
+          <button data-v="fx" class="on">달러 환율</button>
+          <button data-v="usdt">테더(USDT) 가격</button>
+        </span>
+      </label>
+      <label>최소 거래대금 (국내 24시간)
+        <select id="minVol">
+          <option value="0">전체</option>
+          <option value="100000000">1억 원 이상</option>
+          <option value="1000000000" selected>10억 원 이상</option>
+          <option value="10000000000">100억 원 이상</option>
+        </select>
+      </label>
+      <label>정렬
+        <select id="sort">
+          <option value="vol">거래대금 많은 순</option>
+          <option value="hi">김프 높은 순</option>
+          <option value="lo">김프 낮은 순 (역프)</option>
+          <option value="name">이름 순</option>
+        </select>
+      </label>
+      <label>검색
+        <input id="q" placeholder="BTC, SOL…">
+      </label>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <div class="tiles" id="tiles"><div class="muted">불러오는 중…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th class="l">코인</th><th>국내 가격</th><th>바이낸스 가격</th><th>바이낸스 원화 환산</th>
+          <th>김프</th><th>가격 차이</th><th>국내 24시간</th><th>국내 거래대금</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="8" class="l muted">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="small muted" style="margin-top:8px">⚠ 표시: 김프가 ±25%를 넘는 코인이에요. 국내와 해외에서 이름만 같은 다른 코인이거나, 입출금이 막혀 있을 수 있어서 평균에서는 뺐어요.</div>
+  </div>
+
+  <div class="foot">
+    국내: 업비트·빗썸 공개 API · 해외: 바이낸스 현물(USDT) · 환율: open.er-api.com (하루 한 번 갱신) · 30초마다 새로고침<br>
+    참고용 정보이며 투자 판단의 근거가 아닙니다.
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script src="nav.js"></script>
+<script>
+let kx = "upbit", basis = "fx", logos = {}, data = null;
+
+const krw = v => v == null || !isFinite(v) ? "-" : "₩" + (Math.abs(v) >= 100 ? Math.round(v).toLocaleString("ko-KR")
+                                                           : v.toLocaleString("ko-KR", { maximumSignificantDigits: 4 }));
+function krwBig(v) {       // 1,234억 / 5.6억
+  if (v == null || !isFinite(v)) return "-";
+  if (v >= 1e12) return (v / 1e12).toFixed(2) + "조";
+  if (v >= 1e8) return (v / 1e8).toLocaleString("ko-KR", { maximumFractionDigits: v >= 1e10 ? 0 : 1 }) + "억";
+  if (v >= 1e4) return Math.round(v / 1e4).toLocaleString("ko-KR") + "만";
+  return Math.round(v).toLocaleString("ko-KR");
+}
+
+// ── 데이터 받기 ──────────────────────────────────────────────────
+async function domestic() {
+  if (kx === "upbit") {
+    // 업비트: 원화 마켓 전체 시세를 한 번에 (브라우저에서는 요청 제한이 빡빡해서 한 번만 부름)
+    const list = await getJSON("https://api.upbit.com/v1/ticker/all?quote_currencies=KRW");
+    const m = {};
+    for (const x of list) m[x.market.replace("KRW-", "")] = { price: x.trade_price, chg: x.signed_change_rate * 100, vol: x.acc_trade_price_24h };
+    return m;
+  }
+  const j = await getJSON("https://api.bithumb.com/public/ticker/ALL_KRW");
+  const m = {};
+  for (const [k, x] of Object.entries(j.data || {})) {
+    if (k === "date" || !x || !x.closing_price) continue;
+    m[k] = { price: +x.closing_price, chg: +x.fluctate_rate_24H, vol: +x.acc_trade_value_24H };
+  }
+  return m;
+}
+
+async function load() {
+  $("status").textContent = "불러오는 중…";
+  try {
+    const [dom, bn, trading, fx, lg] = await Promise.all([
+      domestic(),
+      getJSON("https://api.binance.com/api/v3/ticker/price"),
+      // 바이낸스에서 지금 실제로 거래 중인 코인 목록 (상장폐지된 코인은 옛날 가격이 남아 있어서 빼야 함) · 6시간 저장
+      cached("bn-trading-usdt", 6 * 3600e3, async () => {
+        const j = await getJSON("https://api.binance.com/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false");
+        return j.symbols.filter(x => x.quoteAsset === "USDT").map(x => x.baseAsset);
+      }),
+      cached("fx-usdkrw", 60 * 60e3, () => getJSON("https://open.er-api.com/v6/latest/USD")),
+      logoMap(),
+    ]);
+    logos = lg;
+    const usdPrice = {};
+    const live = new Set(trading);
+    for (const x of bn) {
+      const base = x.symbol.slice(0, -4);
+      if (x.symbol.endsWith("USDT") && live.has(base)) usdPrice[base] = +x.price;
+    }
+    data = { dom, usdPrice, fxRate: fx.rates.KRW, fxTime: fx.time_last_update_unix * 1000, usdtKrw: dom.USDT ? dom.USDT.price : null };
+    render();
+    $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${kx === "upbit" ? "업비트" : "빗썸"} vs 바이낸스`;
+  } catch (e) { $("status").textContent = e.message; }
+}
+
+// ── 계산 + 그리기 ────────────────────────────────────────────────
+function render() {
+  if (!data) return;
+  const { dom, usdPrice, fxRate, fxTime, usdtKrw } = data;
+  const rate = basis === "usdt" && usdtKrw ? usdtKrw : fxRate;     // 1달러(또는 1테더) = 몇 원
+  const minVol = +$("minVol").value, q = $("q").value.trim().toUpperCase();
+
+  let rows = [];
+  for (const [sym, d] of Object.entries(dom)) {
+    if (sym === "USDT" || sym === "USDC" || !usdPrice[sym] || !(d.price > 0)) continue;
+    const abroad = usdPrice[sym] * rate;                          // 바이낸스 가격을 원화로
+    const kp = (d.price / abroad - 1) * 100;
+    rows.push({ sym, ...d, usd: usdPrice[sym], abroad, kp, diff: d.price - abroad, odd: Math.abs(kp) > 25 });
+  }
+  const all = rows;
+  rows = rows.filter(r => r.vol >= minVol && (!q || r.sym.includes(q)));
+  const by = { vol: (a, b) => b.vol - a.vol, hi: (a, b) => b.kp - a.kp, lo: (a, b) => a.kp - b.kp, name: (a, b) => a.sym.localeCompare(b.sym) }[$("sort").value];
+  rows.sort(by);
+
+  // 요약 카드
+  const ok = all.filter(r => !r.odd && r.vol >= 1e9);              // 평균은 거래대금 10억 이상, 이상한 값 제외
+  const wAvg = ok.reduce((s, r) => s + r.kp * r.vol, 0) / (ok.reduce((s, r) => s + r.vol, 0) || 1);
+  const btc = all.find(r => r.sym === "BTC"), eth = all.find(r => r.sym === "ETH");
+  const tetherP = usdtKrw ? (usdtKrw / fxRate - 1) * 100 : null;
+  const tile = (k, v, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const kpSpan = v => `<span class="${cls(v)}">${pct(v)}</span>`;
+  $("tiles").innerHTML = [
+    tile("비트코인 김프", btc ? kpSpan(btc.kp) : "-", btc ? `국내 ${krw(btc.price)} · 해외 ${krw(btc.abroad)}` : ""),
+    tile("이더리움 김프", eth ? kpSpan(eth.kp) : "-", eth ? `국내 ${krw(eth.price)} · 해외 ${krw(eth.abroad)}` : ""),
+    tile("평균 김프", kpSpan(wAvg), `거래대금 10억 원 이상 ${ok.length}개 코인 · 거래대금 가중`),
+    tile("달러 환율", "₩" + fxRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }), `${new Date(fxTime).toLocaleDateString("ko-KR")} 기준`),
+    tile("테더(USDT) 원화 가격", usdtKrw ? krw(usdtKrw) : "-", tetherP != null ? `테더 프리미엄 ${pct(tetherP)}` : ""),
+    tile("비교한 코인", all.length + "개", `${kx === "upbit" ? "업비트와" : "빗썸과"} 바이낸스에 둘 다 있는 코인`),
+  ].join("");
+
+  // 표
+  const maxAbs = Math.max(3, ...rows.filter(r => !r.odd).map(r => Math.abs(r.kp)));
+  $("rows").innerHTML = rows.map(r => {
+    const w = Math.min(50, Math.abs(r.kp) / maxAbs * 50);
+    const bar = `<span class="kbar"><b></b><i style="${r.kp >= 0 ? `left:50%` : `right:50%`};width:${w}%;background:${r.kp >= 0 ? "var(--up)" : "var(--down)"}"></i></span>`;
+    return `<tr>
+      <td class="l">${coinTag(r.sym, logos, null, "coin.html?s=" + encodeURIComponent(r.sym))}</td>
+      <td>${krw(r.price)}</td>
+      <td>${usd(r.usd)}</td>
+      <td class="muted">${krw(r.abroad)}</td>
+      <td class="kp ${cls(r.kp)}">${pct(r.kp)}${r.odd ? '<span class="warn">⚠</span>' : ""}${bar}</td>
+      <td class="${cls(r.diff)}">${r.diff > 0 ? "+" : ""}${krw(r.diff).replace("₩-", "-₩")}</td>
+      <td class="${cls(r.chg)}">${pct(r.chg)}</td>
+      <td>${krwBig(r.vol)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="8" class="l muted">조건에 맞는 코인이 없어요</td></tr>`;
+}
+
+function seg(id, set) {
+  for (const b of $(id).querySelectorAll("button")) b.onclick = () => {
+    for (const x of $(id).querySelectorAll("button")) x.classList.toggle("on", x === b);
+    set(b.dataset.v);
+  };
+}
+seg("kx", v => { kx = v; load(); });
+seg("basis", v => { basis = v; render(); });
+$("minVol").onchange = render;
+$("sort").onchange = render;
+$("q").oninput = render;
+load();
+setInterval(() => { if (!document.hidden) load(); }, 30e3);
+</script>
+</body>
+</html>

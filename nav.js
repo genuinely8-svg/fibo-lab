@@ -10,6 +10,7 @@
     ["oi.html", "OI"],
     ["rank.html", "코인순위"],
     ["movers.html", "24시간변동률"],
+    ["kimp.html", "김치프리미엄"],
     ["news.html", "주요뉴스"],
   ];
   const style = document.createElement("style");
