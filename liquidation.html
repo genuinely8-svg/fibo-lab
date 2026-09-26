@@ -28,8 +28,7 @@
   <div class="card">
     <div class="controls">
       <label>코인
-        <input id="coin" list="coinList" value="BTC" style="width:110px">
-        <datalist id="coinList"></datalist>
+        <input id="coin" value="BTC" style="width:200px" placeholder="코인 검색 (예: 비트, SOL)">
       </label>
       <label>기간
         <select id="range">
@@ -99,11 +98,14 @@
 
 <script src="common.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
+<script src="coinpicker.js"></script>
 <script>
 const F = "https://fapi.binance.com";
 const LEV = [[5, .10], [10, .30], [25, .25], [50, .20], [100, .15]];   // [레버리지, 비중]
 const ROWS = 150;                 // 가격을 몇 칸으로 나눌지
-$("coinList").innerHTML = DEFAULT_COINS.map(c => `<option value="${c}">`).join("");
+// 코인 검색 칸 (coinpicker.js): 고르면 바로 계산
+CoinPicker.attach($("coin"), { onPick: () => load() });
 let model = null, sym = "BTC", logos = {};
 
 // ── 1) 모델 계산 ─────────────────────────────────────────────────
@@ -328,7 +330,7 @@ for (const b of $("liveMode").querySelectorAll("button")) b.onclick = () => {
 };
 
 $("run").onclick = load;
-$("coin").onkeydown = e => { if (e.key === "Enter") load(); };
+
 $("range").onchange = load;
 $("gain").oninput = draw;
 addEventListener("resize", draw);

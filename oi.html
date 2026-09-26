@@ -23,8 +23,7 @@
   <div class="card">
     <div class="controls">
       <label>코인
-        <input id="coin" list="coinList" value="BTC" style="width:110px">
-        <datalist id="coinList"></datalist>
+        <input id="coin" value="BTC" style="width:200px" placeholder="코인 검색 (예: 비트, SOL)">
       </label>
       <label>기간
         <select id="period">
@@ -66,14 +65,14 @@
   </div>
 
   <div class="card">
-    <h2>코인별 OI 한눈에 보기</h2>
+    <h2>내 관심목록 OI 한눈에 보기</h2>
     <div class="tablewrap">
       <table id="sumTable">
         <thead><tr><th class="l">코인</th><th>OI (달러)</th><th>OI 24시간 변화</th><th>가격 24시간 변화</th><th>펀딩비</th><th>롱/숏 비율</th></tr></thead>
         <tbody id="sum"><tr><td colspan="6" class="l muted">불러오는 중…</td></tr></tbody>
       </table>
     </div>
-    <div class="small muted" style="margin-top:8px">줄을 누르면 위 차트가 그 코인으로 바뀌어요.</div>
+    <div class="small muted" style="margin-top:8px">메인 페이지(TEST 참고용) → 관심목록에 넣은 코인들이에요. 줄을 누르면 위 차트가 그 코인으로 바뀌어요.</div>
   </div>
 
   <div class="foot">데이터: 바이낸스 선물 공개 API · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
@@ -82,13 +81,21 @@
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="common.js"></script>
 <script src="nav.js"></script>
+<script src="meta.js"></script>
+<script src="coinpicker.js"></script>
 <script>
 const F = "https://fapi.binance.com";
 const LIMIT = { "5m": 500, "15m": 500, "1h": 500, "4h": 180, "1d": 30 };
 const KST = 9 * 3600;
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 let logos = {};
-$("coinList").innerHTML = DEFAULT_COINS.map(c => `<option value="${c}">`).join("");
+// 코인 검색 칸 (coinpicker.js): 고르면 바로 불러옴
+CoinPicker.attach($("coin"), { onPick: () => loadOne() });
+// 아래 표에 보여줄 코인: 메인 페이지 "관심목록"과 같은 목록 (없으면 기본 코인)
+function myCoins() {
+  try { const w = JSON.parse(localStorage.getItem("watch-v1") || "null"); if (Array.isArray(w) && w.length) return w.slice(0, 30); } catch (e) {}
+  return DEFAULT_COINS;
+}
 
 // 차트 두 개 만들기 (Lightweight Charts)
 function mkChart(el) {
@@ -175,7 +182,7 @@ async function loadOne() {
 async function loadSummary() {
   logos = await logoMap();
   const rows = [];
-  for (const sym of DEFAULT_COINS) {
+  for (const sym of myCoins()) {
     try {
       const [oi, tick, prem, ls] = await Promise.all([
         getJSON(`${F}/futures/data/openInterestHist?symbol=${sym}USDT&period=1h&limit=25`),
@@ -197,7 +204,7 @@ async function loadSummary() {
 }
 
 $("run").onclick = loadOne;
-$("coin").onkeydown = e => { if (e.key === "Enter") loadOne(); };
+
 $("period").onchange = loadOne;
 const q = new URLSearchParams(location.search);
 if (q.get("s")) $("coin").value = q.get("s");
