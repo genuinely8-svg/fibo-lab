@@ -35,7 +35,10 @@
   tbody tr{cursor:pointer}
   tbody tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
   tbody tr.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
-  .name small{color:var(--muted);margin-left:4px}
+  .name{color:var(--text);text-decoration:none;font-weight:600}
+  .name:hover{text-decoration:underline}
+  .name small{color:var(--muted);margin-left:4px;font-weight:400}
+  .name .go{font-size:11px;color:var(--accent);font-weight:600;margin-left:4px}
   .err{color:var(--muted);font-size:11px}
   .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
   .b-near{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
@@ -288,7 +291,9 @@ function renderTable() {
   // 진입 가격까지 가까운 순으로 정렬
   const rows = [...results].sort((a, b) => (a.current?.distance ?? 1e9) - (b.current?.distance ?? 1e9));
   $("tbody").innerHTML = rows.map(r => {
-    const name = `<span class="name">${r.market}<small>${r.market}USDT</small></span>`;
+    // 코인 이름을 누르면 상세 페이지로 (지금 설정 그대로 넘김)
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+    const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${r.market}<small>${r.market}USDT</small> <span class="go">상세 ›</span></a>`;
     if (r.error) return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const s = r.stats, c = r.current;
     const few = s.count < 5 ? "few" : "";
