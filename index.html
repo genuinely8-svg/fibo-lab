@@ -90,6 +90,19 @@
   .summary{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin:0 0 10px}
   .summary b{font-size:15px}
   td.rk{color:var(--muted);width:32px}
+  /* 코인 누르면 펼쳐지는 차트 줄 */
+  tbody tr[data-m] .caret{display:inline-block;color:var(--muted);font-size:11px;transition:transform .15s;margin-left:2px}
+  tbody tr.open .caret{transform:rotate(180deg);color:var(--accent)}
+  tbody tr.open{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  tr.exp > td{padding:12px 10px 16px;background:color-mix(in srgb,var(--accent) 5%,transparent);white-space:normal;text-align:left}
+  tr.exp:hover{background:transparent}
+  #chartPanel #chart{height:420px}
+  #closeChart{margin-left:4px}
+  .ncell{display:flex;align-items:center}
+  /* more 버튼: 상세 페이지로 */
+  a.more{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:99px;background:var(--accent);color:#fff;
+         font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.2px;vertical-align:middle}
+  a.more:hover{filter:brightness(1.12)}
   .mc,.tf{font-size:11px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px;white-space:nowrap}
   .mc{color:var(--muted);background:var(--bg);border:1px solid var(--line)}
   .tf{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
@@ -182,12 +195,14 @@
     </table>
   </div>
 
-  <div class="card">
+  <!-- 차트 묶음: 평소엔 숨겨져 있다가, 코인을 누르면 그 줄 바로 아래로 옮겨져서 펼쳐짐 -->
+  <div id="chartHolder" hidden><div id="chartPanel">
     <div class="chead">
-      <h2 id="chartTitle">표에서 코인을 누르면 차트가 나와요</h2>
+      <h2 id="chartTitle">차트</h2>
       <div class="tabs">
         <button id="tabLw" class="on">분석 차트</button>
         <button id="tabTv">트레이딩뷰</button>
+        <button id="closeChart" title="접기">접기 ✕</button>
       </div>
     </div>
     <div id="chart"></div>
@@ -199,7 +214,7 @@
       <span style="color:var(--accent)">▲ 과거 진입가 터치</span>
       <span>마우스 휠로 확대, 드래그로 과거 보기</span>
     </div>
-  </div>
+  </div></div>
 
   <div class="card">
     <details>
@@ -233,7 +248,7 @@ const BINANCE_INTERVAL = { 240: "4h", 120: "2h", 60: "1h", 30: "30m", 15: "15m" 
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let results = [];          // 코인별 분석 결과
-let selected = null;       // 차트에 보여줄 코인
+let openCoin = null;       // 차트가 펼쳐져 있는 코인 (없으면 null)
 let timer = null;
 let curEx = "futures";       // 지금 표에 나온 결과의 거래소
 
@@ -412,9 +427,8 @@ async function runOnce() {
   results = mode === "scan" ? out.filter(r => !r.error) : out;
   curEx = ex;
   renderTable();
-  const prev = selected;
-  if (!selected || !results.find(r => r.market === selected && !r.error)) selected = sortedRows()[0]?.market;
-  if (view === "lw" || prev !== selected) drawChart();   // 트레이딩뷰는 스스로 실시간 갱신됨
+  if (openCoin && !results.find(r => r.market === openCoin && !r.error)) { openCoin = null; renderTable(); }
+  if (openCoin && view === "lw") drawChart();            // 펼쳐 둔 차트도 새 데이터로 (트레이딩뷰는 스스로 실시간 갱신)
   $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개 · `
     + (mode === "scan" ? `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`);
   $("run").disabled = false;
@@ -447,7 +461,9 @@ function rankKey(r) {
 }
 const sortedRows = () => [...results].sort((a, b) => rankKey(a) - rankKey(b));
 
+const chartPanel = $("chartPanel");      // 차트 묶음 (표를 다시 그려도 지워지지 않게 따로 잡아둠)
 function renderTable() {
+  $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
   const rows = sortedRows();
   const ok = results.filter(r => !r.error && r.current?.level);
   const near = ok.filter(r => r.current.distance > 0 && r.current.distance <= 5).length;
@@ -458,14 +474,15 @@ function renderTable() {
     <span style="color:var(--muted)">진입 가격에 가까운 순서</span>`;
   let rank = 0;
   $("tbody").innerHTML = rows.map(r => {
-    // 코인 이름을 누르면 상세 페이지로 (지금 설정 그대로 넘김)
+    // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
     const logo = logoHtml(r.market);
-    const name = `<a class="name" href="${href}" onclick="event.stopPropagation()">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="go">상세 ›</span></a>`;
+    const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
+      + `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a></div>`;
     if (r.error) return `<tr><td class="rk">-</td><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const s = r.stats, c = r.current;
     const few = s.count < 5 ? "few" : "";
-    return `<tr data-m="${r.market}" class="${r.market === selected ? "sel" : ""}">
+    const row = `<tr data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}" title="누르면 차트가 펼쳐져요">
       <td class="rk">${++rank}</td>
       <td>${name}</td>
       <td>${won(r.price)}</td>
@@ -478,9 +495,23 @@ function renderTable() {
       <td>${pct(s.winRate)}</td>
       <td>${won(c?.expected)}</td>
     </tr>`;
+    // 펼친 코인이면 바로 아래에 차트 줄을 하나 더
+    return r.market === openCoin ? row + `<tr class="exp"><td colspan="11" id="expCell"></td></tr>` : row;
   }).join("");
+  // 차트 묶음을 펼친 줄 안으로 옮기기 (없으면 숨김 보관함으로)
+  if ($("expCell")) $("expCell").appendChild(chartPanel);
   for (const tr of $("tbody").querySelectorAll("tr[data-m]")) {
-    tr.onclick = () => { selected = tr.dataset.m; renderTable(); drawChart(); };
+    tr.onclick = () => toggleCoin(tr.dataset.m);
+  }
+}
+// 같은 코인을 다시 누르면 접고, 다른 코인을 누르면 그 코인 아래로 펼침
+function toggleCoin(m) {
+  openCoin = openCoin === m ? null : m;
+  renderTable();
+  if (openCoin) {
+    drawChart();
+    const tr = $("tbody").querySelector(`tr[data-m="${openCoin}"]`);
+    if (tr) { const y = tr.getBoundingClientRect().top; if (y < 0 || y > innerHeight * 0.6) tr.scrollIntoView({ behavior: "smooth", block: "start" }); }
   }
 }
 
@@ -493,7 +524,7 @@ function tvSymbol(m) {
 }
 
 function drawChart() {
-  const r = results.find(x => x.market === selected);
+  const r = results.find(x => x.market === openCoin);
   if (!r || r.error) return;
   $("chartTitle").textContent = `${r.market} · ${EX[curEx].name} · 과거 진입가 터치 ${r.stats.count}회`;
   if (view === "lw") FiboChart.draw($("chart"), r, { krw: false });
@@ -511,6 +542,7 @@ function setView(v) {
 }
 $("tabLw").onclick = () => setView("lw");
 $("tabTv").onclick = () => setView("tv");
+$("closeChart").onclick = () => { if (openCoin) toggleCoin(openCoin); };
 
 // ── 관심목록: 칩 + 검색 자동완성 ──────────────────────────────────
 function renderChips() {
