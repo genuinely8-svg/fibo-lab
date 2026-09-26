@@ -15,7 +15,7 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;font-size:14px}
-  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+  .wrap{max-width:1320px;margin:0 auto;padding:20px 16px 60px}   /* 표가 넓어서 조금 넓게 */
   h1{font-size:22px;margin:0 0 4px}
   .sub{color:var(--muted);margin:0 0 18px;line-height:1.5}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
@@ -97,7 +97,12 @@
   tr.exp > td{padding:12px 10px 16px;background:color-mix(in srgb,var(--accent) 5%,transparent);white-space:normal;text-align:left}
   tr.exp:hover{background:transparent}
   #chartPanel #chart{height:420px}
-  #closeChart{margin-left:4px}
+  /* 트레이딩뷰 탭: 트레이딩뷰 공식 아이콘 (트레이딩뷰 서버의 파일을 그대로 씀) */
+  .tvlogo{width:16px;height:16px;border-radius:4px;vertical-align:-3px;margin-right:6px}
+  #closeChart{margin-left:8px;padding:6px 12px;font-size:13px}
+  .chead{flex-wrap:nowrap} .chead h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 펼친 차트는 표가 옆으로 넓어도 보이는 영역 폭에 맞춰서 (접기 버튼이 안 잘리게) */
+  #chartPanel{position:sticky;left:0}
   .ncell{display:flex;align-items:center}
   /* more 버튼: 상세 페이지로 */
   a.more{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:99px;background:var(--accent);color:#fff;
@@ -201,9 +206,9 @@
       <h2 id="chartTitle">차트</h2>
       <div class="tabs">
         <button id="tabLw" class="on">분석 차트</button>
-        <button id="tabTv">트레이딩뷰</button>
-        <button id="closeChart" title="접기">접기 ✕</button>
+        <button id="tabTv"><img class="tvlogo" src="https://static.tradingview.com/static/images/favicon.ico" alt="TradingView" onerror="this.remove()">트레이딩뷰</button>
       </div>
+      <button id="closeChart" class="ghost" title="차트 접기">접기 ✕</button>
     </div>
     <div id="chart"></div>
     <div id="tv" hidden></div>
@@ -499,11 +504,17 @@ function renderTable() {
     return r.market === openCoin ? row + `<tr class="exp"><td colspan="11" id="expCell"></td></tr>` : row;
   }).join("");
   // 차트 묶음을 펼친 줄 안으로 옮기기 (없으면 숨김 보관함으로)
-  if ($("expCell")) $("expCell").appendChild(chartPanel);
+  if ($("expCell")) { $("expCell").appendChild(chartPanel); fitPanel(); }
   for (const tr of $("tbody").querySelectorAll("tr[data-m]")) {
     tr.onclick = () => toggleCoin(tr.dataset.m);
   }
 }
+// 펼친 차트 폭 = 표가 보이는 영역 폭 (표가 옆으로 스크롤돼도 차트는 화면 안에)
+function fitPanel() {
+  const box = document.querySelector(".tablewrap");
+  if (box && chartPanel.parentElement && chartPanel.parentElement.id === "expCell") chartPanel.style.width = (box.clientWidth - 48) + "px";
+}
+addEventListener("resize", fitPanel);
 // 같은 코인을 다시 누르면 접고, 다른 코인을 누르면 그 코인 아래로 펼침
 function toggleCoin(m) {
   openCoin = openCoin === m ? null : m;

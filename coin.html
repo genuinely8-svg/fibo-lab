@@ -72,6 +72,9 @@
   .tabs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px}
   .tabs button{font:inherit;border:0;background:transparent;color:var(--muted);padding:6px 12px;font-weight:600;border-radius:6px;cursor:pointer}
   .tabs button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+  /* 트레이딩뷰 탭: 트레이딩뷰 공식 아이콘 (트레이딩뷰 서버의 파일을 그대로 씀) */
+  .tvlogo{width:16px;height:16px;border-radius:4px;vertical-align:-3px;margin-right:6px}
+
   #chart{width:100%;height:460px}
   #tv{width:100%;height:560px}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
@@ -150,7 +153,7 @@
       <h2 id="chartTitle">차트</h2>
       <div class="tabs">
         <button id="tabLw" class="on">분석 차트</button>
-        <button id="tabTv">트레이딩뷰</button>
+        <button id="tabTv"><img class="tvlogo" src="https://static.tradingview.com/static/images/favicon.ico" alt="TradingView" onerror="this.remove()">트레이딩뷰</button>
       </div>
     </div>
     <div id="chart"></div>
