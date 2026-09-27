@@ -17,7 +17,6 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">바이낸스 선물 미결제약정(OI)·펀딩비·롱숏 비율을 봅니다. OI는 아직 청산되지 않고 열려 있는 선물 포지션의 총량이에요.</p>
   <nav id="nav"></nav>
 
   <div class="card">
@@ -50,7 +49,6 @@
     <div class="legend">
       <span>캔들: 가격 (오른쪽 축)</span>
       <span><i style="background:#f59e0b"></i>OI 달러 가치 (왼쪽 축)</span>
-      <span>가격이 오르는데 OI도 늘면 새 돈이 들어오는 중, 가격이 빠지며 OI가 줄면 포지션이 정리(청산)되는 중인 경우가 많아요.</span>
     </div>
   </div>
 
@@ -72,10 +70,7 @@
         <tbody id="sum"><tr><td colspan="6" class="l muted">불러오는 중…</td></tr></tbody>
       </table>
     </div>
-    <div class="small muted" style="margin-top:8px">메인 페이지(TEST 참고용) → 관심목록에 넣은 코인들이에요. 줄을 누르면 위 차트가 그 코인으로 바뀌어요.</div>
   </div>
-
-  <div class="foot">데이터: 바이낸스 선물 공개 API · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -166,9 +161,9 @@ async function loadOne() {
     $("title").textContent = `${sym} OI 요약`;
     $("tiles").innerHTML = [
       ["현재 OI", bigUsd(+last.sumOpenInterestValue), `${(+last.sumOpenInterest).toLocaleString("en-US", { maximumFractionDigits: 0 })} ${sym}`],
-      ["OI 24시간 변화", `<span class="${cls(oiChg)}">${pct(oiChg)}</span>`, "하루 전 대비 열린 포지션 증감"],
+      ["OI 24시간 변화", `<span class="${cls(oiChg)}">${pct(oiChg)}</span>`, ""],
       ["가격 24시간 변화", `<span class="${cls(+tick.priceChangePercent)}">${pct(+tick.priceChangePercent)}</span>`, usd(+tick.lastPrice)],
-      ["현재 펀딩비", `<span class="${cls(fr)}">${fr.toFixed(4)}%</span>`, `다음 정산까지 ${Math.floor(mins / 60)}시간 ${mins % 60}분 · 양수면 롱이 숏에게 지불`],
+      ["현재 펀딩비", `<span class="${cls(fr)}">${fr.toFixed(4)}%</span>`, `다음 정산까지 ${Math.floor(mins / 60)}시간 ${mins % 60}분`],
       ["롱/숏 비율 (전체 계정)", lsNow ? (+lsNow.longShortRatio).toFixed(2) : "-", lsNow ? `롱 ${(+lsNow.longAccount * 100).toFixed(1)}% · 숏 ${(+lsNow.shortAccount * 100).toFixed(1)}%` : ""],
       ["롱/숏 비율 (탑 트레이더)", topNow ? (+topNow.longShortRatio).toFixed(2) : "-", topNow ? `롱 ${(+topNow.longAccount * 100).toFixed(1)}% · 숏 ${(+topNow.shortAccount * 100).toFixed(1)}%` : ""],
     ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");

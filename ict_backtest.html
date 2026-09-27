@@ -1,0 +1,167 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICT 백테스트 · ath TEST</title>
+<style>
+body{margin:0;background:#101014;color:#ECEEF2;font-family:system-ui,"Malgun Gothic",sans-serif;padding:24px;font-size:14px}
+h2{margin:0 0 6px;font-size:20px}h3{margin:26px 0 4px;font-size:16px}
+table{border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+td,th{padding:6px 11px;border-bottom:1px solid #2A2A33;text-align:right;white-space:nowrap}
+th{color:#8B95A1;font-weight:500}td:first-child,th:first-child{text-align:left}
+.up{color:#FF5C6C}.dn{color:#7C8AFF}.mut{color:#8B95A1}
+details{margin-top:10px}summary{cursor:pointer;color:#B0B8C1}
+ol{color:#B0B8C1;line-height:1.8;padding-left:20px;max-width:1100px}
+</style></head><body>
+<h2>ICT 모델 · BTC 5분봉 2년 백테스트</h2>
+<div id="st" class="mut">데이터 받는 중… (1~2분 걸려요)</div>
+<ol>
+<li><b>유동성</b> — ① 아시아 세션(한국 09~15시) 고점·저점 ② 전날 고점·저점. 이 선 너머엔 손절 주문이 몰려 있다고 봄</li>
+<li><b>킬존 (시간대)</b> — 런던 오픈 (한국 16~19시) / 뉴욕 오픈 (한국 21~24시). 이 시간에만 매매</li>
+<li><b>셋업 (롱 기준, 숏은 반대)</b> — ① 킬존 안에서 가격이 유동성 저점을 아래로 쓸고(스윕) ② 2시간 안에, 스윕 직전 1시간 최고가를 종가로 돌파(구조 전환 MSS) ③ 그 상승 구간에 생긴 FVG 윗선에 지정가 진입</li>
+<li><b>손절</b> — 스윕 최저점 아래 (0.1% 여유), 진입과 동시에 주문 · <b>익절</b> — 2R (손절 폭의 2배) · 24시간 안에 안 끝나면 정리</li>
+<li><b>크기</b> — 손절되면 계좌의 1%만 잃게 계산 (최대 잔고의 10배) · 킬존 하나당 매매 1번</li>
+<li>수수료: 지정가 0.02% · 손절(시장가) 0.05% + 미끄러짐 0.05% · 펀딩비 포함 · 한 봉에서 손절·익절 같이 닿으면 손절 처리 · 규칙과 숫자는 결과 보기 전에 정함</li>
+</ol>
+<div id="out"></div>
+<script>
+const F = "https://fapi.binance.com";
+const j = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status + " " + u); return r.json(); });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const st = t => document.getElementById("st").textContent = t;
+const H = 3600e3, DAY = 864e5;
+
+async function klines() {
+  const need = Math.ceil(735 * DAY / 300e3);
+  let out = [], end = Date.now();
+  while (out.length < need) {
+    const a = await j(`${F}/fapi/v1/klines?symbol=BTCUSDT&interval=5m&limit=1500&endTime=${end}`);
+    if (!a.length) break;
+    out = a.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] })).concat(out);
+    end = a[0][0] - 1; st(`데이터 받는 중… ${Math.round(out.length / need * 100)}%`); await sleep(150);
+    if (a.length < 1500) break;
+  }
+  const last = out[out.length - 1]; if (last.t + 300e3 > Date.now()) out.pop();
+  return out;
+}
+async function funding() {
+  let out = [], t0 = Date.now() - 760 * DAY;
+  while (true) { const a = await j(`${F}/fapi/v1/fundingRate?symbol=BTCUSDT&startTime=${t0}&limit=1000`); out = out.concat(a.map(x => ({ t: x.fundingTime, r: +x.fundingRate }))); if (a.length < 1000) break; t0 = a[a.length - 1].fundingTime + 1; await sleep(150); }
+  return out;
+}
+
+// 날짜별 아시아 고저(UTC 00~06), 전날 고저
+function levels(c) {
+  const d = new Map();
+  for (const k of c) {
+    const day = Math.floor(k.t / DAY) * DAY, hr = (k.t - day) / H;
+    let x = d.get(day); if (!x) d.set(day, x = { hi: -Infinity, lo: Infinity, ahi: -Infinity, alo: Infinity });
+    x.hi = Math.max(x.hi, k.h); x.lo = Math.min(x.lo, k.l);
+    if (hr < 6) { x.ahi = Math.max(x.ahi, k.h); x.alo = Math.min(x.alo, k.l); }
+  }
+  return d;
+}
+
+const SESS = { london: [7, 10], ny: [12, 15] };   // UTC 시
+function run(c, fund, lv, t0, t1, o) {
+  let eq = 50000, peak = eq, mdd = 0, fi = 0, pos = null, pend = null, setup = null, maxExp = 0;
+  const rows = [], usedSess = new Set();
+  const open = (i, side, entry, stop, tp) => {
+    const risk = Math.abs(entry - stop); if (!(risk > 0)) return;
+    const qty = Math.min(eq * 0.01 / risk, eq * 10 / entry), fee = qty * entry * 0.0002;
+    eq -= fee; pos = { side, entry, stop, tp, qty, ei: i, R: risk, pnl: -fee, sess: setup && setup.name, liq: setup && setup.liq };
+    maxExp = Math.max(maxExp, qty * entry / eq);
+  };
+  const close = (i, px, why, taker) => {
+    const p = pos.side * pos.qty * (px - pos.entry) - pos.qty * px * (taker ? 0.0005 : 0.0002);
+    eq += p; pos.pnl += p; rows.push({ ...pos, xi: i, why, eqAfter: eq }); pos = null;
+  };
+  for (let i = 300; i < c.length; i++) {
+    const k = c[i]; if (k.t >= t1) break;
+    const day = Math.floor(k.t / DAY) * DAY, hr = (k.t - day) / H;
+    // 1) 지정가 체결
+    if (pend && !pos) {
+      if (pend.side > 0 ? k.l <= pend.limit : k.h >= pend.limit) { setup = pend.setup; open(i, pend.side, pend.side > 0 ? Math.min(k.o, pend.limit) : Math.max(k.o, pend.limit), pend.stop, pend.tp); setup = null; pend = null; }
+      else if (i > pend.exp || (pend.side > 0 ? k.l <= pend.stop : k.h >= pend.stop)) pend = null;
+    }
+    // 2) 포지션 관리
+    if (pos) {
+      const S = pos.side;
+      if (S > 0 ? k.l <= pos.stop : k.h >= pos.stop) close(i, (S > 0 ? Math.min(k.o, pos.stop) : Math.max(k.o, pos.stop)) * (1 - S * 0.0005), "손절", true);
+      else if (i > pos.ei && (S > 0 ? k.h >= pos.tp : k.l <= pos.tp)) close(i, pos.tp, "2R 익절", false);
+      else if (i - pos.ei >= 288) close(i, k.c, "24시간 정리", true);
+    }
+    while (fi < fund.length && fund[fi].t <= k.t) { if (pos && fund[fi].t > c[pos.ei].t) { const p = -pos.side * pos.qty * k.c * fund[fi].r; eq += p; pos.pnl += p; } fi++; }
+    // 3) 셋업 찾기
+    if (!pos && !pend && k.t >= t0) {
+      for (const name of o.sess) {
+        const [a, b] = SESS[name]; const key = day + name;
+        if (hr < a || hr >= b || usedSess.has(key)) continue;
+        const today = lv.get(day), yest = lv.get(day - DAY); if (!today || !yest) continue;
+        const L = []; if (o.liq.includes("asia")) L.push(["아시아", today.ahi, today.alo]); if (o.liq.includes("pd")) L.push(["전날", yest.hi, yest.lo]);
+        // 스윕 발견 → 셋업 시작
+        if (!setup || setup.key !== key) {
+          for (const [ln, hi, lo] of L) {
+            let ref;
+            if (k.l < lo && c[i - 1].l >= lo) { ref = -Infinity; for (let q = i - 12; q < i; q++) ref = Math.max(ref, c[q].h); setup = { key, name, liq: ln, side: 1, ext: k.l, ref, si: i }; break; }
+            if (k.h > hi && c[i - 1].h <= hi) { ref = Infinity; for (let q = i - 12; q < i; q++) ref = Math.min(ref, c[q].l); setup = { key, name, liq: ln, side: -1, ext: k.h, ref, si: i }; break; }
+          }
+          if (!setup || setup.key !== key) continue;
+        }
+        const s = setup;
+        if (i - s.si > 24) { usedSess.add(key); setup = null; continue; }
+        if (s.side > 0) s.ext = Math.min(s.ext, k.l); else s.ext = Math.max(s.ext, k.h);
+        // 구조 전환 (종가 돌파)
+        if (i > s.si && (s.side > 0 ? k.c > s.ref : k.c < s.ref)) {
+          let gap = null;
+          for (let q = i; q >= s.si + 2; q--) {
+            if (s.side > 0 && c[q].l > c[q - 2].h) { gap = c[q].l; break; }
+            if (s.side < 0 && c[q].h < c[q - 2].l) { gap = c[q].h; break; }
+          }
+          usedSess.add(key);
+          if (gap != null) {
+            const stop = s.ext * (1 - s.side * 0.001), tp = gap + s.side * 2 * Math.abs(gap - stop);
+            pend = { side: s.side, limit: gap, stop, tp, exp: i + 12, setup: s };
+          }
+          setup = null;
+        }
+        break;
+      }
+    }
+    const m = eq + (pos ? pos.side * pos.qty * (k.c - pos.entry) : 0);
+    if (k.t >= t0) { peak = Math.max(peak, m); mdd = Math.max(mdd, (peak - m) / peak); }
+  }
+  if (pos) close(c.length - 1, c[c.length - 1].c, "기간 끝", true);
+  const R = rows.filter(r => c[r.ei].t >= t0), w = R.filter(r => r.pnl > 0), l = R.filter(r => r.pnl <= 0);
+  const gw = w.reduce((a, r) => a + r.pnl, 0), gl = -l.reduce((a, r) => a + r.pnl, 0);
+  return { rows: R, final: eq, mdd: mdd * 100, n: R.length, win: w.length, pf: gl > 0 ? gw / gl : null, longs: R.filter(r => r.side > 0).length, maxExp };
+}
+
+const f = v => (v < 0 ? "-$" : "$") + Math.round(Math.abs(v)).toLocaleString();
+const pc = v => `<span class="${v >= 0 ? "up" : "dn"}">${v >= 0 ? "+" : ""}${v.toFixed(1)}%</span>`;
+const dt = t => new Date(t).toLocaleString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+(async () => {
+  const fund = await funding(), c = await klines(), lv = levels(c);
+  const now = Date.now(), P = [["2년 전체", now - 730 * DAY, now], ["앞 1년 (2년 전 ~ 1년 전)", now - 730 * DAY, now - 365 * DAY], ["최근 1년", now - 365 * DAY, now]];
+  const V = [
+    ["런던 + 뉴욕 · 아시아 + 전날 고저", { sess: ["london", "ny"], liq: ["asia", "pd"] }],
+    ["런던 + 뉴욕 · 아시아 고저만", { sess: ["london", "ny"], liq: ["asia"] }],
+    ["런던 + 뉴욕 · 전날 고저만", { sess: ["london", "ny"], liq: ["pd"] }],
+    ["런던만 · 아시아 + 전날 고저", { sess: ["london"], liq: ["asia", "pd"] }],
+    ["뉴욕만 · 아시아 + 전날 고저", { sess: ["ny"], liq: ["asia", "pd"] }],
+  ];
+  st(`BTCUSDT 선물 5분봉 · 마지막 봉 ${dt(c[c.length - 1].t)}`);
+  let h = "";
+  for (const [pn, t0, t1] of P) {
+    h += `<h3>${pn}</h3><table><tr><th>방식</th><th>매매 (롱/숏)</th><th>승률</th><th>손익비</th><th>최대 낙폭</th><th>최종 잔고</th><th>수익률</th><th>최대 노출</th></tr>`;
+    for (const [vn, o] of V) {
+      const r = run(c, fund, lv, t0, t1, o), ret = (r.final / 50000 - 1) * 100;
+      h += `<tr><td>${vn}</td><td>${r.n} (${r.longs}/${r.n - r.longs})</td><td>${r.n ? (r.win / r.n * 100).toFixed(1) : 0}%</td><td>${r.pf == null ? "-" : r.pf.toFixed(2)}</td><td>${r.mdd.toFixed(1)}%</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.maxExp.toFixed(1)}배</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  const r = run(c, fund, lv, now - 730 * DAY, now, V[0][1]);
+  h += `<div class="mut" style="margin-top:8px">승률 33.4%가 본전 기준선이에요 (2R 익절이라 3번 중 1번만 이겨도 수수료 빼고 대략 본전)</div>`;
+  h += `<details><summary>매매 내역 (런던 + 뉴욕 · 아시아 + 전날 고저, 2년, ${r.n}번) 펼쳐보기</summary><table><tr><th>진입</th><th>킬존</th><th>쓸린 유동성</th><th>방향</th><th>진입가</th><th>손절가</th><th>익절가</th><th>결과</th><th>손익</th><th>잔고</th></tr>`;
+  for (const x of r.rows.slice().reverse()) h += `<tr><td>${dt(c[x.ei].t)}</td><td>${x.sess === "london" ? "런던" : "뉴욕"}</td><td>${x.liq}</td><td class="${x.side > 0 ? "up" : "dn"}">${x.side > 0 ? "롱" : "숏"}</td><td>${x.entry.toFixed(1)}</td><td>${x.stop.toFixed(1)}</td><td>${x.tp.toFixed(1)}</td><td>${x.why}</td><td class="${x.pnl > 0 ? "up" : "dn"}">${f(x.pnl)}</td><td>${f(x.eqAfter)}</td></tr>`;
+  h += `</table></details>`;
+  document.getElementById("out").innerHTML = h;
+})().catch(e => st("오류: " + e.message));
+</script></body></html>

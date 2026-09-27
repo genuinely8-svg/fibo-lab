@@ -1,0 +1,192 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TAE 신호 백테스트 · ath TEST</title>
+<style>
+body{margin:0;background:#101014;color:#ECEEF2;font-family:system-ui,"Malgun Gothic",sans-serif;padding:24px;font-size:14px}
+h2{margin:0 0 6px;font-size:20px}h3{margin:26px 0 4px;font-size:16px}
+table{border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+td,th{padding:6px 11px;border-bottom:1px solid #2A2A33;text-align:right;white-space:nowrap}
+th{color:#8B95A1;font-weight:500}td:first-child,th:first-child{text-align:left}
+.up{color:#FF5C6C}.dn{color:#7C8AFF}.mut{color:#8B95A1}.grp td{border-top:2px solid #3A3A46}
+details{margin-top:10px}summary{cursor:pointer;color:#B0B8C1}
+ol{color:#B0B8C1;line-height:1.8;padding-left:20px;max-width:1100px}
+</style></head><body>
+<h2>TAE Weighted 7 Signal v8.5 · BTC 2년 백테스트</h2>
+<div id="st" class="mut">데이터 받는 중… (1~2분 걸려요)</div>
+<ol>
+<li><b>신호</b> — 파인 코드 그대로: RSI · 거래량 · FVG · DMI/ADX · AO · 슈퍼트렌드 가중 점수가 70%를 새로 넘는 봉에서 확정 롱/숏 (종가 진입). <b>OI는 뺐어요</b>: 바이낸스가 과거 OI를 30일치만 줘서 2년 계산이 불가능 → 파인에서 OI 끈 것과 같음</li>
+<li><b>TP / SL</b> — 파인 코드 그대로: 3봉 이상 보유 후, 수익 0.15% 이상 + 추세 약화 2개 이상이면 TP / 손실 중 + 반대 추세 2개 이상 또는 ATR×1.5 이탈이면 SL (둘 다 봉 종가에 청산)</li>
+<li><b>자금</b> — 시작 $50,000 · 매번 잔고의 30%를 증거금으로 20배 → 포지션 크기 = 잔고의 6배<br>
+  · <b>격리</b>: 증거금 30%만 걸림. 가격이 약 4.6% 반대로 가면 그 30%가 청산<br>
+  · <b>크로스</b>: 나머지 70%도 증거금으로 버팀. 가격이 약 16% 반대로 가야 계좌 전체 청산<br>
+  · <b>참고 1배</b>: 레버리지 없이 신호만 따랐을 때 (신호 자체의 실력 확인용)</li>
+<li>수수료 진입·청산 각 0.05% (포지션 크기 기준) · 펀딩비 포함 · 봉 중간 최고가/최저가로 청산 체크</li>
+</ol>
+<div id="out"></div>
+<script>
+const F = "https://fapi.binance.com";
+const j = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status + " " + u); return r.json(); });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const st = t => document.getElementById("st").textContent = t;
+const TFS = [["15분봉", "15m", 900e3], ["1시간봉", "1h", 3600e3], ["4시간봉", "4h", 14400e3]];
+
+async function klines(iv, ms) {
+  const need = Math.ceil(740 * 864e5 / ms) + 400;
+  let out = [], end = Date.now();
+  while (out.length < need) {
+    const a = await j(`${F}/fapi/v1/klines?symbol=BTCUSDT&interval=${iv}&limit=1500&endTime=${end}`);
+    if (!a.length) break;
+    out = a.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] })).concat(out);
+    end = a[0][0] - 1; st(`데이터 받는 중… ${iv} ${out.length}/${need}`); await sleep(200);
+    if (a.length < 1500) break;
+  }
+  const last = out[out.length - 1]; if (last && last.t + ms > Date.now()) out.pop();   // 아직 안 끝난 봉 제외
+  return out;
+}
+async function funding() {
+  let out = [], t0 = Date.now() - 760 * 864e5;
+  while (true) { const a = await j(`${F}/fapi/v1/fundingRate?symbol=BTCUSDT&startTime=${t0}&limit=1000`); out = out.concat(a.map(x => ({ t: x.fundingTime, r: +x.fundingRate }))); if (a.length < 1000) break; t0 = a[a.length - 1].fundingTime + 1; await sleep(150); }
+  return out;
+}
+
+// ── 파인 함수 옮기기 ──
+function rma(src, n) { const o = new Array(src.length).fill(NaN); let s = 0, c = 0, prev = NaN;
+  for (let i = 0; i < src.length; i++) { const x = src[i]; if (isNaN(x)) continue;
+    if (isNaN(prev)) { s += x; c++; if (c === n) { prev = s / n; o[i] = prev; } } else { prev = (prev * (n - 1) + x) / n; o[i] = prev; } }
+  return o; }
+function sma(src, n) { const o = new Array(src.length).fill(NaN); let s = 0; for (let i = 0; i < src.length; i++) { s += src[i]; if (i >= n) s -= src[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+function indicators(c) {
+  const N = c.length, close = c.map(x => x.c), hl2 = c.map(x => (x.h + x.l) / 2), vol = c.map(x => x.v);
+  const tr = c.map((x, i) => i === 0 ? x.h - x.l : Math.max(x.h - x.l, Math.abs(x.h - c[i - 1].c), Math.abs(x.l - c[i - 1].c)));
+  // RSI 14
+  const g = close.map((x, i) => i ? Math.max(x - close[i - 1], 0) : NaN), d = close.map((x, i) => i ? Math.max(close[i - 1] - x, 0) : NaN);
+  const ag = rma(g, 14), ad = rma(d, 14), rsi = ag.map((a, i) => ad[i] === 0 ? 100 : 100 - 100 / (1 + a / ad[i]));
+  const volMA = sma(vol, 20);
+  // DMI 14/14
+  const pdm = c.map((x, i) => { if (!i) return NaN; const up = x.h - c[i - 1].h, dn = c[i - 1].l - x.l; return up > dn && up > 0 ? up : 0; });
+  const mdm = c.map((x, i) => { if (!i) return NaN; const up = x.h - c[i - 1].h, dn = c[i - 1].l - x.l; return dn > up && dn > 0 ? dn : 0; });
+  const trr = rma(tr.map((x, i) => i ? x : NaN), 14), pr = rma(pdm, 14), mr = rma(mdm, 14);
+  const pdi = pr.map((x, i) => 100 * x / trr[i]), mdi = mr.map((x, i) => 100 * x / trr[i]);
+  const dx = pdi.map((p, i) => { const s = p + mdi[i]; return isNaN(s) ? NaN : Math.abs(p - mdi[i]) / (s === 0 ? 1 : s); });
+  const adx = rma(dx, 14).map(x => 100 * x);
+  // AO
+  const s5 = sma(hl2, 5), s34 = sma(hl2, 34), ao = s5.map((x, i) => x - s34[i]);
+  // SuperTrend 3 / 10
+  const atr10 = rma(tr, 10), dir = new Array(N).fill(1); let pu = NaN, pl = NaN, pst = NaN;
+  for (let i = 0; i < N; i++) {
+    if (isNaN(atr10[i])) continue;
+    let up = hl2[i] + 3 * atr10[i], lo = hl2[i] - 3 * atr10[i];
+    if (!isNaN(pl)) lo = (lo > pl || close[i - 1] < pl) ? lo : pl;
+    if (!isNaN(pu)) up = (up < pu || close[i - 1] > pu) ? up : pu;
+    let dr; if (isNaN(pst)) dr = 1; else if (pst === pu) dr = close[i] > up ? -1 : 1; else dr = close[i] < lo ? 1 : -1;
+    dir[i] = dr; pst = dr === -1 ? lo : up; pu = up; pl = lo;
+  }
+  const atr14 = rma(tr, 14);
+  // FVG (최근 10봉)
+  let lastBull = -1e9, lastBear = -1e9; const rBull = [], rBear = [];
+  for (let i = 0; i < N; i++) { if (i >= 2 && c[i].l > c[i - 2].h) lastBull = i; if (i >= 2 && c[i].h < c[i - 2].l) lastBear = i; rBull.push(i - lastBull <= 10); rBear.push(i - lastBear <= 10); }
+  // 가중 점수 (OI 제외)
+  const W = { rsi: 0.75, vol: 1.25, fvg: 1.5, dmi: 1.5, ao: 0.75, st: 1.25 }, TOT = 7.0;
+  const L = [], S = [];
+  for (let i = 0; i < N; i++) {
+    const hv = vol[i] >= volMA[i] * 1.5;
+    let l = 0, s = 0;
+    if (rsi[i] >= 52) l += W.rsi; if (rsi[i] <= 48) s += W.rsi;
+    if (hv && c[i].c > c[i].o) l += W.vol; if (hv && c[i].c < c[i].o) s += W.vol;
+    if (rBull[i]) l += W.fvg; if (rBear[i]) s += W.fvg;
+    if (pdi[i] > mdi[i] && adx[i] >= 20) l += W.dmi; if (mdi[i] > pdi[i] && adx[i] >= 20) s += W.dmi;
+    if (ao[i] > 0) l += W.ao; if (ao[i] < 0) s += W.ao;
+    if (dir[i] < 0) l += W.st; if (dir[i] > 0) s += W.st;
+    L.push(l / TOT * 100); S.push(s / TOT * 100);
+  }
+  return { pdi, mdi, adx, ao, dir, atr14, L, S };
+}
+
+// ── 파인 포지션 로직 그대로 → 거래 목록 ──
+function trades(c, I, i0) {
+  const out = []; let pos = 0, eb = -1, ep = 0;
+  for (let i = Math.max(i0, 300); i < c.length; i++) {
+    const cl = c[i].c;
+    const pnl = pos === 1 ? (cl - ep) / ep * 100 : pos === -1 ? (ep - cl) / ep * 100 : 0;
+    const adxWeak = I.adx[i] < 20 || I.adx[i] < I.adx[i - 1];
+    const lw = (I.pdi[i] <= I.mdi[i]) + adxWeak + (I.ao[i] < I.ao[i - 1]) + (I.dir[i] > 0);
+    const sw = (I.mdi[i] <= I.pdi[i]) + adxWeak + (I.ao[i] > I.ao[i - 1]) + (I.dir[i] < 0);
+    const dmiL = I.pdi[i] > I.mdi[i] && I.adx[i] >= 20, dmiS = I.mdi[i] > I.pdi[i] && I.adx[i] >= 20;
+    const lo = dmiS + (I.ao[i] < 0) + (I.dir[i] > 0) + (I.S[i] >= 70);
+    const so = dmiL + (I.ao[i] > 0) + (I.dir[i] < 0) + (I.L[i] >= 70);
+    const can = eb >= 0 && i - eb >= 3;
+    const atrS = I.atr14[i] * 1.5;
+    let exit = null;
+    if (pos === 1 && can) { if (pnl >= 0.15 && lw >= 2) exit = "TP"; else if (pnl < 0 && (lo >= 2 || cl <= ep - atrS)) exit = "SL"; }
+    if (pos === -1 && can) { if (pnl >= 0.15 && sw >= 2) exit = "TP"; else if (pnl < 0 && (so >= 2 || cl >= ep + atrS)) exit = "SL"; }
+    const longSig = pos === 0 && I.L[i] >= 70 && I.L[i - 1] < 70 && I.L[i] > I.S[i];
+    const shortSig = pos === 0 && I.S[i] >= 70 && I.S[i - 1] < 70 && I.S[i] > I.L[i];
+    if (exit) { out[out.length - 1].xi = i; out[out.length - 1].xp = cl; out[out.length - 1].why = exit; pos = 0; eb = -1; }
+    if (longSig) { pos = 1; eb = i; ep = cl; out.push({ side: 1, ei: i, ep: cl }); }
+    if (shortSig) { pos = -1; eb = i; ep = cl; out.push({ side: -1, ei: i, ep: cl }); }
+  }
+  if (out.length && out[out.length - 1].xi == null) out.pop();   // 아직 안 끝난 거래 제외
+  return out;
+}
+
+// ── 돈 계산 ──
+// mode: iso(격리) / cross(크로스) / one(1배)
+function money(c, T, fund, t0, t1, mode) {
+  let eq = 50000, peak = eq, mdd = 0, liqs = 0, dead = null; const rows = [];
+  let fi = 0;
+  for (const tr of T) {
+    if (c[tr.ei].t < t0 || c[tr.xi].t >= t1) continue;
+    if (eq <= 1) break;
+    const lev = mode === "one" ? 1 : 20, margin = mode === "one" ? eq : eq * 0.3, notional = margin * lev;
+    const qty = notional / tr.ep, side = tr.side;
+    let pnl = -notional * 0.0005, liq = false, exitP = tr.xp;
+    // 봉마다 청산 체크
+    for (let i = tr.ei + 1; i <= tr.xi; i++) {
+      const worst = side > 0 ? c[i].l : c[i].h, u = side * qty * (worst - tr.ep);
+      if (mode === "iso" && -u >= margin - notional * 0.004) { liq = true; break; }
+      if (mode === "cross" && eq + u <= notional * 0.004) { liq = true; break; }
+    }
+    if (liq) { pnl = mode === "iso" ? -margin : -eq; liqs++; }
+    else {
+      pnl += side * qty * (exitP - tr.ep) - qty * exitP * 0.0005;
+      // 펀딩비: 보유 중 정산 시각마다 (롱은 + 펀딩이면 냄)
+      while (fi < fund.length && fund[fi].t <= c[tr.ei].t) fi++;
+      for (let k = fi; k < fund.length && fund[k].t <= c[tr.xi].t; k++) pnl -= side * notional * fund[k].r;
+    }
+    eq += pnl; if (eq <= 1) { eq = 0; dead = new Date(c[tr.xi].t).toLocaleDateString("ko-KR"); }
+    peak = Math.max(peak, eq); mdd = Math.max(mdd, (peak - eq) / peak);
+    rows.push({ ...tr, pnl, liq, eqAfter: eq });
+  }
+  const w = rows.filter(r => r.pnl > 0), l = rows.filter(r => r.pnl <= 0);
+  const gw = w.reduce((a, r) => a + r.pnl, 0), gl = -l.reduce((a, r) => a + r.pnl, 0);
+  return { rows, final: eq, mdd: mdd * 100, liqs, dead, n: rows.length, win: w.length, pf: gl > 0 ? gw / gl : null,
+           longs: rows.filter(r => r.side > 0).length, avgW: w.length ? gw / w.length : 0, avgL: l.length ? gl / l.length : 0 };
+}
+
+const f = v => (v < 0 ? "-$" : "$") + Math.round(Math.abs(v)).toLocaleString();
+const pc = v => `<span class="${v >= 0 ? "up" : "dn"}">${v >= 0 ? "+" : ""}${v.toFixed(1)}%</span>`;
+const dt = t => new Date(t).toLocaleString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+(async () => {
+  const fund = await funding();
+  const data = [];
+  for (const [name, iv, ms] of TFS) { const c = await klines(iv, ms); const I = indicators(c); data.push([name, c, trades(c, I, 0)]); }
+  const now = Date.now(), P = [["2년 전체", now - 730 * 864e5, now], ["앞 1년 (2년 전 ~ 1년 전)", now - 730 * 864e5, now - 365 * 864e5], ["최근 1년", now - 365 * 864e5, now]];
+  const M = [["격리 (증거금 30% · 20배)", "iso"], ["크로스 (30% · 20배, 나머지 버팀)", "cross"], ["참고: 1배 (레버리지 없음)", "one"]];
+  st(`BTCUSDT 선물 · 마지막 봉 ${dt(data[1][1][data[1][1].length - 1].t)}`);
+  let h = "";
+  for (const [pn, t0, t1] of P) {
+    h += `<h3>${pn}</h3><table><tr><th>봉</th><th>방식</th><th>매매 (롱/숏)</th><th>승률</th><th>평균 이익 / 손실</th><th>손익비</th><th>최대 낙폭</th><th>최종 잔고</th><th>수익률</th><th>청산</th></tr>`;
+    for (const [tn, c, T] of data) M.forEach(([mn, m], k) => {
+      const r = money(c, T, fund, t0, t1, m), ret = (r.final / 50000 - 1) * 100;
+      h += `<tr class="${k === 0 ? "grp" : ""}"><td>${k === 0 ? tn : ""}</td><td>${mn}</td><td>${r.n} (${r.longs}/${r.n - r.longs})</td><td>${r.n ? (r.win / r.n * 100).toFixed(1) : 0}%</td><td>${f(r.avgW)} / ${f(-r.avgL)}</td><td>${r.pf == null ? "-" : r.pf.toFixed(2)}</td><td>${r.mdd.toFixed(1)}%</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td class="dn">${r.liqs ? r.liqs + "번" : ""}${r.dead ? " · 계좌 0원 " + r.dead : ""}</td></tr>`;
+    });
+    h += `</table>`;
+  }
+  for (const [tn, c, T] of data) {
+    const r = money(c, T, fund, now - 730 * 864e5, now, "iso");
+    h += `<details><summary>${tn} 격리 매매 내역 (2년, ${r.n}번) 펼쳐보기</summary><table><tr><th>진입</th><th>방향</th><th>진입가</th><th>청산</th><th>청산가</th><th>이유</th><th>손익</th><th>잔고</th></tr>`;
+    for (const x of r.rows.slice().reverse()) h += `<tr><td>${dt(c[x.ei].t)}</td><td class="${x.side > 0 ? "up" : "dn"}">${x.side > 0 ? "롱" : "숏"}</td><td>${x.ep.toFixed(1)}</td><td>${dt(c[x.xi].t)}</td><td>${x.xp.toFixed(1)}</td><td>${x.liq ? '<span class="dn">청산</span>' : x.why}</td><td class="${x.pnl > 0 ? "up" : "dn"}">${f(x.pnl)}</td><td>${f(x.eqAfter)}</td></tr>`;
+    h += `</table></details>`;
+  }
+  document.getElementById("out").innerHTML = h;
+})().catch(e => st("오류: " + e.message));
+</script></body></html>

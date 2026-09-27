@@ -20,7 +20,6 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">시가총액 순위와 전체 시장 현황이에요. 코인을 누르면 상세 페이지로 가요.</p>
   <nav id="nav"></nav>
 
   <div class="card">
@@ -63,8 +62,6 @@
     </div>
     <div class="status" id="status"></div>
   </div>
-
-  <div class="foot">데이터: 코인게코(CoinGecko) · 2분마다 새로 받아와요 · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
 </div>
 
 <script src="common.js"></script>
@@ -82,7 +79,7 @@ async function loadGlobal() {
     $("global").innerHTML = [
       ["전체 시가총액", bigUsd(g.total_market_cap.usd), `<span class="${cls(g.market_cap_change_percentage_24h_usd)}">${pct(g.market_cap_change_percentage_24h_usd)}</span> 24시간`],
       ["24시간 전체 거래량", bigUsd(g.total_volume.usd), ""],
-      ["비트코인 도미넌스", (dom.btc || 0).toFixed(1) + "%", "전체 시총 중 비트코인 비중"],
+      ["비트코인 도미넌스", (dom.btc || 0).toFixed(1) + "%", ""],
       ["이더리움 도미넌스", (dom.eth || 0).toFixed(1) + "%", ""],
       ["거래되는 코인 수", (g.active_cryptocurrencies || 0).toLocaleString("ko-KR") + "개", `거래소 ${g.markets}곳`],
     ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");

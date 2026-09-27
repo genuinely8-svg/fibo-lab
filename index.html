@@ -172,8 +172,6 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">바이낸스(달러) 캔들로 최근 하락 스윙의 <b>진입 가격</b>(피보나치 -1 레벨)을 찾고, 과거에 진입 가격에 닿았을 때 얼마나 반등했는지 통계를 냅니다.<br>
-  참고용 통계이며 투자 판단의 근거가 아닙니다.</p>
   <nav id="nav"></nav>
 
   <div class="card collapsed" id="setCard">
@@ -231,7 +229,6 @@
             <option value="100">100개</option>
           </select>
         </label>
-        <span class="small" style="color:var(--muted)">바이낸스 24시간 거래량이 많은 코인을 자동으로 골라서 분석해요</span>
       </span>
       <div id="watchBox" hidden>
         <div class="chips" id="chips"></div>
@@ -276,22 +273,9 @@
       <span><i style="background:var(--down)"></i>L 스윙 저점</span>
       <span><i style="background:var(--accent)"></i>진입 가격 · 예상 반등가(점선)</span>
       <span style="color:var(--accent)">▲ 과거 진입가 터치</span>
-      <span>마우스 휠로 확대, 드래그로 과거 보기</span>
     </div>
   </div></div>
 
-  <div class="card">
-    <details>
-      <summary>숫자 읽는 법</summary>
-      <p><b>진입 가격</b> = 저점 − (고점 − 저점). 피보나치 -1 레벨이에요. 고점 120, 저점 100이면 진입 가격은 80이에요.<br>
-      <b>과거 터치</b>: 분석 기간 동안 하락 스윙이 고점을 다시 넘기 전에 진입 가격까지 내려간 횟수. 5회 미만이면 <span class="few">주황색</span>으로 표시해요. 표본이 적으면 평균을 믿기 어려워요.<br>
-      <b>평균 반등</b>: 터치 후 관찰 봉 수 동안 진입 가격 대비 최대 몇 % 올랐는지의 평균. 작은 회색 숫자는 표준오차(±)예요.<br>
-      <b>평균 추가하락</b>: 같은 기간 진입 가격 아래로 최대 몇 % 더 빠졌는지의 평균.<br>
-      <b>반등 우세</b>: 반등 폭이 추가하락 폭보다 컸던 경우의 비율.<br>
-      <b>예상 반등가</b>: 진입 가격 × (1 + 평균 반등%). 과거 평균일 뿐, 미래를 보장하지 않아요.</p>
-      <p>투자 판단의 근거가 아니라 공부용 도구예요.</p>
-    </details>
-  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>

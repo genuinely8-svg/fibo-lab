@@ -22,7 +22,6 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">어느 가격에 청산 물량이 몰려 있을지 추정한 지도예요. 밝을수록 그 가격에 청산될 포지션이 많다는 뜻이에요.</p>
   <nav id="nav"></nav>
 
   <div class="card">
@@ -57,12 +56,10 @@
   <div class="cols">
     <div class="card">
       <h2 style="color:#22c55e">위쪽 · 숏 청산이 몰린 가격</h2>
-      <div class="small muted" style="margin:-6px 0 8px">가격이 여기까지 오르면 숏 포지션이 강제로 정리(= 시장가 매수)돼요</div>
       <table><thead><tr><th class="l">가격</th><th>지금보다</th><th>추정 물량</th></tr></thead><tbody id="above"></tbody></table>
     </div>
     <div class="card">
       <h2 style="color:#f0625a">아래쪽 · 롱 청산이 몰린 가격</h2>
-      <div class="small muted" style="margin:-6px 0 8px">가격이 여기까지 내리면 롱 포지션이 강제로 정리(= 시장가 매도)돼요</div>
       <table><thead><tr><th class="l">가격</th><th>지금보다</th><th>추정 물량</th></tr></thead><tbody id="below"></tbody></table>
     </div>
   </div>
@@ -84,16 +81,6 @@
     </div>
     <div class="small muted" style="margin-top:8px" id="liveStatus"></div>
   </div>
-
-  <div class="note">
-    <b>이 히트맵은 어떻게 만들었나요?</b><br>
-    진짜 청산 지도(코인글래스 등)는 유료라서, 바이낸스 공개 데이터로 비슷하게 <b>추정</b>했어요.
-    ① 봉마다 OI(열린 포지션)가 늘어난 만큼 그 가격에 새 포지션이 생겼다고 보고,
-    ② 그 중 절반은 롱, 절반은 숏, 레버리지는 5·10·25·50·100배가 섞여 있다고 가정해서 각각의 청산 가격을 계산해요.
-    ③ 이후 가격이 그 청산 가격을 지나가면 "청산됐다"고 보고 지도에서 지워요. OI가 줄어든 봉에서는 남은 물량도 그만큼 줄여요.
-    그래서 실제 청산 물량과는 다를 수 있어요. 정확한 유료 버전은 <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener noreferrer">코인글래스 ↗</a>에서 볼 수 있어요.
-  </div>
-  <div class="foot" style="margin-top:14px">데이터: 바이낸스 선물 공개 API · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
 </div>
 
 <script src="common.js"></script>

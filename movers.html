@@ -18,7 +18,6 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">비트겟(Bitget) 기준 24시간 동안 가장 많이 오르고 내린 코인이에요. 거래량이 너무 적은 코인과 주식·원자재 상품은 빼고 보여줘요.</p>
   <nav id="nav"></nav>
 
   <div class="card">
@@ -67,8 +66,6 @@
       </table></div>
     </div>
   </div>
-
-  <div class="foot">데이터: 비트겟 공개 API · 1분마다 새로고침 · 코인을 누르면 비트겟 거래 화면이 새 창으로 열려요 · 참고용 정보이며 투자 판단의 근거가 아닙니다.</div>
 </div>
 
 <script src="common.js"></script>
@@ -114,7 +111,7 @@ async function load() {
     $("summary").innerHTML = [
       ["조건에 맞는 코인", all.length + "개", `${mkt === "futures" ? "선물" : "현물"} · 거래량 ${shortUsd(minVol)} 이상`],
       ["오른 코인 / 내린 코인", `<span class="up">${ups}</span> / <span class="down">${downs}</span>`, `오른 비율 ${(ups / (all.length || 1) * 100).toFixed(0)}%`],
-      ["평균 변동률", `<span class="${cls(avg)}">${pct(avg)}</span>`, "조건에 맞는 코인 전체 평균"],
+      ["평균 변동률", `<span class="${cls(avg)}">${pct(avg)}</span>`, ""],
       ["비트코인", btc ? `<span class="${cls(btc.chg)}">${pct(btc.chg)}</span>` : "-", btc ? usd(btc.price) : ""],
     ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
     $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · 비트겟 ${mkt === "futures" ? "USDT 무기한 선물" : "USDT 현물"}`;

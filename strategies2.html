@@ -1,0 +1,161 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>모멘텀 3배 안전장치 · ath TEST</title>
+<style>
+body{margin:0;background:#101014;color:#ECEEF2;font-family:system-ui,"Malgun Gothic",sans-serif;padding:24px;font-size:14px}
+h2{margin:0 0 6px;font-size:20px}h3{margin:26px 0 4px;font-size:16px}
+table{border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+td,th{padding:6px 12px;border-bottom:1px solid #2A2A33;text-align:right;white-space:nowrap}
+th{color:#8B95A1;font-weight:500}td:first-child,th:first-child{text-align:left}
+.up{color:#FF5C6C}.dn{color:#7C8AFF}.mut{color:#8B95A1}.grp td{border-top:2px solid #3A3A46}
+details{margin-top:10px}summary{cursor:pointer;color:#B0B8C1}
+ol{color:#B0B8C1;line-height:1.8;padding-left:20px;max-width:1000px}
+</style></head><body>
+<h2>상위 코인 모멘텀 · 2배/3배 · 안전장치 비교 + 보유 코인 기록</h2>
+<div id="st" class="mut">데이터 받는 중… (1~2분 걸려요)</div>
+<ol>
+<li><b>모멘텀 규칙</b> — 시총 상위 15개 중 "최근 4주 수익 플러스 + 50일선 위"인 코인 중 가장 많이 오른 3개를 똑같이 나눠 보유. BTC가 50일선 아래면 전부 쉬기. 주 1회(월) / 주 3회(월·수·금) 다시 고르기</li>
+<li><b>코인별 손절 -10%</b> — 들고 있는 코인이 고른 날 가격보다 10% 떨어지면 그 코인만 정리하고, 다음 리밸런싱까지 그 자리는 비워둠 (3배라 계좌 기준으로는 그 코인 몫의 -30%)</li>
+<li><b>하루 -15% 정리</b> — 하루 중 계좌가 15% 빠지면 전부 정리하고 다음 리밸런싱까지 쉬기</li>
+</ol>
+<div class="mut">공통: 시작 $50,000 · 매매마다 수수료+미끄러짐 0.1% · 3배는 선물(하루 최저가 기준 강제청산 체크, 펀딩비 비용 포함, 모든 코인이 동시에 최저가라고 보수적으로 가정) · 대상은 지금 시총 상위 15개라 결과가 실제보다 좋게 나올 수 있음</div>
+<div id="out"></div>
+<script>
+const F = "https://fapi.binance.com";
+const STABLE = new Set(["USDT","USDC","USDE","DAI","FDUSD","USDS","PYUSD","USD1","TUSD","USDD","BUSD","SUSDE","USDTB","USDF","RLUSD","BSC-USD","USDG","USDX"]);
+const j = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status + " " + u); return r.json(); });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const COST = 0.001;
+
+async function load() {
+  const ex = await j(F + "/fapi/v1/exchangeInfo");
+  const perp = new Set(ex.symbols.filter(s => s.quoteAsset === "USDT" && s.contractType === "PERPETUAL" && s.status === "TRADING" && s.underlyingType === "COIN").map(s => s.symbol));
+  const cg = await j("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1");
+  const coins = [];
+  for (const c of cg) {
+    const s = c.symbol.toUpperCase(); if (STABLE.has(s)) continue;
+    const sym = perp.has(s + "USDT") ? s + "USDT" : perp.has("1000" + s + "USDT") ? "1000" + s + "USDT" : null;
+    if (!sym || coins.includes(sym)) continue; coins.push(sym); if (coins.length === 15) break;
+  }
+  const day = {}, low = {};
+  for (const s of coins) {
+    const a = await j(`${F}/fapi/v1/klines?symbol=${s}&interval=1d&limit=1000`);
+    day[s] = new Map(a.slice(0, -1).map(k => [k[0], +k[4]]));   // 마지막(오늘, 아직 안 끝난) 봉 제외
+    low[s] = new Map(a.slice(0, -1).map(k => [k[0], +k[3]]));
+    document.getElementById("st").textContent = `데이터 받는 중… ${Object.keys(day).length}/${coins.length}`;
+    await sleep(150);
+  }
+  const funding = {};
+  for (const s of ["BTCUSDT", "ETHUSDT"]) {
+    let out = [], st = Date.now() - 800 * 864e5;
+    while (true) {
+      const a = await j(`${F}/fapi/v1/fundingRate?symbol=${s}&startTime=${st}&limit=1000`);
+      out = out.concat(a.map(x => ({ t: x.fundingTime, r: +x.fundingRate })));
+      if (a.length < 1000) break; st = a[a.length - 1].fundingTime + 1; await sleep(150);
+    }
+    funding[s] = out;
+  }
+  const days = [...day.BTCUSDT.keys()].sort((a, b) => a - b);
+  // 날짜별 하루 펀딩비 합계 (BTC·ETH 평균) → 레버리지 롱 비용 추정용
+  const fday = new Map();
+  for (const s of ["BTCUSDT", "ETHUSDT"]) for (const x of funding[s]) { const d = Math.floor(x.t / 864e5) * 864e5; fday.set(d, (fday.get(d) || 0) + x.r / 2); }
+  return { coins, day, low, funding, days, fday };
+}
+
+// 인덱스 i까지(포함)의 n일 평균
+function sma(D, s, i, n) {
+  let sum = 0;
+  for (let q = i - n + 1; q <= i; q++) { const v = D.day[s].get(D.days[q]); if (v == null) return null; sum += v; }
+  return sum / n;
+}
+const px = (D, s, i) => D.day[s].get(D.days[i]);
+const lowAt = (D, s, i) => D.low[s].get(D.days[i]);
+const above = (D, s, i) => { const m = sma(D, s, i, 50), p = px(D, s, i); return m != null && p != null && p > m; };
+const nm = s => s.replace("USDT", "");
+const dstr = t => new Date(t).toLocaleDateString("ko-KR");
+
+function pick(D, i) {
+  if (!above(D, "BTCUSDT", i)) return {};
+  const cand = [];
+  for (const s of D.coins) { const p = px(D, s, i), p28 = px(D, s, i - 28); if (!p || !p28 || !above(D, s, i)) continue; const m = p / p28 - 1; if (m > 0) cand.push([s, m]); }
+  cand.sort((a, b) => b[1] - a[1]);
+  const w = {}, top = cand.slice(0, 3); for (const [s] of top) w[s] = 1 / top.length; return w;
+}
+
+// 모멘텀 시뮬레이션: freq = 리밸런싱 요일(UTC, 그날 종가에 결정), L = 배율, cs = 코인별 손절, ds = 하루 계좌 손실 한도
+function sim(D, i0, i1, { freq, L = 1, cs = 0, ds = 0 }) {
+  let eq = 50000, peak = eq, mdd = 0, trades = 0, liq = null;
+  let w = {}, entry = {};
+  const log = [], held = new Map();
+  for (let i = i0; i < i1; i++) {
+    if (freq.includes(new Date(D.days[i]).getUTCDay())) {
+      const nw = pick(D, i);
+      let turn = 0; for (const s of new Set([...Object.keys(w), ...Object.keys(nw)])) turn += Math.abs((nw[s] || 0) - (w[s] || 0));
+      if (turn > 1e-9) { trades++; eq *= 1 - turn * COST * L; }
+      w = nw; entry = {}; for (const s in w) entry[s] = px(D, s, i);
+      log.push({ t: D.days[i], coins: Object.keys(w).map(nm) });
+    }
+    held.set(D.days[i + 1], Object.keys(w));
+    let r = 0, worst = 0, hsum = 0; const out = [];
+    for (const s in w) {
+      const a = px(D, s, i), b = px(D, s, i + 1), lo = lowAt(D, s, i + 1);
+      if (!a || !b) continue;
+      hsum += w[s];
+      const stop = cs ? entry[s] * (1 - cs) : 0;
+      if (cs && lo <= stop) { const fill = Math.min(stop, a); r += w[s] * (fill / a - 1); worst += w[s] * (fill / a - 1); out.push(s); }
+      else { r += w[s] * (b / a - 1); worst += w[s] * ((lo || b) / a - 1); }
+    }
+    if (L > 1 && 1 + L * worst <= 0.005 * L) { eq = 0; mdd = 1; liq = dstr(D.days[i + 1]); break; }
+    if (L > 1) r -= hsum * (D.fday.get(D.days[i + 1]) || 0);
+    if (ds && L * worst <= -ds) { eq *= (1 - ds) * (1 - hsum * COST * L); w = {}; trades++; }
+    else {
+      eq *= 1 + L * r;
+      for (const s of out) { eq *= 1 - w[s] * COST * L; delete w[s]; trades++; }
+    }
+    peak = Math.max(peak, eq); mdd = Math.max(mdd, (peak - eq) / peak);
+  }
+  return { final: eq, mdd: mdd * 100, trades, liq, log, held };
+}
+
+const f = v => (v < 0 ? "-$" : "$") + Math.round(Math.abs(v)).toLocaleString();
+const pc = v => `<span class="${v >= 0 ? "up" : "dn"}">${v >= 0 ? "+" : ""}${v.toFixed(1)}%</span>`;
+load().then(D => {
+  const n = D.days.length, idxAt = t => D.days.findIndex(x => x >= t), now = D.days[n - 1];
+  const P = [["2년 전체", idxAt(now - 730 * 864e5), n - 1], ["앞 1년 (2년 전 ~ 1년 전)", idxAt(now - 730 * 864e5), idxAt(now - 365 * 864e5)], ["최근 1년", idxAt(now - 365 * 864e5), n - 1]];
+  const FQ = [["주 1회", [0]], ["주 3회", [0, 2, 4]]];
+  const V = [["1배", { L: 1 }], ["2배 (안전장치 없음)", { L: 2 }], ["3배 (안전장치 없음)", { L: 3 }], ["3배 + 코인별 손절 -10%", { L: 3, cs: 0.10 }], ["3배 + 하루 -15% 정리", { L: 3, ds: 0.15 }], ["3배 + 둘 다", { L: 3, cs: 0.10, ds: 0.15 }]];
+  document.getElementById("st").textContent = `대상: ${D.coins.map(nm).join(", ")} · 마지막 일봉 ${dstr(now)}`;
+  let h = "";
+  for (const [pn, i0, i1] of P) {
+    h += `<h3>${pn} <span class="mut" style="font-size:13px">${dstr(D.days[i0])} ~ ${dstr(D.days[i1])}</span></h3><table><tr><th>리밸런싱</th><th>방식</th><th>최종 잔고</th><th>수익률</th><th>최대 낙폭</th><th>수익률 ÷ 낙폭</th><th>매매</th><th></th></tr>`;
+    for (const [fn, fq] of FQ) V.forEach(([vn, v], k) => {
+      const r = sim(D, i0, i1, { freq: fq, ...v }), ret = (r.final / 50000 - 1) * 100;
+      h += `<tr class="${k === 0 ? "grp" : ""}"><td>${k === 0 ? fn : ""}</td><td>${vn}</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.mdd.toFixed(1)}%</td><td>${r.mdd > 0.01 ? (ret / r.mdd).toFixed(2) : "-"}</td><td>${r.trades}</td><td class="dn">${r.liq ? "강제청산 " + r.liq : ""}</td></tr>`;
+    });
+    h += `</table>`;
+  }
+  // 2025년 10월 10일 보유 코인
+  const T = Date.UTC(2025, 9, 10), ti = D.days.indexOf(T);
+  if (ti > 0) {
+    h += `<h3>2025년 10월 10일 (대폭락 날) 들고 있던 코인</h3><table><tr><th>리밸런싱</th><th>언제 고른 코인</th><th>코인</th><th>그날 최저가 (전날 종가 대비)</th><th>그날 종가</th><th>2배면 계좌 영향</th><th>3배면 계좌 영향 (최저가 기준)</th></tr>`;
+    for (const [fn, fq] of FQ) {
+      const r = sim(D, idxAt(now - 730 * 864e5), n - 1, { freq: fq, L: 1 });
+      const coins = r.held.get(T) || [], last = r.log.filter(x => x.t < T).pop();
+      if (!coins.length) { h += `<tr class="grp"><td>${fn}</td><td>${last ? dstr(last.t) : "-"}</td><td colspan="5" class="mut">보유 없음 (쉬는 중)</td></tr>`; continue; }
+      let tot = 0;
+      coins.forEach((s, k) => {
+        const a = px(D, s, ti - 1), lo = lowAt(D, s, ti), c = px(D, s, ti), dl = (lo / a - 1) * 100; tot += dl / coins.length;
+        h += `<tr class="${k === 0 ? "grp" : ""}"><td>${k === 0 ? fn : ""}</td><td>${k === 0 && last ? dstr(last.t) + " 종가" : ""}</td><td>${nm(s)}</td><td>${pc(dl)}</td><td>${pc((c / a - 1) * 100)}</td><td>${k === coins.length - 1 ? pc(2 * tot) + (2 * tot <= -99.5 ? " → 청산" : "") : ""}</td><td>${k === coins.length - 1 ? pc(3 * tot) + (3 * tot <= -99.5 ? " → 청산" : "") : ""}</td></tr>`;
+      });
+    }
+    h += `</table><div class="mut" style="margin-top:6px">코인별 최저가가 같은 시각에 찍혔다고 가정한 값이에요. 실제로는 시각이 조금씩 달라서 실제 손실은 이것보다 작을 수 있어요.</div>`;
+  }
+  // 리밸런싱 기록
+  for (const [fn, fq] of FQ) {
+    const r = sim(D, idxAt(now - 730 * 864e5), n - 1, { freq: fq, L: 1 });
+    h += `<details><summary>${fn} 리밸런싱 기록 (2년, ${r.log.length}번) 펼쳐보기</summary><table><tr><th>고른 날 (종가)</th><th>보유 코인</th></tr>`;
+    for (const x of r.log.slice().reverse()) h += `<tr><td>${dstr(x.t)}</td><td style="text-align:left">${x.coins.join(", ") || '<span class="mut">쉬기</span>'}</td></tr>`;
+    h += `</table></details>`;
+  }
+  document.getElementById("out").innerHTML = h;
+}).catch(e => { document.getElementById("st").textContent = "오류: " + e.message; });
+</script></body></html>

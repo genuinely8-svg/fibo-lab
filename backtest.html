@@ -1,0 +1,272 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>백테스트 · ath TEST</title>
+<style>
+body{margin:0;background:#101014;color:#ECEEF2;font-family:system-ui,"Malgun Gothic",sans-serif;padding:24px;font-size:14px}
+h2{margin:0 0 6px;font-size:20px}h3{margin:28px 0 4px;font-size:16px}
+table{border-collapse:collapse;margin-top:10px;font-variant-numeric:tabular-nums}
+td,th{padding:7px 12px;border-bottom:1px solid #2A2A33;text-align:right;white-space:nowrap}
+th{color:#8B95A1;font-weight:500}td:first-child,th:first-child{text-align:left}
+.up{color:#FF5C6C}.dn{color:#7C8AFF}.mut{color:#8B95A1}
+</style></head><body>
+<h2>ICT 신호 검증 · 처음 보는 기간(2년 전~1년 전)으로 확인 · 롱 · 손절 -3% · 분할 익절 · 1시간봉 · 시총 상위 15개</h2>
+<div id="st" class="mut">데이터 받는 중… (3~5분 걸려요)</div>
+<div id="rule" class="mut" style="margin-top:6px;line-height:1.7"></div>
+<div id="out"></div>
+<script src="fib-core.js"></script>
+<script>
+const CFG = {
+  DAYS: 735, SEED: 50000, LEV: 20, MARGIN: 0.10, MAX_POS: 2,
+  ADD_AT: null,                       // 첫 진입가 대비 -3% 물타기 1번 (같은 금액)
+  CUTS: [[0.03, 1]], TPS: [[0.05, 0.5], [0.10, 1]],   // 평단 대비 -10% 30%, -12.5% 30%, -15% 나머지 전부
+  TP_USD: 10000, FEE_IN: 0.0002, FEE_OUT: 0.0005, MMR: 0.005,
+};
+const STABLE = new Set(["USDT","USDC","USDE","DAI","FDUSD","USDS","PYUSD","USD1","TUSD","USDD","BUSD","SUSDE","USDTB","USDF","RLUSD","BSC-USD","USDG","USDX"]);
+const F = "https://fapi.binance.com";
+const j = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status + " " + u); return r.json(); });
+
+async function load() {
+  const now = Date.now(), WARM = 800, need = CFG.DAYS * 24 + WARM;
+  const ex = await j(F + "/fapi/v1/exchangeInfo");
+  const perp = new Set(ex.symbols.filter(s => s.quoteAsset === "USDT" && s.contractType === "PERPETUAL" && s.status === "TRADING" && s.underlyingType === "COIN").map(s => s.symbol));
+  const cg = await j("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1");
+  const coins = [];
+  for (const c of cg) {
+    const s = c.symbol.toUpperCase();
+    if (STABLE.has(s)) continue;
+    const sym = perp.has(s + "USDT") ? s + "USDT" : perp.has("1000" + s + "USDT") ? "1000" + s + "USDT" : null;
+    if (!sym || coins.some(x => x.sym === sym)) continue;
+    coins.push({ sym, name: s, rank: c.market_cap_rank });
+    if (coins.length === 15) break;
+  }
+  const data = {}, daily = {};
+  for (const c of coins) {
+    let out = [], end = now;
+    while (out.length < need) {
+      const a = await j(`${F}/fapi/v1/klines?symbol=${c.sym}&interval=1h&limit=1500&endTime=${end}`);
+      if (!a.length) break;
+      out = a.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] })).concat(out);
+      end = a[0][0] - 1;
+      await new Promise(r => setTimeout(r, 200));
+      if (a.length < 1500) break;
+    }
+    data[c.sym] = out.slice(-need);
+    const dd = await j(`${F}/fapi/v1/klines?symbol=${c.sym}&interval=1d&limit=1000`);
+    // 하루가 끝난 시각(다음날 0시)과 그 시점의 200일 이동평균
+    const closes = dd.map(k => +k[4]), rows = [];
+    for (let i = 0; i < dd.length; i++) {
+      if (i < 199) continue;
+      let sum = 0; for (let x = i - 199; x <= i; x++) sum += closes[x];
+      let s50 = 0; for (let x = i - 49; x <= i; x++) s50 += closes[x];
+      rows.push({ end: dd[i][0] + 864e5, close: closes[i], ma: sum / 200, ma50: s50 / 50 });
+    }
+    for (let i = 5; i < rows.length; i++) rows[i].ma50prev = rows[i - 5].ma50;   // 5일 전 50일선 (기울기 확인용)
+    daily[c.sym] = rows;
+    document.getElementById("st").textContent = `데이터 받는 중… ${Object.keys(data).length}/${coins.length}`;
+  }
+  return { coins, data, daily, now };
+}
+
+// 그 시각 직전에 끝난 일봉 기준: +1 = 200일선 위(롱), -1 = 아래(숏), 0 = 데이터 부족
+function lastDay(rows, t) {
+  let lo = 0, hi = rows.length - 1, ans = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (rows[m].end <= t) { ans = m; lo = m + 1; } else hi = m - 1; }
+  return ans < 0 ? null : rows[ans];
+}
+function regime(rows, t) {
+  let lo = 0, hi = rows.length - 1, ans = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (rows[m].end <= t) { ans = m; lo = m + 1; } else hi = m - 1; }
+  if (ans < 0) return 0;
+  return rows[ans].close > rows[ans].ma ? 1 : -1;
+}
+
+// 진입 확인 (ICT 방식)
+//  none: -1 닿으면 바로 진입
+//  mss : -1 터치 뒤 24시간 안에, 터치 직전 5개 봉의 최고가를 종가로 돌파하면(구조 전환) 다음 봉 시가에 진입
+//  fvg : 구조 전환 뒤, 그 상승 구간에 생긴 FVG(3봉 갭) 윗선까지 24시간 안에 되돌아오면 거기서 진입
+function confirm(c, x, lv) {
+  if (CFG.CONF === "none") return { i: x, lv };
+  let ref = -Infinity; for (let q = Math.max(0, x - 5); q <= x; q++) ref = Math.max(ref, c[q].h);
+  let m = -1;
+  for (let y = x + 1; y <= Math.min(x + 24, c.length - 2); y++) if (c[y].c > ref) { m = y; break; }
+  if (m < 0) return null;
+  if (CFG.CONF === "mss") return { i: m + 1, lv: Infinity };
+  let gap = null;
+  for (let k = m; k >= Math.max(x + 2, 2); k--) if (c[k].l > c[k - 2].h) { gap = c[k].l; break; }
+  if (gap == null) return null;
+  for (let z = m + 1; z <= Math.min(m + 24, c.length - 1); z++) if (c[z].l <= gap) return { i: z, lv: gap };
+  return null;
+}
+
+// 롱 신호: 하락 스윙(고점→저점)의 -1 터치 / 숏 신호: 상승 스윙(저점→고점)의 +1 터치 (거울 대칭)
+// ── ICT 신호 (피보나치 안 씀, 롱만) ──
+// FVG: 3봉 중 1번 봉 고가 < 3번 봉 저가 (0.2% 이상 갭) → 이후 48시간 안에 갭 윗선까지 내려오면 진입. 그 전에 종가가 갭 아랫선 밑이면 무효
+// 오더블록: 음봉 다음 3봉 안에 종가가 직전 10봉 최고가를 돌파(구조 돌파) → 그 음봉 고가까지 72시간 안에 내려오면 진입. 그 전에 종가가 음봉 저가 밑이면 무효
+function ictSignals(c, kind) {
+  const out = [];
+  if (kind === "fvg" || kind === "both") {
+    for (let k = 2; k < c.length - 1; k++) {
+      const bot = c[k - 2].h, top = c[k].l;
+      if (!(top > bot * 1.002)) continue;
+      for (let z = k + 1; z <= Math.min(k + 48, c.length - 1); z++) {
+        if (c[z].l <= top) { out.push({ i: z, lv: top }); break; }
+        if (c[z].c < bot) break;
+      }
+    }
+  }
+  if (kind === "ob" || kind === "both") {
+    for (let k = 10; k < c.length - 4; k++) {
+      if (!(c[k].c < c[k].o)) continue;
+      let prevHi = -Infinity; for (let q = k - 10; q < k; q++) prevHi = Math.max(prevHi, c[q].h);
+      let b = -1; for (let y = k + 1; y <= k + 3; y++) if (c[y].c > prevHi) { b = y; break; }
+      if (b < 0) continue;
+      const top = c[k].h, bot = c[k].l;
+      for (let z = b + 1; z <= Math.min(b + 72, c.length - 1); z++) {
+        if (c[z].l <= top) { out.push({ i: z, lv: top }); break; }
+        if (c[z].c < bot) break;
+      }
+    }
+  }
+  return out;
+}
+
+function signals(data, start) {
+  const sig = {};
+  if (CFG.SRC) {
+    for (const s in data) {
+      const c = data[s], seen = new Set();
+      for (const e of ictSignals(c, CFG.SRC)) {
+        if (c[e.i].t < start || seen.has(e.i)) continue;
+        seen.add(e.i);
+        (sig[c[e.i].t] ||= []).push({ s, lv: e.lv, side: 1 });
+      }
+    }
+    return sig;
+  }
+  for (const s in data) {
+    const c = data[s], pv = FibCore.findPivots(c, CFG.N || 5);
+    for (let k = 0; k < pv.length - 1; k++) {
+      const a = pv[k], b = pv[k + 1];
+      if (a.type === "H" && b.type === "L") {
+        const H = a.price, L = b.price, lv = L - (H - L); if (lv <= 0) continue;
+        for (let x = b.i + 1; x < c.length; x++) {
+          if (c[x].h > H) break;
+          if (c[x].l <= lv) { const e = confirm(c, x, lv); if (e && c[e.i].t >= start) (sig[c[e.i].t] ||= []).push({ s, lv: e.lv, side: 1 }); break; }
+        }
+      } else if (a.type === "L" && b.type === "H") {
+        const L = a.price, H = b.price, lv = H + (H - L);
+        for (let x = b.i + 1; x < c.length; x++) { if (c[x].l < L) break; if (c[x].h >= lv) { if (c[x].t >= start) (sig[c[x].t] ||= []).push({ s, lv, side: -1 }); break; } }
+      }
+    }
+  }
+  return sig;
+}
+
+// mode: "long" = 롱만(필터 없음, 기존) / "longMA" = 200일선 위에서만 롱 / "both" = 위에서는 롱, 아래에서는 숏
+function simulate(D, start, mode, LEV, TP = 0.04, opt = {}) {
+  let streak = 0, pauseUntil = 0;
+  const { data, daily } = D;
+  const sig = signals(data, start);
+  const idx = {}; for (const s in data) idx[s] = new Map(data[s].map(k => [k.t, k]));
+  const times = [...new Set(Object.values(data).flatMap(c => c.map(k => k.t)))].filter(t => t >= start && t < (opt.end || Infinity)).sort((a, b) => a - b);
+  let cash = CFG.SEED, pos = [], trades = [], liquidated = null, peak = CFG.SEED, mdd = 0;
+  const upnl = (x, px) => x.side * x.qty * (px - x.avg);
+  const mark = (x, t, pick) => { const k = idx[x.s].get(t); return k ? pick(k, x) : x.avg; };
+  function closePart(p, frac, px, t, why) {
+    const q = p.qty * frac, pnl = p.side * q * (px - p.avg) - q * px * CFG.FEE_OUT;
+    cash += pnl; p.realized += pnl; p.qty -= q; p.events.push(why);
+    if (p.qty <= 1e-12 || frac >= 1) { p.qty = 0; p.exitT = t; trades.push(p);
+      if (p.realized < 0 && p.events.some(e => e.startsWith("손절"))) { if (++streak >= 3) { pauseUntil = t + 72 * 3600e3; streak = 0; } } else if (p.realized > 0) streak = 0; }
+  }
+  for (const t of times) {
+    for (const p of pos) {
+      const k = idx[p.s].get(t); if (!k) continue;
+      const S = p.side, bad = S > 0 ? k.l : k.h, good = S > 0 ? k.h : k.l;
+      const worse = (px, lvl) => S > 0 ? px <= lvl : px >= lvl;
+      const fillBad = lvl => S > 0 ? Math.min(k.o, lvl) : Math.max(k.o, lvl);
+      const addLvl = p.first * (1 - S * CFG.ADD_AT);
+      if (CFG.ADD_AT && !p.added && worse(bad, addLvl)) {
+        const px = fillBad(addLvl);
+        const eq = cash + pos.reduce((a, x) => a + upnl(x, x === p ? px : mark(x, t, kk => kk.c)), 0);
+        const notional = eq * CFG.MARGIN * LEV;
+        p.added = true;
+        if (notional > 0) {
+          const q = notional / px; cash -= notional * CFG.FEE_IN; p.realized -= notional * CFG.FEE_IN;
+          p.avg = (p.avg * p.qty + px * q) / (p.qty + q); p.qty += q; p.events.push("물타기");
+        }
+      }
+      for (let ci = p.cut; ci < CFG.CUTS.length && p.qty > 0; ci++) {
+        const [dd, fr] = CFG.CUTS[ci], lvl = (CFG.BE && p.tpi) ? p.avg : p.avg * (1 - S * dd);
+        if (!worse(bad, lvl)) break;
+        const base = p.qtyAtCut ??= p.qty;
+        closePart(p, fr >= 1 ? 1 : Math.min(1, base * fr / p.qty), fillBad(lvl), t, (CFG.BE && p.tpi) ? "본전 정리" : `손절 -${+(dd * 100).toFixed(1)}%`);
+        p.cut = ci + 1;
+      }
+      // 분할 익절: +5%에서 처음 수량의 50%, +10%에서 나머지 전부
+      for (let ti = p.tpi || 0; ti < CFG.TPS.length && p.qty > 0 && t !== p.entryT; ti++) {
+        const [g, fr] = CFG.TPS[ti], lvl = p.avg * (1 + S * g);
+        if (!(S > 0 ? good >= lvl : good <= lvl)) break;
+        const base = p.qtyAtTp ??= p.qty;
+        closePart(p, fr >= 1 ? 1 : Math.min(1, base * fr / p.qty), S > 0 ? Math.max(k.o, lvl) : Math.min(k.o, lvl), t, `익절 +${g * 100}%`);
+        p.tpi = ti + 1;
+      }
+    }
+    pos = pos.filter(p => p.qty > 0);
+    const worst = cash + pos.reduce((a, x) => a + upnl(x, mark(x, t, (k, x) => x.side > 0 ? k.l : k.h)), 0);
+    const mm = pos.reduce((a, x) => a + x.qty * x.avg * CFG.MMR, 0);
+    if (pos.length && worst <= mm) { liquidated = new Date(t).toLocaleString("ko-KR"); const share = cash / pos.length; for (const p of pos) { p.exitT = t; p.events.push("강제청산"); p.realized -= share; trades.push(p); } cash = 0; pos = []; break; }
+    for (const g of sig[t] || []) {
+      if (pos.length >= CFG.MAX_POS || pos.some(p => p.s === g.s)) continue;
+      const rg = regime(daily[g.s], t);
+      if (mode === "long" && g.side !== 1) continue;
+      if (opt.pause && t < pauseUntil) continue;
+      if (opt.btc) {
+        const b = lastDay(daily.BTCUSDT, t); if (!b) continue;
+        const below = b.close <= (opt.btc === 50 ? b.ma50 : b.ma);
+        // 완화: 50일선 아래이면서 50일선이 5일 전보다 내려가 있을 때만 막음
+        if (opt.soft ? (below && b.ma50prev != null && b.ma50 < b.ma50prev) : below) continue;
+      }
+      if (mode === "longMA" && !(g.side === 1 && rg === 1)) continue;
+      if (mode === "both" && g.side !== rg) continue;
+      const k = idx[g.s].get(t), px = g.side > 0 ? Math.min(k.o, g.lv) : Math.max(k.o, g.lv);
+      const eq = cash + pos.reduce((a, x) => a + upnl(x, mark(x, t, kk => kk.c)), 0);
+      const notional = eq * CFG.MARGIN * LEV; if (notional <= 0) continue;
+      cash -= notional * CFG.FEE_IN;
+      pos.push({ s: g.s, side: g.side, entryT: t, first: px, avg: px, qty: notional / px, added: false, cut: 0, realized: -notional * CFG.FEE_IN, events: [] });
+    }
+    const eqc = cash + pos.reduce((a, x) => a + upnl(x, mark(x, t, kk => kk.c)), 0);
+    peak = Math.max(peak, eqc); mdd = Math.max(mdd, (peak - eqc) / peak);
+  }
+  const tEnd = times[times.length - 1];
+  for (const p of pos) { const c = data[p.s], k = idx[p.s].get(tEnd) || c.filter(x => x.t <= tEnd).pop(); closePart(p, 1, k.c, k.t, "기간 종료"); }
+  const w = trades.filter(x => x.realized > 0);
+  return { trades, win: w.length, lose: trades.length - w.length, longs: trades.filter(x => x.side > 0).length, shorts: trades.filter(x => x.side < 0).length, final: cash, mdd: mdd * 100, liquidated };
+}
+
+const f = v => (v < 0 ? "-$" : "$") + Math.round(Math.abs(v)).toLocaleString();
+const pc = v => `<span class="${v >= 0 ? "up" : "dn"}">${v >= 0 ? "+" : ""}${v.toFixed(1)}%</span>`;
+const d = t => new Date(t).toLocaleString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric", hour: "2-digit" });
+load().then(D => {
+  const P = [["검증: 2년 전 ~ 1년 전 (처음 보는 기간)", D.now - 730 * 864e5, D.now - 365 * 864e5], ["참고: 최근 1년 (지금까지 본 기간)", D.now - 365 * 864e5, Infinity]];
+  const ROWS = [["FVG + 오더블록", "both", 5], ["FVG + 오더블록", "both", 3], ["오더블록만", "ob", 5], ["FVG만", "fvg", 5]];
+  const op = { pause: true, btc: 50, soft: true };
+  document.getElementById("st").textContent = `대상: ${D.coins.map(c => c.name).join(", ")} (지금 시총 기준이라 2년 전에는 순위가 달랐을 수 있음)`;
+  document.getElementById("rule").textContent = `공통: 시작 $50,000 · 크로스 · 롱만 · 잔고 10%씩 · 동시 최대 10개 · 물타기 없음 · 손절 진입가 -3% 전량 · 익절 +5%에서 50%, +10%에서 나머지 · 절반 익절 뒤 남은 절반은 본절 · 3연속 손절이면 72시간 쉬기 · BTC 50일선 필터(완화) · 수수료 포함 · FVG = 3봉 갭(0.2% 이상) 48시간 안 되돌림 진입 · 오더블록 = 10봉 최고가 돌파 직전 마지막 음봉, 72시간 안 되돌림 진입`;
+  CFG.BE = true; CFG.MAX_POS = 10; CFG.CONF = "none";
+  let h = "", keep = null;
+  for (const [pn, st, en] of P) {
+    h += `<h3>${pn}</h3><table><tr><th>신호</th><th>배율</th><th>매매</th><th>이긴/진</th><th>최대 낙폭</th><th>최종 잔고</th><th>수익률</th><th>수익률 ÷ 낙폭</th><th></th></tr>`;
+    for (const [sn, sr, lv] of ROWS) {
+      CFG.SRC = sr;
+      const r = simulate(D, st, "long", lv, 0.04, { ...op, end: en });
+      if (sr === "both" && lv === 5 && !keep) keep = [pn, r];
+      const ret = (r.final / 50000 - 1) * 100;
+      h += `<tr><td>${sn}</td><td>${lv}배</td><td>${r.trades.length}</td><td>${r.win}/${r.lose}</td><td>${r.mdd.toFixed(1)}%</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.mdd > 0 ? (ret / r.mdd).toFixed(2) : "-"}</td><td class="dn">${r.liquidated ? "강제청산 " + r.liquidated : ""}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  const [pn, r] = keep;
+  h += `<h3>매매 내역 (${pn} · FVG + 오더블록 · 5배)</h3><table><tr><th>코인</th><th>진입</th><th>진입가</th><th>진행</th><th>종료</th><th>손익</th></tr>`;
+  for (const x of r.trades) h += `<tr><td>${x.s.replace("USDT", "")}</td><td>${d(x.entryT)}</td><td>${x.first.toPrecision(5)}</td><td class="mut">${x.events.join(" → ") || "-"}</td><td>${d(x.exitT)}</td><td class="${x.realized > 0 ? "up" : "dn"}">${f(x.realized)}</td></tr>`;
+  document.getElementById("out").innerHTML = h + `</table>`;
+}).catch(e => { document.getElementById("st").textContent = "오류: " + e.message; });
+</script></body></html>

@@ -132,7 +132,6 @@
         <tbody id="periods"><tr><td colspan="6" class="muted">불러오는 중…</td></tr></tbody>
       </table>
     </div>
-    <div class="small muted" style="margin-top:8px">현재 위치: 그 기간의 최저가(왼쪽)와 최고가(오른쪽) 사이에서 지금 가격이 어디쯤인지 보여줘요.</div>
   </div>
 
   <!-- 4. 봉별 진입 분석 -->
@@ -144,7 +143,6 @@
         <tbody id="tfs"><tr><td colspan="9" class="muted">불러오는 중…</td></tr></tbody>
       </table>
     </div>
-    <div class="small muted" style="margin-top:8px" id="tfNote"></div>
   </div>
 
   <!-- 5. 차트 -->
@@ -163,7 +161,6 @@
       <span><i style="background:var(--down)"></i>L 스윙 저점</span>
       <span><i style="background:var(--accent)"></i>진입 가격 · 예상 반등가(점선)</span>
       <span style="color:var(--accent)">▲ 과거 진입가 터치</span>
-      <span>위 표에서 봉을 누르면 차트가 바뀌어요</span>
     </div>
   </div>
 
@@ -173,11 +170,6 @@
     <div id="desc" class="muted">불러오는 중…</div>
     <div class="chips" id="cats"></div>
     <div class="links" id="links"></div>
-  </div>
-
-  <div class="foot">
-    가격·거래량·차트: 바이낸스 · 시가총액·발행량·소개: 코인게코(CoinGecko)<br>
-    참고용 정보이며 투자 판단의 근거가 아닙니다.
   </div>
 </div>
 
@@ -340,7 +332,7 @@ function renderTiles(cg, t) {
   const out = [];
   if (cg) {
     out.push(tile("시가총액", bigUsd(cg.mcap), cg.rank ? `전체 ${cg.rank}위` : ""));
-    out.push(tile("완전 희석 시가총액", bigUsd(cg.fdv), "총 발행량이 모두 풀렸을 때"));
+    out.push(tile("완전 희석 시가총액", bigUsd(cg.fdv), ""));
   }
   if (t) out.push(tile(`24시간 거래량 (${EXNAME[ex]})`, bigUsd(+t.quoteVolume), `${bigNum(+t.volume, SYM)}`));
   if (cg) {
@@ -348,8 +340,8 @@ function renderTiles(cg, t) {
     const cap = cg.max || cg.total;
     const ratio = cap ? cg.circ / cap * 100 : null;
     out.push(tile("유통량", bigNum(cg.circ, SYM), ratio != null ? `${cg.max ? "최대" : "총"} 발행량의 ${ratio.toFixed(1)}%` : "", ratio));
-    out.push(tile("총 발행량", bigNum(cg.total, SYM), "지금까지 만들어진 양"));
-    out.push(tile("최대 발행량", cg.max ? bigNum(cg.max, SYM) : "제한 없음", cg.max ? "앞으로도 이 이상은 안 생겨요" : "계속 새로 발행될 수 있어요"));
+    out.push(tile("총 발행량", bigNum(cg.total, SYM), ""));
+    out.push(tile("최대 발행량", cg.max ? bigNum(cg.max, SYM) : "제한 없음", ""));
     out.push(tile("역대 최고가 (ATH)", usd(cg.ath), `${ymd(cg.athDate)} · 지금은 <span class="${cls(cg.athPct)}">${pct(cg.athPct)}</span>`));
     out.push(tile("역대 최저가 (ATL)", usd(cg.atl), `${ymd(cg.atlDate)} · 지금은 <span class="${cls(cg.atlPct)}">${pct(cg.atlPct)}</span>`));
     if (cg.genesis) out.push(tile("시작일", ymd(cg.genesis), ""));
@@ -436,9 +428,7 @@ async function loadTimeframes() {
       tfResults[tf.unit] = { candles, ...FibCore.analyze(candles, { n: N, k: K }) };
     } catch (e) { tfResults[tf.unit] = { error: e.message }; }
     renderTf();
-  }
-  $("tfNote").textContent = `각 봉마다 캔들 1000개 · 스윙 민감도 ${N} · 터치 후 관찰 ${K}봉 기준. 줄을 누르면 아래 차트가 그 봉으로 바뀌어요.`;
-}
+  }}
 
 function renderTf() {
   $("tfs").innerHTML = TF.map(tf => {

@@ -68,6 +68,9 @@
       .sort((a, b) => a.time - b.time);
     series.setMarkers(markers);
 
+    // 이전 코인에서 가격 눈금을 손으로 늘리거나 줄였으면 자동 맞춤이 꺼져 있음 → 코인 바뀔 때마다 다시 켜기
+    chart.priceScale("right").applyOptions({ autoScale: true });
+
     // 최근 300개 봉이 보이게 (마우스 휠·드래그로 과거도 볼 수 있음)
     const n = cs.length;
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 300), to: n + 5 });

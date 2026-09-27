@@ -20,7 +20,6 @@
 <body>
 <div class="wrap">
   <h1>ath TEST (참고용)</h1>
-  <p class="sub">김치프리미엄(김프) = 국내 거래소 가격이 해외(바이낸스) 가격보다 몇 % 비싼지예요. 플러스면 국내가 더 비싸고, 마이너스(역프)면 국내가 더 싸요.</p>
   <nav id="nav"></nav>
 
   <div class="card">
@@ -74,12 +73,6 @@
         <tbody id="rows"><tr><td colspan="8" class="l muted">불러오는 중…</td></tr></tbody>
       </table>
     </div>
-    <div class="small muted" style="margin-top:8px">⚠ 표시: 김프가 ±25%를 넘는 코인이에요. 국내와 해외에서 이름만 같은 다른 코인이거나, 입출금이 막혀 있을 수 있어서 평균에서는 뺐어요.</div>
-  </div>
-
-  <div class="foot">
-    국내: 업비트·빗썸 공개 API · 해외: 바이낸스 현물(USDT) · 환율: open.er-api.com (하루 한 번 갱신) · 30초마다 새로고침<br>
-    참고용 정보이며 투자 판단의 근거가 아닙니다.
   </div>
 </div>
 
@@ -177,7 +170,7 @@ function render() {
     tile("평균 김프", kpSpan(wAvg), `거래대금 10억 원 이상 ${ok.length}개 코인 · 거래대금 가중`),
     tile("달러 환율", "₩" + fxRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }), `${new Date(fxTime).toLocaleDateString("ko-KR")} 기준`),
     tile("테더(USDT) 원화 가격", usdtKrw ? krw(usdtKrw) : "-", tetherP != null ? `테더 프리미엄 ${pct(tetherP)}` : ""),
-    tile("비교한 코인", all.length + "개", `${kx === "upbit" ? "업비트와" : "빗썸과"} 바이낸스에 둘 다 있는 코인`),
+    tile("비교한 코인", all.length + "개", ""),
   ].join("");
 
   // 표
@@ -190,7 +183,7 @@ function render() {
       <td>${krw(r.price)}</td>
       <td>${usd(r.usd)}</td>
       <td class="muted">${krw(r.abroad)}</td>
-      <td class="kp ${cls(r.kp)}">${pct(r.kp)}${r.odd ? '<span class="warn">⚠</span>' : ""}${bar}</td>
+      <td class="kp ${cls(r.kp)}">${pct(r.kp)}${r.odd ? '<span class="warn" title="김프 ±25% 이상: 입출금 중단이거나 이름만 같은 다른 코인일 수 있어서 평균에서 뺐어요">⚠</span>' : ""}${bar}</td>
       <td class="${cls(r.diff)}">${r.diff > 0 ? "+" : ""}${krw(r.diff).replace("₩-", "-₩")}</td>
       <td class="${cls(r.chg)}">${pct(r.chg)}</td>
       <td>${krwBig(r.vol)}</td>
