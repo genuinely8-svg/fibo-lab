@@ -115,6 +115,20 @@
   .mc{color:var(--muted);background:var(--bg);border:1px solid var(--line)}
   .tf{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
   summary{cursor:pointer;color:var(--text);font-weight:600}
+  /* 실시간 가격 */
+  .sumrow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .sumrow .summary{flex:1;min-width:0}
+  .live{font-size:12px;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+  .live i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+  .live.on i{background:#22c55e;box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 25%,transparent)}
+  .live.on b{color:#22c55e}
+  .live.wait i{background:var(--warn);animation:blink 1s infinite}
+  .live.wait b{color:var(--warn)}
+  @keyframes blink{50%{opacity:.25}}
+  .fu{animation:fu .9s ease-out} .fd{animation:fd .9s ease-out}
+  @keyframes fu{0%{background:color-mix(in srgb,var(--up) 35%,transparent);color:var(--up)}100%{background:transparent}}
+  @keyframes fd{0%{background:color-mix(in srgb,var(--down) 35%,transparent);color:var(--down)}100%{background:transparent}}
+  span.fu,span.fd{border-radius:4px}
   /* ─────────── 휴대폰 화면 (가로 700px 이하) ─────────── */
   .setbar,#cards{display:none}
   @media (max-width:700px){
@@ -206,7 +220,7 @@
           <option value="2000">2000개</option>
         </select>
       </label>
-      <label>자동 새로고침
+      <label>진입가 재계산 (가격은 실시간)
         <select id="auto">
           <option value="0">끔</option>
           <option value="60">1분</option>
@@ -244,7 +258,7 @@
   </div>
 
   <div class="card tablewrap">
-    <div class="summary" id="summary"></div>
+    <div class="sumrow"><div class="summary" id="summary"></div><span class="live" id="live"><i></i><b>실시간 준비 중</b></span></div>
     <table>
       <thead><tr>
         <th style="text-align:left">#</th><th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
@@ -474,7 +488,9 @@ async function runOnce() {
   lastSkipped = mode === "scan" ? out.filter(r => r.error).length : 0;
   results = mode === "scan" ? out.filter(r => !r.error) : out;
   curEx = ex;
+  Live.applyLatest();          // 분석하는 사이에 들어온 실시간 가격을 바로 반영
   renderTable();
+  Live.connect(ex, results.filter(r => !r.error).map(r => r.market));
   if (openCoin && !results.find(r => r.market === openCoin && !r.error)) { openCoin = null; renderTable(); }
   if (openCoin && view === "lw") drawChart();            // 펼쳐 둔 차트도 새 데이터로 (트레이딩뷰는 스스로 실시간 갱신)
   $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개 · `
@@ -509,10 +525,7 @@ function rankKey(r) {
 }
 const sortedRows = () => [...results].sort((a, b) => rankKey(a) - rankKey(b));
 
-const chartPanel = $("chartPanel");      // 차트 묶음 (표를 다시 그려도 지워지지 않게 따로 잡아둠)
-function renderTable() {
-  $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
-  const rows = sortedRows();
+function renderSummary() {
   const ok = results.filter(r => !r.error && r.current?.level);
   const near = ok.filter(r => r.current.distance > 0 && r.current.distance <= 5).length;
   const under = ok.filter(r => r.current.distance <= 0).length;
@@ -520,6 +533,14 @@ function renderTable() {
     <span>진입 근접(5% 이내) <b class="up">${near}</b>개</span>
     <span>진입가 이하 <b>${under}</b>개</span>
     <span style="color:var(--muted)">진입 가격에 가까운 순서</span>`;
+}
+let shownOrder = "";     // 지금 화면에 보이는 코인 순서 (실시간 정렬 때 바뀌었는지 비교용)
+const chartPanel = $("chartPanel");      // 차트 묶음 (표를 다시 그려도 지워지지 않게 따로 잡아둠)
+function renderTable() {
+  $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
+  const rows = sortedRows();
+  shownOrder = rows.map(r => r.market).join(",");
+  renderSummary();
   let rank = 0;
   $("tbody").innerHTML = rows.map(r => {
     // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
@@ -533,15 +554,15 @@ function renderTable() {
     const row = `<tr data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}" title="누르면 차트가 펼쳐져요">
       <td class="rk">${++rank}</td>
       <td>${name}</td>
-      <td>${won(r.price)}</td>
-      <td>${won(c?.level)}</td>
-      <td>${pct(c?.distance)}</td>
-      <td>${badge(c)}</td>
+      <td class="px">${won(r.price)}</td>
+      <td class="lv">${won(c?.level)}</td>
+      <td class="ds">${pct(c?.distance)}</td>
+      <td class="st">${badge(c)}</td>
       <td class="${few}">${s.count}회</td>
       <td class="up">${pct(s.reboundAvg)}${err(s.reboundErr)}</td>
       <td class="down">${pct(s.fallAvg)}${err(s.fallErr)}</td>
       <td>${pct(s.winRate)}</td>
-      <td>${won(c?.expected)}</td>
+      <td class="xp">${won(c?.expected)}</td>
     </tr>`;
     // 펼친 코인이면 바로 아래에 차트 줄을 하나 더
     return r.market === openCoin ? row + `<tr class="exp"><td colspan="11" id="expCell"></td></tr>` : row;
@@ -566,15 +587,15 @@ function renderCards(rows) {
     if (r.error) return `<div class="ccard"><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
       <div class="c3">${r.error}${more}</div></div>`;
     const s = r.stats, c = r.current, open = r.market === openCoin;
-    const dist = c?.level ? `<span class="dist ${c.distance <= 5 ? "up" : ""}">(${pct(c.distance)})</span>` : "";
+    const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
     return `<div class="ccard${open ? " open" : ""}" data-m="${r.market}">
-      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}${badge(c)}</div>
-      <div class="c2">${won(r.price)}<span class="arrow">→</span>진입 ${won(c?.level)}${dist}</div>
+      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}<span class="st" style="margin-left:auto">${badge(c)}</span></div>
+      <div class="c2"><span class="px">${won(r.price)}</span><span class="arrow">→</span>진입 <span class="lv">${won(c?.level)}</span>${dist}</div>
       <div class="c3">평균 반등 <span class="up">${pct(s.reboundAvg)}</span> · 터치 <span class="${s.count < 5 ? "few" : ""}">${s.count}회</span>${more}</div>
       ${open ? `<div class="cdet">
           <div><span>평균 추가하락</span><b class="down">${pct(s.fallAvg)}</b></div>
           <div><span>반등 우세</span><b>${pct(s.winRate)}</b></div>
-          <div><span>예상 반등가</span><b>${won(c?.expected)}</b></div>
+          <div><span>예상 반등가</span><b class="xp">${won(c?.expected)}</b></div>
         </div>
         <div class="cchart" id="expCard" onclick="event.stopPropagation()"></div>` : ""}
     </div>`;
@@ -737,6 +758,152 @@ function setAuto() {
 }
 $("auto").onchange = () => { setAuto(); saveSettings(); };
 for (const id of ["ex", "unit", "n", "k", "count", "topN"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); run(); });
+
+// ── 실시간 가격 (바이낸스 웹소켓) ─────────────────────────────────
+// 무거운 계산(스윙·진입가·통계)은 몇 분마다, 가격은 바이낸스가 바뀔 때마다 보내주는 걸 받아서 즉시 반영
+const Live = (() => {
+  // 선물은 2026년 4월부터 주소가 /market 으로 바뀜 (예전 주소는 폐지)
+  const URLS = {
+    binance: ["wss://stream.binance.com:9443/stream?streams=", "wss://data-stream.binance.vision/stream?streams="],
+    futures: ["wss://fstream.binance.com/market/stream?streams="],
+  };
+  let ws = null, key = "", ex = "", coins = [], urlIdx = 0, retry = 0, retryTimer = null, lastTick = 0;
+  const latest = new Map();        // 코인 → 가장 최근 실시간 가격
+  const pending = new Map();       // 화면에 아직 안 그린 가격 변화
+
+  function setStatus(kind, text) {
+    const el = $("live");
+    el.className = "live " + kind;
+    el.querySelector("b").textContent = text;
+  }
+
+  function connect(newEx, newCoins) {
+    const k = newEx + "|" + newCoins.slice().sort().join(",");
+    if (k === key && ws && ws.readyState <= 1) return;        // 같은 목록이면 그대로 유지
+    if (newEx !== curLiveEx) latest.clear();
+    key = k; ex = newEx; coins = newCoins; urlIdx = 0; retry = 0;
+    curLiveEx = ex;
+    open();
+  }
+  let curLiveEx = "";
+
+  function open() {
+    clearTimeout(retryTimer);
+    if (ws) { ws.onclose = ws.onerror = ws.onmessage = null; try { ws.close(); } catch (e) {} ws = null; }
+    if (!coins.length) { setStatus("", "실시간 꺼짐"); return; }
+    const streams = coins.map(c => c.toLowerCase() + "usdt@miniTicker").join("/");
+    const myKey = key;
+    setStatus("wait", retry ? "재연결 중…" : "실시간 연결 중…");
+    const sock = new WebSocket(URLS[ex][urlIdx % URLS[ex].length] + streams);
+    ws = sock;
+    let opened = false;
+    sock.onopen = () => { opened = true; retry = 0; setStatus("on", "실시간 연결됨"); };
+    sock.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+      const d = m.data || m;
+      if (!d || !d.s || !d.s.endsWith("USDT")) return;
+      const coin = d.s.slice(0, -4), px = +d.c;
+      if (!(px > 0)) return;
+      latest.set(coin, { px, t: Date.now() }); pending.set(coin, px);
+      lastTick = Date.now();
+    };
+    sock.onclose = () => {
+      if (ws !== sock || key !== myKey) return;
+      ws = null;
+      if (!opened) urlIdx++;                                   // 연결 자체가 안 되면 다른 주소로 시도
+      retry++;
+      const wait = Math.min(30000, 1000 * 2 ** Math.min(retry - 1, 5));
+      setStatus("wait", `재연결 중… (${Math.round(wait / 1000)}초 뒤)`);
+      retryTimer = setTimeout(open, wait);
+    };
+    sock.onerror = () => {};                                   // onclose 에서 처리
+  }
+
+  // 새 가격으로 한 코인의 진입가·거리 다시 계산 (fib-core.js 와 같은 규칙)
+  function applyPrice(r, px) {
+    r.price = px;
+    const c = r.current;
+    if (!c || c.state === "신고점") return;
+    if (px > c.H) {                                            // 스윙 고점을 뚫음 → 이 스윙은 끝
+      r.current = { state: "신고점", highIdx: c.highIdx, H: px };
+      return;
+    }
+    if (c.L != null && px < c.L) {                             // 새 저점 → 진입가도 따라 내려감
+      c.L = px;
+      c.level = c.L - (c.H - c.L);
+      if (!(c.level > 0)) c.level = null;
+      c.expected = c.level && r.stats.reboundAvg != null ? c.level * (1 + r.stats.reboundAvg / 100) : null;
+    }
+    if (c.level) c.distance = (px - c.level) / c.level * 100;
+  }
+
+  function applyLatest() {
+    if (curLiveEx !== $("ex").value) return;
+    for (const r of results) {
+      const l = latest.get(r.market);
+      if (!r.error && l && Date.now() - l.t < 60000) applyPrice(r, l.px);   // 1분 안에 받은 가격만
+    }
+  }
+
+  function flash(el, dir) {
+    if (!el || !dir) return;
+    el.classList.remove("fu", "fd"); void el.offsetWidth; el.classList.add(dir > 0 ? "fu" : "fd");
+  }
+
+  // 0.3초마다 바뀐 코인만 화면에 반영 (표 전체를 다시 그리지 않음 → 펼친 차트도 유지)
+  function flush() {
+    if (!pending.size || curEx !== curLiveEx) { pending.clear(); return; }
+    let changed = false;
+    for (const [coin, px] of pending) {
+      const r = results.find(x => x.market === coin && !x.error);
+      if (!r) continue;
+      const before = r.price, oldBadge = badge(r.current);
+      applyPrice(r, px);
+      if (px === before) continue;
+      changed = true;
+      const c = r.current, dir = px > before ? 1 : -1, newBadge = badge(c);
+      const targets = [$("tbody").querySelector(`tr[data-m="${coin}"]`), $("cards").querySelector(`.ccard[data-m="${coin}"]`)];
+      for (const el of targets) {
+        if (!el) continue;
+        const q = s => el.querySelector(s);
+        q(".px").textContent = won(r.price); flash(q(".px"), dir);
+        q(".lv").textContent = won(c?.level);
+        const ds = q(".ds") || q(".dist");
+        if (ds) {
+          if (ds.classList.contains("dist")) { ds.textContent = c?.level ? `(${pct(c.distance)})` : ""; ds.classList.toggle("up", !!(c?.level && c.distance <= 5)); }
+          else ds.textContent = pct(c?.distance);
+        }
+        if (oldBadge !== newBadge) { q(".st").innerHTML = newBadge; flash(q(".st"), dir); }
+        const xp = q(".xp"); if (xp) xp.textContent = won(c?.expected);
+      }
+    }
+    pending.clear();
+    if (changed) renderSummary();
+  }
+  setInterval(flush, 300);
+
+  // 정렬은 3초에 한 번만: 순서가 실제로 바뀌었을 때만 표를 다시 그림
+  setInterval(() => {
+    if (!results.length || running || openCoin || curEx !== curLiveEx) return;   // 차트를 펼쳐 보는 중엔 줄이 안 움직이게
+    if (sortedRows().map(r => r.market).join(",") !== shownOrder) renderTable();
+  }, 3000);
+
+  // 연결 상태 옆에 마지막 가격 수신 시각
+  setInterval(() => {
+    if (ws && ws.readyState === 1) {
+      const ago = lastTick ? Math.round((Date.now() - lastTick) / 1000) : null;
+      setStatus("on", ago == null ? "실시간 연결됨" : `실시간 연결됨 · ${ago <= 1 ? "방금" : ago + "초 전"} 수신`);
+      if (lastTick && Date.now() - lastTick > 60000) { try { ws.close(); } catch (e) {} }   // 1분 넘게 조용하면 끊고 다시
+    }
+  }, 1000);
+
+  // 화면을 다시 켰을 때 연결이 끊겨 있으면 바로 다시 연결
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && coins.length && (!ws || ws.readyState > 1)) { retry = 0; open(); }
+  });
+
+  return { connect, applyLatest };
+})();
 
 // ── 시작: 설정 불러오고 바로 분석 ─────────────────────────────────
 loadSettings();
