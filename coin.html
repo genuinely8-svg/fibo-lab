@@ -62,6 +62,10 @@
   .b-near{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
   .b-under{background:color-mix(in srgb,var(--muted) 20%,transparent);color:var(--text)}
   .b-hit{background:#16a34a;color:#fff}
+  .b-reb{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+  .b-out{background:transparent;color:var(--up);border:1px solid color-mix(in srgb,var(--up) 60%,transparent)}
+  .b-done{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted)}
+  .since{display:block;color:var(--muted);font-size:10.5px;line-height:1.2;margin-top:2px;font-weight:400}
   .b-wait{background:color-mix(in srgb,var(--down) 12%,transparent);color:var(--down)}
   .b-none{color:var(--muted)}
   .few{color:var(--warn)}
@@ -414,9 +418,24 @@ async function loadPeriods(t) {
 function badge(cur) {
   if (!cur) return `<span class="badge b-none">스윙 없음</span>`;
   if (!cur.level) return `<span class="badge b-none">저점 형성 중</span>`;
-  if (cur.touched) return `<span class="badge b-hit">진입가 도달</span>`;
+  if (cur.touched) {
+    if (cur.phase === "목표 도달") return `<span class="badge b-done">목표 도달</span>`;
+    if (cur.phase === "이탈") return `<span class="badge b-out">이탈</span>`;
+    if (cur.phase === "반등 중") return `<span class="badge b-reb">반등 중${cur.progress != null ? " " + Math.max(0, Math.round(cur.progress)) + "%" : ""}</span>`;
+    return `<span class="badge b-hit">진입 구간</span>`;
+  }
   if (cur.distance <= 5) return `<span class="badge b-near">진입 근접</span>`;
   return `<span class="badge b-wait">대기</span>`;
+}
+const sgn = v => (v > 0 ? "+" : "") + v.toFixed(2) + "%";
+function sinceLine(cur, unitMin) {
+  if (!cur?.touched) return "";
+  const m = (cur.barsSinceTouch || 0) * unitMin;
+  const ago = m === 0 ? "이번 봉" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`;
+  const parts = [ago + " 도달"];
+  if (cur.lowPct != null) parts.push("최저 " + sgn(cur.lowPct));
+  if (cur.highPct != null) parts.push("최고 " + sgn(cur.highPct));
+  return `<span class="since">${parts.join(" · ")}</span>`;
 }
 const errSpan = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
 
@@ -441,7 +460,7 @@ function renderTf() {
       <td><b>${tf.label}</b></td>
       <td>${usd(c?.level)}</td>
       <td>${c?.level ? pctPlain(c.distance) : "-"}</td>
-      <td>${badge(c)}</td>
+      <td>${badge(c)}${sinceLine(c, tf.tv === "D" ? 1440 : +tf.tv)}</td>
       <td class="${s.count < 5 ? "few" : ""}">${s.count}회</td>
       <td class="up">${pctPlain(s.reboundAvg)}${errSpan(s.reboundErr)}</td>
       <td class="down">${pctPlain(s.fallAvg)}${errSpan(s.fallErr)}</td>

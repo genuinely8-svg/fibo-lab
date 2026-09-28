@@ -111,7 +111,7 @@ async function telegram(text) {
     const info = `현재가 $${fmt(r.price)} · 진입가 $${fmt(cur.level)}` +
       (s.count ? `\n과거 터치 ${s.count}회 · 평균 반등 ${s.reboundAvg.toFixed(2)}% · 반등 우세 ${s.winRate.toFixed(1)}%` : "") +
       (cur.expected ? `\n예상 반등가 $${fmt(cur.expected)}` : "");
-    if (cur.touched && !st.entry) {
+    if (cur.touched && cur.phase === "진입 구간" && !st.entry) {
       msgs.push(`🟢 [진입] ${sym}\n${info}`);
       st.entry = true; st.near = true;
     } else if (!cur.touched && d > 0 && d <= CFG.near && !st.near) {

@@ -121,6 +121,16 @@
       if (touchIdx >= 0 && since > K) continue;
       current = { state: touchIdx >= 0 ? "도달" : "대기", highIdx: s.high.i, lowIdx: s.low.i, H, L, level,
                   touched: touchIdx >= 0, touchIdx: touchIdx >= 0 ? touchIdx : null, barsSinceTouch: since };
+      if (touchIdx >= 0) {
+        // 도달한 뒤 가장 낮았던 가격 / 가장 높았던 가격 (반등은 다음 봉부터 — 과거 통계와 같은 기준)
+        let lo = Infinity, hi = -Infinity;
+        for (let x = touchIdx; x < candles.length; x++) {
+          lo = Math.min(lo, candles[x].l);
+          if (x > touchIdx) hi = Math.max(hi, candles[x].h);
+        }
+        current.minSince = lo;
+        current.maxSince = hi > -Infinity ? hi : null;
+      }
     }
     // 살아있는 스윙이 없음 = 새 고점을 만들었거나 아직 저점이 확정 전 → 저점이 확정되길 기다리는 중
     if (!current && candles.length) current = { state: "저점 형성 중", level: null };
@@ -137,11 +147,35 @@
     if (current && current.level) {
       current.distance = (price - current.level) / current.level * 100;
       current.expected = stats.reboundAvg != null ? current.level * (1 + stats.reboundAvg / 100) : null;
+      if (current.touched) touchPhase(current, stats, price);
     }
     return { price, stats, current, touches };
   }
 
-  const api = { findPivots, downSwings, analyze, mean, stdErr };
+  /*
+    진입가 도달 후 지금 어떤 상황인지 (과거 통계와 비교)
+      목표 도달 : 도달 후 예상 반등가까지 한 번이라도 올라감 → 이번 기회는 지나감
+      이탈      : 진입가 아래로 "평균 추가하락 + 오차"보다 더 빠진 적 있음 → 평소보다 깊게 빠짐
+      반등 중   : 지금 진입가 위 (예상 반등까지 몇 % 왔는지 progress)
+      진입 구간 : 지금 진입가 아래지만 평소에 더 빠지던 범위 안
+    (도달 후 최저·최고 가격 minSince / maxSince 는 실시간 가격으로도 갱신 가능)
+  */
+  function touchPhase(cur, stats, price) {
+    const lv = cur.level;
+    const limit = stats.fallAvg != null ? stats.fallAvg + (stats.fallErr || 0) : null;   // 이탈 기준 (%)
+    cur.outLimit = limit;
+    cur.lowPct = cur.minSince != null ? (cur.minSince - lv) / lv * 100 : null;          // 도달 후 최저 (진입가 대비 %)
+    cur.highPct = cur.maxSince != null ? (cur.maxSince - lv) / lv * 100 : null;         // 도달 후 최고
+    cur.progress = cur.expected && cur.expected > lv ? (price - lv) / (cur.expected - lv) * 100 : null;
+    if (cur.expected != null && cur.maxSince != null && cur.maxSince >= cur.expected) cur.phase = "목표 도달";
+    else if (limit != null && cur.lowPct != null && -cur.lowPct > limit) cur.phase = "이탈";
+    else if (price > lv) cur.phase = "반등 중";
+    else cur.phase = "진입 구간";
+    cur.state = cur.phase;
+    return cur;
+  }
+
+  const api = { findPivots, downSwings, analyze, touchPhase, mean, stdErr };
   if (typeof module !== "undefined" && module.exports) module.exports = api; // node 테스트용
   else root.FibCore = api;                                                  // 브라우저용
 })(this);

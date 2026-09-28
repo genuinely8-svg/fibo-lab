@@ -50,6 +50,10 @@
   .b-near{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
   .b-under{background:color-mix(in srgb,var(--muted) 20%,transparent);color:var(--text)}
   .b-hit{background:#16a34a;color:#fff}
+  .b-reb{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+  .b-out{background:transparent;color:var(--up);border:1px solid color-mix(in srgb,var(--up) 60%,transparent)}
+  .b-done{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted)}
+  .since{display:block;color:var(--muted);font-size:10.5px;line-height:1.2;margin-top:2px;font-weight:400}
   .b-wait{background:color-mix(in srgb,var(--down) 12%,transparent);color:var(--down)}
   .b-none{color:var(--muted)}
   .up{color:var(--up)} .down{color:var(--down)}
@@ -509,31 +513,56 @@ const won = v => {
 const pct = v => v == null ? "-" : v.toFixed(2) + "%";
 const err = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
 
+// 봉 개수 → "3시간 전" 같은 말로 (봉 단위: 분)
+function agoText(bars, unitMin) {
+  const m = bars * unitMin;
+  if (m < 60) return bars === 0 ? "이번 봉" : `${m}분 전`;
+  if (m < 1440) return `${Math.round(m / 60)}시간 전`;
+  return `${Math.round(m / 1440)}일 전`;
+}
+const sgn = v => (v > 0 ? "+" : "") + v.toFixed(2) + "%";
+// 도달 후 한 줄 요약: "3시간 전 도달 · 최저 −0.8% · 최고 +2.1%"
+function sinceLine(cur) {
+  if (!cur?.touched) return "";
+  const parts = [agoText(cur.barsSinceTouch || 0, +$("unit").value) + " 도달"];
+  if (cur.lowPct != null) parts.push("최저 " + sgn(cur.lowPct));
+  if (cur.highPct != null) parts.push("최고 " + sgn(cur.highPct));
+  return `<span class="since">${parts.join(" · ")}</span>`;
+}
 function badge(cur) {
   if (!cur) return `<span class="badge b-none">스윙 없음</span>`;
   if (!cur.level) return `<span class="badge b-none">저점 형성 중</span>`;
-  if (cur.touched) return `<span class="badge b-hit">진입가 도달</span>`;
+  if (cur.touched) {
+    const title = cur.outLimit != null ? ` title="이탈 기준: 진입가 −${cur.outLimit.toFixed(2)}% (과거 평균 추가하락 + 오차)"` : "";
+    if (cur.phase === "목표 도달") return `<span class="badge b-done"${title}>목표 도달</span>`;
+    if (cur.phase === "이탈") return `<span class="badge b-out"${title}>이탈</span>`;
+    if (cur.phase === "반등 중") return `<span class="badge b-reb"${title}>반등 중${cur.progress != null ? " " + Math.max(0, Math.round(cur.progress)) + "%" : ""}</span>`;
+    return `<span class="badge b-hit"${title}>진입 구간</span>`;
+  }
   if (cur.distance <= 5) return `<span class="badge b-near">진입 근접</span>`;
   return `<span class="badge b-wait">대기</span>`;
 }
 
-// 순위: ① 최근에 진입가에 도달한 코인 (최근 순) → ② 아직 진입가 위에 있는 코인 중 가까운 순 → ③ 저점 형성 중 → ④ 오류
+// 순위: ① 진입 구간 (최근 도달 순) → ② 대기 중 진입가에 가까운 순 → ③ 반등 중 → ④ 이탈 → ⑤ 목표 도달 → ⑥ 저점 형성 중 → ⑦ 오류
 function rankKey(r) {
   if (r.error) return 4e9;
   const c = r.current;
   if (!c?.level) return 3e9;
-  if (c.touched) return -1e6 + (c.barsSinceTouch || 0);
-  return c.distance;
+  if (!c.touched) return c.distance;
+  const order = { "진입 구간": -1e6, "반등 중": 1e6, "이탈": 2e6, "목표 도달": 2.5e6 }[c.phase] ?? 1e6;
+  return order + (c.phase === "반등 중" ? (c.progress || 0) : (c.barsSinceTouch || 0));
 }
 const sortedRows = () => [...results].sort((a, b) => rankKey(a) - rankKey(b));
 
 function renderSummary() {
   const ok = results.filter(r => !r.error && r.current?.level);
   const near = ok.filter(r => !r.current.touched && r.current.distance <= 5).length;
-  const hit = ok.filter(r => r.current.touched).length;
+  const ph = p => ok.filter(r => r.current.touched && r.current.phase === p).length;
   $("summary").innerHTML = `<span>분석 <b>${results.length}</b>개</span>
     <span>진입 근접(5% 이내) <b class="up">${near}</b>개</span>
-    <span>진입가 도달 <b style="color:#16a34a">${hit}</b>개</span>
+    <span>진입 구간 <b style="color:#16a34a">${ph("진입 구간")}</b>개</span>
+    <span>반등 중 <b style="color:var(--accent)">${ph("반등 중")}</b>개</span>
+    <span>이탈 <b class="up">${ph("이탈")}</b>개</span>
     <span style="color:var(--muted)">진입 가격에 가까운 순서</span>`;
 }
 let shownOrder = "";     // 지금 화면에 보이는 코인 순서 (실시간 정렬 때 바뀌었는지 비교용)
@@ -559,7 +588,7 @@ function renderTable() {
       <td class="px">${won(r.price)}</td>
       <td class="lv">${won(c?.level)}</td>
       <td class="ds">${pct(c?.distance)}</td>
-      <td class="st">${badge(c)}</td>
+      <td class="st">${badge(c)}${sinceLine(c)}</td>
       <td class="${few}">${s.count}회</td>
       <td class="up">${pct(s.reboundAvg)}${err(s.reboundErr)}</td>
       <td class="down">${pct(s.fallAvg)}${err(s.fallErr)}</td>
@@ -591,7 +620,7 @@ function renderCards(rows) {
     const s = r.stats, c = r.current, open = r.market === openCoin;
     const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
     return `<div class="ccard${open ? " open" : ""}" data-m="${r.market}">
-      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}<span class="st" style="margin-left:auto">${badge(c)}</span></div>
+      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}<span class="st" style="margin-left:auto;text-align:right">${badge(c)}${sinceLine(c)}</span></div>
       <div class="c2"><span class="px">${won(r.price)}</span><span class="arrow">→</span>진입 <span class="lv">${won(c?.level)}</span>${dist}</div>
       <div class="c3">평균 반등 <span class="up">${pct(s.reboundAvg)}</span> · 터치 <span class="${s.count < 5 ? "few" : ""}">${s.count}회</span>${more}</div>
       ${open ? `<div class="cdet">
@@ -830,8 +859,14 @@ const Live = (() => {
       r.current = { state: "저점 형성 중", level: null };
       return;
     }
-    if (!c.touched && px <= c.level) { c.touched = true; c.state = "도달"; c.barsSinceTouch = 0; }   // 진입가 도달!
+    if (!c.touched && px <= c.level) {                        // 진입가 도달!
+      c.touched = true; c.barsSinceTouch = 0; c.minSince = px; c.maxSince = null;
+    } else if (c.touched) {                                    // 도달 후 최저·최고 갱신
+      c.minSince = Math.min(c.minSince ?? px, px);
+      c.maxSince = Math.max(c.maxSince ?? px, px);
+    }
     c.distance = (px - c.level) / c.level * 100;
+    if (c.touched) FibCore.touchPhase(c, r.stats, px);
   }
 
   function applyLatest() {
@@ -870,7 +905,8 @@ const Live = (() => {
           if (ds.classList.contains("dist")) { ds.textContent = c?.level ? `(${pct(c.distance)})` : ""; ds.classList.toggle("up", !!(c?.level && c.distance <= 5)); }
           else ds.textContent = pct(c?.distance);
         }
-        if (oldBadge !== newBadge) { q(".st").innerHTML = newBadge; flash(q(".st"), dir); }
+        const newSt = newBadge + sinceLine(c);
+        if (q(".st").innerHTML !== newSt) { q(".st").innerHTML = newSt; if (oldBadge !== newBadge) flash(q(".st"), dir); }
         const xp = q(".xp"); if (xp) xp.textContent = won(c?.expected);
       }
     }
