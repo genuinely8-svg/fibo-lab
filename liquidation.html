@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>청산히트맵 · ath TEST (참고용)</title>
-<link rel="stylesheet" href="common.css?v=20260928210934">
+<link rel="stylesheet" href="common.css?v=20260928213931">
 <style>
   #heatWrap{position:relative;width:100%;height:500px;border-radius:10px;overflow:hidden;background:#0d0829}
   #heat{width:100%;height:100%;display:block;cursor:crosshair}
@@ -16,6 +16,8 @@
   @media (max-width:860px){ .cols{grid-template-columns:1fr} #heatWrap{height:380px} }
   #live tr.new{animation:flash 1.2s}
   @keyframes flash{from{background:color-mix(in srgb,var(--accent) 25%,transparent)}to{background:transparent}}
+  /* 휴대폰: 실시간 청산 표에서 가격 칸 숨김 */
+  @media (max-width:700px){ #liveTable th:nth-child(4),#liveTable td:nth-child(4){display:none} }
   .note{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.7}
 </style>
 </head>
@@ -74,7 +76,7 @@
     </div>
     <div class="tiles" id="liveSum" style="margin-bottom:12px"></div>
     <div class="tablewrap" style="max-height:420px;overflow-y:auto">
-      <table>
+      <table id="liveTable">
         <thead><tr><th class="l">시간</th><th class="l">코인</th><th class="l">종류</th><th>가격</th><th>금액</th></tr></thead>
         <tbody id="live"><tr><td colspan="5" class="l muted">연결 중… 청산이 생기면 여기에 바로 떠요</td></tr></tbody>
       </table>
@@ -83,10 +85,10 @@
   </div>
 </div>
 
-<script src="common.js?v=20260928210934"></script>
-<script src="nav.js?v=20260928210934"></script>
-<script src="meta.js?v=20260928210934"></script>
-<script src="coinpicker.js?v=20260928210934"></script>
+<script src="common.js?v=20260928213931"></script>
+<script src="nav.js?v=20260928213931"></script>
+<script src="meta.js?v=20260928213931"></script>
+<script src="coinpicker.js?v=20260928213931"></script>
 <script>
 const F = "https://fapi.binance.com";
 const LEV = [[5, .10], [10, .30], [25, .25], [50, .20], [100, .15]];   // [레버리지, 비중]

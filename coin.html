@@ -93,6 +93,19 @@
   .more{font:inherit;border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-weight:600}
   .foot{color:var(--muted);font-size:12px;line-height:1.7}
   @media (max-width:600px){ .price{margin-left:0;text-align:left;width:100%} #chart{height:360px} }
+  /* 휴대폰: 표가 옆으로 안 넘치게 */
+  @media (max-width:700px){
+    .wrap{padding:14px 10px 50px}
+    .card{padding:12px 10px}
+    th,td{padding:8px 4px;font-size:13px}
+    th{font-size:11px;white-space:normal;line-height:1.25;vertical-align:bottom}
+    td[colspan]{white-space:normal}
+    .range{min-width:50px}
+    /* 봉별 진입 분석: 봉, 진입 가격, 거리, 상태, 평균 반등만 */
+    #tfTable th:nth-child(5),#tfTable td:nth-child(5),#tfTable th:nth-child(7),#tfTable td:nth-child(7),#tfTable th:nth-child(8),#tfTable td:nth-child(8),#tfTable th:nth-child(9),#tfTable td:nth-child(9){display:none}
+    /* 기간별 가격 범위: 변동폭 숨김 */
+    table:not(#tfTable) th:nth-child(6),table:not(#tfTable) td:nth-child(6){display:none}
+  }
 </style>
 </head>
 <body>
@@ -180,10 +193,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260928210934"></script>
-<script src="chart.js?v=20260928210934"></script>
-<script src="nav.js?v=20260928210934"></script>
-<script src="meta.js?v=20260928210934"></script>
+<script src="fib-core.js?v=20260928213931"></script>
+<script src="chart.js?v=20260928213931"></script>
+<script src="nav.js?v=20260928213931"></script>
+<script src="meta.js?v=20260928213931"></script>
 <script>
 "use strict";
 // ── 주소에서 설정 읽기: coin.html?s=BTC&ex=futures&n=5&k=20 ─────────

@@ -42,3 +42,18 @@ th.l,td.l{text-align:left}
 .seg button{background:transparent;color:var(--muted);padding:6px 12px;border-radius:6px}
 .seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .foot{color:var(--muted);font-size:12px;line-height:1.7}
+
+/* ─────────── 휴대폰 화면 (가로 700px 이하): 표가 옆으로 안 넘치게 ─────────── */
+@media (max-width:700px){
+  .wrap{padding:14px 10px 50px}
+  h1{font-size:20px}
+  .card{padding:12px 10px}
+  th,td{padding:8px 4px;font-size:13px}
+  th{font-size:11px;white-space:normal;line-height:1.25;vertical-align:bottom}   /* 칸 제목은 두 줄로 */
+  td[colspan]{white-space:normal}                                                 /* "불러오는 중…" 같은 안내 문장은 줄바꿈 */
+  .coin{gap:5px}
+  .coin img,.coin .ph{width:18px;height:18px}
+  .coin small,td .coin small{display:none}                                        /* 코인 긴 이름은 숨기고 기호만 */
+  .coin>span{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tiles{grid-template-columns:1fr 1fr}
+}
