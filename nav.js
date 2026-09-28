@@ -46,3 +46,33 @@
   if (on && on.offsetLeft + on.offsetWidth > el.clientWidth) el.scrollLeft = on.offsetLeft - 16;
   edges();
 })();
+
+// ── 새 버전이 올라오면 알아서 새로고침 ─────────────────────────────
+// 이 페이지가 불러온 nav.js?v=버전 과, 서버에 있는 최신 페이지의 버전을 비교해서 다르면 최신으로 다시 열어요.
+// → 주소는 그대로 공유해도 항상 최신 화면이 보임
+(function () {
+  const me = document.querySelector('script[src*="nav.js"]');
+  const cur = ((me && me.getAttribute("src").match(/[?&]v=([^&]+)/)) || [])[1];
+  if (!cur) return;
+  // 새 버전으로 열 때 붙였던 ?v= 는 주소창에서 지워서 깔끔하게
+  const q = new URLSearchParams(location.search);
+  if (q.has("v")) { q.delete("v"); history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash); }
+  let busy = false;
+  async function check() {
+    if (busy || document.hidden) return;
+    busy = true;
+    try {
+      const html = await (await fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" })).text();
+      const m = html.match(/nav\.js\?v=([^"'&]+)/);
+      if (m && m[1] !== cur) {
+        const u = new URLSearchParams(location.search); u.set("v", m[1]);
+        location.replace(location.pathname + "?" + u + location.hash);   // 새 주소로 열면 브라우저가 예전 것을 못 씀
+        return;
+      }
+    } catch (e) {}
+    busy = false;
+  }
+  setTimeout(check, 2000);                       // 열자마자 한 번
+  setInterval(check, 3 * 60 * 1000);             // 켜두면 3분마다
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });   // 다른 앱 갔다 돌아오면
+})();

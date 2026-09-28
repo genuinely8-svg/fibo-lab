@@ -1,0 +1,4 @@
+#!/bin/sh
+# 커밋할 때마다 .html 안의 js/css 주소에 새 버전 번호를 붙이고, 바뀐 html 도 같이 커밋
+node bump.js || exit 1
+git add -u -- '*.html'
