@@ -175,7 +175,24 @@
     return cur;
   }
 
-  const api = { findPivots, downSwings, analyze, touchPhase, mean, stdErr };
+  /*
+    화면에 보여줄 상태 4가지
+      진입 구간 : 진입가에 도달했고, 아직 평소 추가하락 범위 안 (진입가 아래)
+      진입 근접 : 진입가 위 5% 이내 (도달 후 살짝 반등한 경우 포함)
+      이탈      : 진입가 도달 후 평소보다 깊게 빠짐
+      대기      : 그 밖 (멀리 있음 · 반등이 끝남 · 저점 형성 중)
+  */
+  function label(cur, near = 5) {
+    if (!cur || !cur.level) return "대기";
+    if (cur.touched) {
+      if (cur.phase === "진입 구간") return "진입 구간";
+      if (cur.phase === "이탈") return "이탈";
+      if (cur.phase === "목표 도달") return "대기";
+    }
+    return cur.distance <= near ? "진입 근접" : "대기";
+  }
+
+  const api = { findPivots, downSwings, analyze, touchPhase, label, mean, stdErr };
   if (typeof module !== "undefined" && module.exports) module.exports = api; // node 테스트용
   else root.FibCore = api;                                                  // 브라우저용
 })(this);
