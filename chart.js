@@ -62,7 +62,7 @@
 
     // 과거 -1 터치 지점 ▲ 표시 (시간 순서대로 넣어야 함)
     const seen = new Set();
-    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: "belowBar", color: cssVar("--accent"), shape: "arrowUp", text: "" }));
+    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: "belowBar", color: cssVar("--accent"), shape: "arrowUp", text: "진입" }));
     // 지금 스윙에서 진입가에 닿은 봉 → 초록색 "진입" 표시 (과거 기록보다 우선)
     const now = cur && cur.touched && cur.touchIdx != null && cs[cur.touchIdx]
       ? [{ time: T(cs[cur.touchIdx]), position: "belowBar", color: "#16a34a", shape: "arrowUp", text: "진입", size: 2 }] : [];

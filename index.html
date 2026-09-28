@@ -241,6 +241,14 @@
         <button data-v="watch">관심목록</button>
       </span>
       <span id="scanOpts" style="display:contents">
+        <label class="inl">시총
+          <select id="mcap">
+            <option value="100">100위까지</option>
+            <option value="150" selected>150위까지</option>
+            <option value="300">300위까지</option>
+            <option value="0">전체</option>
+          </select>
+        </label>
         <label class="inl">거래량 상위
           <select id="topN">
             <option value="30">30개</option>
@@ -299,10 +307,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260928204104"></script>
-<script src="chart.js?v=20260928204104"></script>
-<script src="nav.js?v=20260928204104"></script>
-<script src="meta.js?v=20260928204104"></script>
+<script src="fib-core.js?v=20260928210934"></script>
+<script src="chart.js?v=20260928210934"></script>
+<script src="nav.js?v=20260928210934"></script>
+<script src="meta.js?v=20260928210934"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -423,7 +431,7 @@ const DEFAULT_WATCH = ["BTC", "ETH", "SOL", "XRP", "ARB", "HYPE", "UNI", "ZEC", 
 let mode = "scan";
 let watch = DEFAULT_WATCH.slice();
 let shared = null;                 // 링크로 공유받은 목록 (저장 전)
-const SETTINGS = ["ex", "unit", "n", "k", "count", "auto", "topN"];
+const SETTINGS = ["ex", "unit", "n", "k", "count", "auto", "topN", "mcap"];
 function saveSettings() {
   const o = { mode }; for (const id of SETTINGS) o[id] = $(id).value;
   try { localStorage.setItem("main-settings-v1", JSON.stringify(o)); } catch (e) {}
@@ -464,7 +472,13 @@ async function runOnce() {
   try {
     if (mode === "scan") {
       $("status").textContent = "거래량 상위 코인 고르는 중…";
-      coins = (await universe(ex)).slice(0, +$("topN").value).map(x => x.sym);
+      let list = await universe(ex);
+      const maxRank = +$("mcap").value;
+      if (maxRank) {
+        await logosReady;                                  // 시가총액 순위 (코인게코) 받을 때까지
+        if (CoinMeta.hasTop()) list = list.filter(x => { const r = CoinMeta.rank(x.sym); return r && r <= maxRank; });   // 시총 순위 밖 잡코인 제외
+      }
+      coins = list.slice(0, +$("topN").value).map(x => x.sym);
     } else {
       coins = activeWatch().slice();
     }
@@ -500,7 +514,7 @@ async function runOnce() {
   if (openCoin && !results.find(r => r.market === openCoin && !r.error)) { openCoin = null; renderTable(); }
   if (openCoin && view === "lw") drawChart();            // 펼쳐 둔 차트도 새 데이터로 (트레이딩뷰는 스스로 실시간 갱신)
   $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개 · `
-    + (mode === "scan" ? `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`);
+    + (mode === "scan" ? (+$("mcap").value ? `시총 ${$("mcap").value}위 안에서 ` : "") + `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`);
   $("run").disabled = false;
 }
 
@@ -560,7 +574,7 @@ function renderTable() {
       <td>${name}</td>
       <td class="px">${won(r.price)}</td>
       <td class="lv">${won(c?.level)}</td>
-      <td class="ds">${pct(c?.distance)}</td>
+      <td class="ds${c?.level && c.distance < 0 ? " up" : ""}">${pct(c?.distance)}</td>
       <td class="st">${badge(c)}</td>
       <td class="${few}">${s.count}회</td>
       <td class="up">${pct(s.reboundAvg)}${err(s.reboundErr)}</td>
@@ -738,7 +752,7 @@ $("saveShared").onclick = () => {
 // ── 휴대폰: 설정 한 줄 요약 (누르면 펼치기/접기) ─────────────────────────
 function updateSetSum() {
   const t = id => $(id).selectedOptions[0].text;
-  $("setSum").textContent = `${t("ex")} · ${t("unit")}봉 · 캔들 ${t("count")}` + (mode === "scan" ? ` · 상위 ${t("topN")}` : " · 관심목록");
+  $("setSum").textContent = `${t("ex")} · ${t("unit")}봉 · 캔들 ${t("count")}` + (mode === "scan" ? ` · 시총 ${t("mcap")} · 거래량 상위 ${t("topN")}` : " · 관심목록");
 }
 $("setBar").onclick = () => $("setCard").classList.toggle("collapsed");
 
@@ -761,7 +775,7 @@ function setAuto() {
   if (s) timer = setInterval(() => { if (!running && !document.hidden) run(); }, s * 1000);
 }
 $("auto").onchange = () => { setAuto(); saveSettings(); };
-for (const id of ["ex", "unit", "n", "k", "count", "topN"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); run(); });
+for (const id of ["ex", "unit", "n", "k", "count", "topN", "mcap"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); run(); });
 
 // ── 실시간 가격 (바이낸스 웹소켓) ─────────────────────────────────
 // 무거운 계산(스윙·진입가·통계)은 몇 분마다, 가격은 바이낸스가 바뀔 때마다 보내주는 걸 받아서 즉시 반영
@@ -876,7 +890,7 @@ const Live = (() => {
         const ds = q(".ds") || q(".dist");
         if (ds) {
           if (ds.classList.contains("dist")) { ds.textContent = c?.level ? `(${pct(c.distance)})` : ""; ds.classList.toggle("up", !!(c?.level && c.distance <= 5)); }
-          else ds.textContent = pct(c?.distance);
+          else { ds.textContent = pct(c?.distance); ds.classList.toggle("up", !!(c?.level && c.distance < 0)); }
         }
         if (oldBadge !== newBadge) { q(".st").innerHTML = newBadge; flash(q(".st"), dir); }
         const xp = q(".xp"); if (xp) xp.textContent = won(c?.expected);
