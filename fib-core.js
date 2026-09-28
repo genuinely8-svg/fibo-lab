@@ -155,7 +155,8 @@
   /*
     진입가 도달 후 지금 어떤 상황인지 (과거 통계와 비교)
       목표 도달 : 도달 후 예상 반등가까지 한 번이라도 올라감 → 이번 기회는 지나감
-      이탈      : 진입가 아래로 "평균 추가하락 + 오차"보다 더 빠진 적 있음 → 평소보다 깊게 빠짐
+      이탈      : 지금 가격이 진입가 아래로 "평균 추가하락 + 오차"보다 더 빠져 있음 → 평소보다 깊게 빠짐
+                  (다시 그 범위 안으로 올라오면 진입 구간으로 돌아옴)
       반등 중   : 지금 진입가 위 (예상 반등까지 몇 % 왔는지 progress)
       진입 구간 : 지금 진입가 아래지만 평소에 더 빠지던 범위 안
     (도달 후 최저·최고 가격 minSince / maxSince 는 실시간 가격으로도 갱신 가능)
@@ -168,7 +169,7 @@
     cur.highPct = cur.maxSince != null ? (cur.maxSince - lv) / lv * 100 : null;         // 도달 후 최고
     cur.progress = cur.expected && cur.expected > lv ? (price - lv) / (cur.expected - lv) * 100 : null;
     if (cur.expected != null && cur.maxSince != null && cur.maxSince >= cur.expected) cur.phase = "목표 도달";
-    else if (limit != null && cur.lowPct != null && -cur.lowPct > limit) cur.phase = "이탈";
+    else if (limit != null && (lv - price) / lv * 100 > limit) cur.phase = "이탈";
     else if (price > lv) cur.phase = "반등 중";
     else cur.phase = "진입 구간";
     cur.state = cur.phase;

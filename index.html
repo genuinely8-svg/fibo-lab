@@ -307,10 +307,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260928213931"></script>
-<script src="chart.js?v=20260928213931"></script>
-<script src="nav.js?v=20260928213931"></script>
-<script src="meta.js?v=20260928213931"></script>
+<script src="fib-core.js?v=20260928221129"></script>
+<script src="chart.js?v=20260928221129"></script>
+<script src="nav.js?v=20260928221129"></script>
+<script src="meta.js?v=20260928221129"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -534,12 +534,12 @@ function badge(cur) {
   return `<span class="badge ${cls}">${l}</span>`;
 }
 
-// 순위: ① 진입 구간 → ② 진입 근접 → ③ 대기 (진입가에 가까운 순) → ④ 이탈 → ⑤ 오류
+// 순위: ① 진입 구간 → ② 진입 근접 → ③ 이탈 → ④ 대기 (진입가에 가까운 순, 진입가 없는 건 맨 뒤) → ⑤ 오류
 function rankKey(r) {
   if (r.error) return 4e9;
   const c = r.current, l = FibCore.label(c);
   const d = c?.level ? c.distance : 1e5;
-  return { "진입 구간": 0, "진입 근접": 1e6, "대기": 2e6, "이탈": 3e6 }[l] + d;
+  return { "진입 구간": 0, "진입 근접": 1e6, "이탈": 2e6, "대기": 3e6 }[l] + d;
 }
 const sortedRows = () => [...results].sort((a, b) => rankKey(a) - rankKey(b));
 
