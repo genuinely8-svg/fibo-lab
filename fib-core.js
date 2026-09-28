@@ -100,21 +100,30 @@
       }
     }
 
-    // ── 지금 진행 중인 스윙 ──
-    // 마지막 스윙 고점 이후 가장 높은 봉을 H로, 그 뒤 가장 낮은 봉을 L로 잡음 (L은 아직 확정 전일 수 있음)
-    const pivots = findPivots(candles, n).filter(p => p.type === "H");
-    if (pivots.length) {
-      let hIdx = pivots[pivots.length - 1].i;
-      for (let x = hIdx; x < candles.length; x++) if (candles[x].h > candles[hIdx].h) hIdx = x;
-      let lIdx = -1;
-      for (let x = hIdx + 1; x < candles.length; x++) if (lIdx < 0 || candles[x].l < candles[lIdx].l) lIdx = x;
-      if (lIdx < 0) {
-        current = { state: "신고점", highIdx: hIdx, H: candles[hIdx].h };
-      } else {
-        const H = candles[hIdx].h, L = candles[lIdx].l;
-        current = { state: "대기", highIdx: hIdx, lowIdx: lIdx, H, L, level: L - (H - L) * ratio };
+    // ── 지금 진행 중인 스윙 (과거 통계와 똑같은 규칙) ──
+    // 저점(L)이 "확정된" 하락 스윙만 씀 → 진입가는 한 번 정해지면 고정 (가격을 따라 내려가지 않음)
+    // 최근 스윙부터 거꾸로 보면서, 아직 고점(H)을 뚫리지 않은 스윙을 고름
+    //   · 아직 진입가를 안 찍었으면 → "대기" (진입가까지 남은 거리 표시)
+    //   · 최근 K개 봉 안에 진입가를 찍었으면 → "도달" (진입 신호)
+    //   · 찍은 지 K개 봉이 지났으면 → 끝난 스윙이라 건너뜀
+    for (let si = swings.length - 1; si >= 0 && !current; si--) {
+      const s = swings[si];
+      const H = s.high.price, L = s.low.price;
+      const level = L - (H - L) * ratio;
+      if (level <= 0) continue;
+      let touchIdx = -1, broken = false;
+      for (let x = s.low.i + 1; x < candles.length; x++) {
+        if (candles[x].h > H) { broken = true; break; }
+        if (touchIdx < 0 && candles[x].l <= level) touchIdx = x;
       }
+      if (broken) continue;
+      const since = touchIdx >= 0 ? candles.length - 1 - touchIdx : null;
+      if (touchIdx >= 0 && since > K) continue;
+      current = { state: touchIdx >= 0 ? "도달" : "대기", highIdx: s.high.i, lowIdx: s.low.i, H, L, level,
+                  touched: touchIdx >= 0, touchIdx: touchIdx >= 0 ? touchIdx : null, barsSinceTouch: since };
     }
+    // 살아있는 스윙이 없음 = 새 고점을 만들었거나 아직 저점이 확정 전 → 저점이 확정되길 기다리는 중
+    if (!current && candles.length) current = { state: "저점 형성 중", level: null };
 
     const reb = touches.map(x => x.rebound), fal = touches.map(x => x.fall);
     const stats = {
@@ -125,7 +134,6 @@
     };
 
     const price = candles.length ? candles[candles.length - 1].c : null;
-    if (current && !(current.level > 0)) { current.level = null; }   // 신고점이거나 -1이 0 이하
     if (current && current.level) {
       current.distance = (price - current.level) / current.level * 100;
       current.expected = stats.reboundAvg != null ? current.level * (1 + stats.reboundAvg / 100) : null;

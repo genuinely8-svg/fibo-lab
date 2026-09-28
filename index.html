@@ -49,6 +49,7 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
   .b-near{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
   .b-under{background:color-mix(in srgb,var(--muted) 20%,transparent);color:var(--text)}
+  .b-hit{background:#16a34a;color:#fff}
   .b-wait{background:color-mix(in srgb,var(--down) 12%,transparent);color:var(--down)}
   .b-none{color:var(--muted)}
   .up{color:var(--up)} .down{color:var(--down)}
@@ -510,28 +511,29 @@ const err = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
 
 function badge(cur) {
   if (!cur) return `<span class="badge b-none">스윙 없음</span>`;
-  if (cur.state === "신고점") return `<span class="badge b-none">신고점 갱신중</span>`;
-  if (cur.distance <= 0) return `<span class="badge b-under">진입가 이하</span>`;
+  if (!cur.level) return `<span class="badge b-none">저점 형성 중</span>`;
+  if (cur.touched) return `<span class="badge b-hit">진입가 도달</span>`;
   if (cur.distance <= 5) return `<span class="badge b-near">진입 근접</span>`;
   return `<span class="badge b-wait">대기</span>`;
 }
 
-// 순위: ① 아직 진입가 위에 있는 코인 중 가까운 순 → ② 이미 진입가 아래로 내려간 코인(가까운 순) → ③ 신고점·스윙 없음 → ④ 오류
+// 순위: ① 최근에 진입가에 도달한 코인 (최근 순) → ② 아직 진입가 위에 있는 코인 중 가까운 순 → ③ 저점 형성 중 → ④ 오류
 function rankKey(r) {
   if (r.error) return 4e9;
-  const d = r.current?.level ? r.current.distance : null;
-  if (d == null) return 3e9;
-  return d >= 0 ? d : 1e9 - d;
+  const c = r.current;
+  if (!c?.level) return 3e9;
+  if (c.touched) return -1e6 + (c.barsSinceTouch || 0);
+  return c.distance;
 }
 const sortedRows = () => [...results].sort((a, b) => rankKey(a) - rankKey(b));
 
 function renderSummary() {
   const ok = results.filter(r => !r.error && r.current?.level);
-  const near = ok.filter(r => r.current.distance > 0 && r.current.distance <= 5).length;
-  const under = ok.filter(r => r.current.distance <= 0).length;
+  const near = ok.filter(r => !r.current.touched && r.current.distance <= 5).length;
+  const hit = ok.filter(r => r.current.touched).length;
   $("summary").innerHTML = `<span>분석 <b>${results.length}</b>개</span>
     <span>진입 근접(5% 이내) <b class="up">${near}</b>개</span>
-    <span>진입가 이하 <b>${under}</b>개</span>
+    <span>진입가 도달 <b style="color:#16a34a">${hit}</b>개</span>
     <span style="color:var(--muted)">진입 가격에 가까운 순서</span>`;
 }
 let shownOrder = "";     // 지금 화면에 보이는 코인 순서 (실시간 정렬 때 바뀌었는지 비교용)
@@ -819,22 +821,17 @@ const Live = (() => {
     sock.onerror = () => {};                                   // onclose 에서 처리
   }
 
-  // 새 가격으로 한 코인의 진입가·거리 다시 계산 (fib-core.js 와 같은 규칙)
+  // 새 가격으로 한 코인의 거리·상태 다시 계산 (fib-core.js 와 같은 규칙: 진입가는 고정)
   function applyPrice(r, px) {
     r.price = px;
     const c = r.current;
-    if (!c || c.state === "신고점") return;
-    if (px > c.H) {                                            // 스윙 고점을 뚫음 → 이 스윙은 끝
-      r.current = { state: "신고점", highIdx: c.highIdx, H: px };
+    if (!c || !c.level) return;
+    if (px > c.H) {                                            // 스윙 고점을 뚫음 → 이 스윙은 끝, 다음 재계산 때 새 스윙을 찾음
+      r.current = { state: "저점 형성 중", level: null };
       return;
     }
-    if (c.L != null && px < c.L) {                             // 새 저점 → 진입가도 따라 내려감
-      c.L = px;
-      c.level = c.L - (c.H - c.L);
-      if (!(c.level > 0)) c.level = null;
-      c.expected = c.level && r.stats.reboundAvg != null ? c.level * (1 + r.stats.reboundAvg / 100) : null;
-    }
-    if (c.level) c.distance = (px - c.level) / c.level * 100;
+    if (!c.touched && px <= c.level) { c.touched = true; c.state = "도달"; c.barsSinceTouch = 0; }   // 진입가 도달!
+    c.distance = (px - c.level) / c.level * 100;
   }
 
   function applyLatest() {
