@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>피보 -1 진입 백테스트 · ath TEST</title>
+<link rel="stylesheet" href="common.css?v=20260929223326">
+<style>
+  :root{ --s1:#2a78d6; --s2:#eb6834; --grid:#e5e7eb; }
+  @media (prefers-color-scheme: dark){ :root{ --s1:#3987e5; --s2:#d95926; --grid:#2a2f37; } }
+  .tiles .v.neg{color:var(--up)}
+  .chartbox{position:relative}
+  #chart{width:100%;height:320px;display:block}
+  #tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+       font-size:12px;line-height:1.6;box-shadow:0 6px 18px rgba(0,0,0,.2);white-space:nowrap}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 8px}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  ul.plain{margin:0;padding-left:18px;line-height:1.8}
+  .note{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.7}
+  td.l{text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>피보 -1 진입 백테스트</h1>
+  <p class="sub">2024.09.28 ~ 2026.09.28 (2년) · 바이낸스 선물 1시간봉 · 시총 150위 안 89개 코인 · 스윙 민감도 5</p>
+
+  <div class="card">
+    <h2>결과 요약 (수수료·펀딩비 포함)</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">최종 잔고</div><div class="v neg">$4,303</div><div class="s">시작 $50,000</div></div>
+      <div class="tile"><div class="k">수익률</div><div class="v neg">−91.4%</div><div class="s">같은 기간 BTC 보유 +27.2%</div></div>
+      <div class="tile"><div class="k">최대 낙폭</div><div class="v neg">−94.7%</div><div class="s">2026.06.04 (이후 증거금 부족으로 매매 중단)</div></div>
+      <div class="tile"><div class="k">매매 횟수</div><div class="v">748회</div><div class="s">신호 4,638개 중 3,890개는 자리 없어서 건너뜀</div></div>
+      <div class="tile"><div class="k">이긴 비율</div><div class="v">52.1%</div><div class="s">평균 이익 $1,212 · 평균 손실 $1,448</div></div>
+      <div class="tile"><div class="k">손익비 (총이익 ÷ 총손실)</div><div class="v neg">0.91</div><div class="s">1보다 작으면 잃는 전략</div></div>
+      <div class="tile"><div class="k">수수료 + 펀딩비</div><div class="v">$20,724</div><div class="s">수수료 $10,710 · 펀딩비 $10,014</div></div>
+      <div class="tile"><div class="k">평균 보유 시간</div><div class="v">58시간</div><div class="s">최장 연속 손실 22번</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>잔고 변화 (주 단위)</h2>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>수수료·펀딩비 포함 (실제에 가까움)</span>
+      <span><i style="background:var(--s2)"></i>비용 0이라고 가정</span>
+    </div>
+    <div class="chartbox"><svg id="chart" role="img" aria-label="주별 잔고 변화 선 그래프"></svg><div id="tip" hidden></div></div>
+    <p class="small muted" style="margin:8px 0 0">비용이 없다고 쳐도 +106.9%(최대 낙폭 −70.7%)예요. 비용이 들어가면 2025년 2월 급락 뒤 잔고가 줄어 포지션을 5개 다 못 잡게 되고, 그 뒤로 결과가 완전히 갈라져요.</p>
+  </div>
+
+  <div class="card">
+    <h2>매매는 어떻게 끝났나</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">끝난 모양</th><th>실제 매매 (748회)</th><th>슬롯 제한 없이 모든 신호 (4,047회)</th><th class="l">손익 (포지션 $25,000 기준)</th></tr></thead>
+      <tbody>
+        <tr><td class="l">−5% 절반 손절 → −7% 나머지 손절</td><td>334</td><td>1,818 (45%)</td><td class="l down">약 −$1,500</td></tr>
+        <tr><td class="l">+5% 절반 익절 → +10% 나머지 익절</td><td>189</td><td>916 (23%)</td><td class="l up">약 +$1,875</td></tr>
+        <tr><td class="l">+5% 절반 익절 → 본전 스톱</td><td>180</td><td>954 (24%)</td><td class="l up">약 +$625</td></tr>
+        <tr><td class="l">−5% 절반 손절 → 반등해서 +5%·+10%</td><td>45</td><td>330 (8%)</td><td class="l">−$625 ~ +$625</td></tr>
+      </tbody>
+    </table></div>
+    <p class="small muted" style="margin:8px 0 0">모든 신호를 다 잡았다고 쳐도 한 번에 평균 −0.46% (−$115)예요. 어떤 신호를 골라 잡느냐에 따라 결과가 크게 흔들리지만, 평균적으로는 이 규칙에 이득이 없어요.</p>
+  </div>
+
+  <div class="card">
+    <h2>가장 크게 잃은 날</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">날짜</th><th>그날 손익</th><th class="l">무슨 일</th></tr></thead>
+      <tbody>
+        <tr><td class="l">2025.02.03</td><td class="down">−$32,615</td><td class="l">시장 전체 급락 · 하루에 28번 손절 (손절 → 다른 코인 신호 → 또 손절)</td></tr>
+        <tr><td class="l">2025.10.11</td><td class="down">−$31,388</td><td class="l">시장 전체 급락 · 하루에 23번 손절</td></tr>
+        <tr><td class="l">2026.01.19</td><td class="down">−$21,679</td><td class="l">급락</td></tr>
+        <tr><td class="l">2025.02.25</td><td class="down">−$10,736</td><td class="l"></td></tr>
+        <tr><td class="l">2025.03.04</td><td class="down">−$10,637</td><td class="l"></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h2>왜 이런 결과가 나왔나</h2>
+    <ul class="plain">
+      <li><b>급락장에서 신호가 한꺼번에 쏟아져요.</b> 코인들이 같이 빠지니까 손절하고 나면 바로 다른 코인에서 신호가 떠서, 하루에 20번 넘게 손절이 이어졌어요. 손실 대부분이 이런 며칠에서 나왔어요.</li>
+      <li><b>스윙이 작아요.</b> 1시간봉 · 민감도 5에서 잡히는 스윙은 대부분 1~3% 크기라, 사이트의 과거 평균 반등도 1~4% 정도예요. +5% / +10% 익절은 평소 반등보다 멀고, −5% / −7% 손절도 넓어서 사실상 "5% 위냐 아래냐" 동전 던지기가 돼요.</li>
+      <li><b>비용이 커요.</b> 한 번에 포지션이 $25,000라 매매마다 수수료와 펀딩비로 약 $28가 나가요. 748번이면 $20,000가 넘어요.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>테스트 규칙</h2>
+    <ul class="plain small">
+      <li>신호: 사이트와 같은 계산. 그 시점까지의 봉만 보고, 확정된 스윙의 -1 진입가에 처음 닿는 순간 롱 진입 (미래 데이터 안 씀)</li>
+      <li>자금: 시작 $50,000 · 한 번에 증거금 $5,000 × 5배 = 포지션 $25,000 · 동시에 최대 5개 · 같은 코인은 1개만</li>
+      <li>손절: 진입가 −5%에서 절반, −7%에서 나머지 · 익절: +5%에서 절반 (이후 나머지는 본전 스톱), +10%에서 나머지</li>
+      <li>한 봉 안에서 손절가·익절가를 둘 다 찍으면 손절이 먼저 된 걸로 봄 (실제로 그런 봉은 43,323개 중 2개뿐이라 영향 거의 없음)</li>
+      <li>진입한 봉에서는 익절을 판단하지 않음 (그 봉의 고가가 진입 전일 수 있어서)</li>
+      <li>비용: 지정가(진입·익절) 0.02%, 시장가(손절) 0.05%, 펀딩비 8시간마다 0.01% · 슬리피지는 넣지 않음</li>
+      <li>자리가 꽉 찼거나 남은 돈이 증거금보다 적으면 새 신호는 건너뜀 · 같은 시각 신호가 여러 개면 거래량 큰 코인부터</li>
+      <li>코인 목록은 "지금" 시총 150위라서, 2년 사이에 순위에서 떨어진 코인은 빠져 있음 (결과가 실제보다 조금 좋게 나올 수 있음)</li>
+    </ul>
+  </div>
+  <p class="foot">참고용 과거 시뮬레이션이에요. 과거 결과가 앞으로의 수익을 보장하지 않아요.</p>
+</div>
+
+<script>
+"use strict";
+// 주 단위 잔고 (단위: 100달러)
+const D = {"d":["24-09-29","24-10-06","24-10-13","24-10-20","24-10-27","24-11-03","24-11-10","24-11-17","24-11-24","24-12-01","24-12-08","24-12-15","24-12-22","24-12-29","25-01-05","25-01-12","25-01-19","25-01-26","25-02-02","25-02-09","25-02-16","25-02-23","25-03-02","25-03-09","25-03-16","25-03-23","25-03-30","25-04-06","25-04-13","25-04-20","25-04-27","25-05-04","25-05-11","25-05-18","25-05-25","25-06-01","25-06-08","25-06-15","25-06-22","25-06-29","25-07-06","25-07-13","25-07-20","25-07-27","25-08-03","25-08-10","25-08-17","25-08-24","25-08-31","25-09-07","25-09-14","25-09-21","25-09-28","25-10-05","25-10-12","25-10-19","25-10-26","25-11-02","25-11-09","25-11-16","25-11-23","25-11-30","25-12-07","25-12-14","25-12-21","25-12-28","26-01-04","26-01-11","26-01-18","26-01-25","26-02-01","26-02-08","26-02-15","26-02-22","26-03-01","26-03-08","26-03-15","26-03-22","26-03-29","26-04-05","26-04-12","26-04-19","26-04-26","26-05-03","26-05-10","26-05-17","26-05-24","26-05-31","26-06-07","26-06-14","26-06-21","26-06-28","26-07-05","26-07-12","26-07-19","26-07-26","26-08-02","26-08-09","26-08-16","26-08-23","26-08-30","26-09-06","26-09-13","26-09-20","26-09-27","26-09-28"],
+"c":[500,431,497,526,493,489,567,642,681,677,789,763,631,605,652,666,689,705,603,219,291,353,309,295,222,300,251,244,201,268,314,374,438,380,450,443,437,448,395,450,488,580,680,685,535,596,616,655,605,595,683,675,552,609,356,473,532,506,532,512,464,464,438,424,320,372,432,477,526,259,102,83,83,86,68,72,80,84,73,74,84,84,75,96,144,96,88,77,43,43,43,43,43,43,43,43,43,43,43,43,43,43,43,43,43,43],
+"n":[500,435,503,534,504,502,583,658,697,694,808,785,657,633,683,699,725,744,646,275,367,439,403,393,379,466,420,434,390,484,549,612,678,622,695,690,686,700,649,708,748,842,944,952,805,869,891,933,887,879,969,963,845,904,658,777,839,816,845,827,784,787,764,753,652,708,770,818,869,608,498,409,486,588,586,567,629,604,583,648,672,736,735,763,865,805,804,767,649,720,740,682,692,709,776,779,719,743,745,851,851,891,909,972,1042,1034]};
+const svg = document.getElementById("chart"), tip = document.getElementById("tip");
+const money = v => "$" + (v * 100).toLocaleString("en-US");
+function draw() {
+  const W = svg.clientWidth, Hh = svg.clientHeight, m = { l: 52, r: 12, t: 10, b: 26 };
+  const n = D.d.length, max = 1100;
+  const x = i => m.l + i / (n - 1) * (W - m.l - m.r), y = v => m.t + (1 - v / max) * (Hh - m.t - m.b);
+  let g = "";
+  for (let v = 0; v <= max; v += 250) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`
+    + `<text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">$${v / 10}k</text>`;
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(500)}" y2="${y(500)}" stroke="var(--muted)" stroke-dasharray="3 3" stroke-width="1"/>`;
+  const step = W < 500 ? 26 : 13;
+  for (let i = 0; i < n; i += step) g += `<text x="${x(i)}" y="${Hh - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">${D.d[i].slice(0, 5).replace("-", ".")}</text>`;
+  const line = (arr, col) => `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" points="${arr.map((v, i) => x(i) + "," + y(v)).join(" ")}"/>`;
+  g += line(D.n, "var(--s2)") + line(D.c, "var(--s1)");
+  g += `<line id="cross" y1="${m.t}" y2="${Hh - m.b}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`
+    + `<circle id="dc" r="4" fill="var(--s1)" stroke="var(--card)" stroke-width="2" visibility="hidden"/>`
+    + `<circle id="dn" r="4" fill="var(--s2)" stroke="var(--card)" stroke-width="2" visibility="hidden"/>`;
+  svg.innerHTML = g;
+  svg.onmousemove = svg.ontouchmove = e => {
+    const r = svg.getBoundingClientRect(), px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - m.l) / (W - m.l - m.r) * (n - 1))));
+    const X = x(i);
+    const cr = svg.querySelector("#cross"); cr.setAttribute("x1", X); cr.setAttribute("x2", X); cr.setAttribute("visibility", "visible");
+    for (const [id, arr] of [["dc", D.c], ["dn", D.n]]) { const c = svg.querySelector("#" + id); c.setAttribute("cx", X); c.setAttribute("cy", y(arr[i])); c.setAttribute("visibility", "visible"); }
+    tip.hidden = false;
+    tip.innerHTML = `<b>20${D.d[i].replace(/-/g, ".")}</b><br><span style="color:var(--s1)">●</span> 비용 포함 ${money(D.c[i])}<br><span style="color:var(--s2)">●</span> 비용 0 가정 ${money(D.n[i])}`;
+    tip.style.left = Math.min(X + 12, W - tip.offsetWidth - 4) + "px"; tip.style.top = "8px";
+  };
+  svg.onmouseleave = () => { tip.hidden = true; svg.querySelectorAll("#cross,#dc,#dn").forEach(el => el.setAttribute("visibility", "hidden")); };
+}
+draw(); addEventListener("resize", draw);
+</script>
+</body>
+</html>

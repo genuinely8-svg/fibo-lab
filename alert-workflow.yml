@@ -1,0 +1,40 @@
+name: 진입 신호 텔레그램 알림
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"      # 5분마다 (GitHub 사정에 따라 몇 분 늦을 수 있음)
+  workflow_dispatch:            # Actions 탭에서 "Run workflow" 버튼으로 바로 실행
+
+concurrency:
+  group: entry-alert
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 이미 보낸 알림 기록 불러오기 (같은 알림을 반복해서 안 보내려고)
+      - uses: actions/cache/restore@v4
+        with:
+          path: .alert-state
+          key: alert-state-${{ github.run_id }}
+          restore-keys: alert-state-
+
+      - name: 신호 확인하고 알림 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node alert.js
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .alert-state
+          key: alert-state-${{ github.run_id }}
