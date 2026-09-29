@@ -16,6 +16,10 @@
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
   let top = { L: {}, N: {}, R: {} }, ko = {}, types = {}, loaded = false, loading = null;
+  let topAt = 0;            // 지금 쓰는 순위 정보를 받은 시각 (하루 넘었으면 오래된 저장값)
+  let retryTimer = null;
+  // 기간과 상관없이 저장값 꺼내기 (코인게코가 막혔을 때 비상용)
+  const getAny = k => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); if (v && v.data) return v; } catch (e) {} return null; };
 
   // 1000PEPE, 1000000MOG, 1MBABYDOGE 같은 선물 이름 → PEPE, MOG, BABYDOGE
   const base = s => String(s).toUpperCase().replace(/^(1000000|10000|1000|1M)(?=[A-Z])/, "");
@@ -28,7 +32,20 @@
 
   async function loadTop() {
     const hit = get("cg-top1000-v1", DAY);
-    if (hit) { top = hit; return; }
+    if (hit) { top = hit; topAt = getAny("cg-top1000-v1").at; return; }
+    const ok = await fetchTop();
+    if (ok) return;
+    // 코인게코 요청 제한 등으로 실패 → 하루 지난 저장값이라도 사용하고, 5분 뒤 다시 받아보기
+    const old = getAny("cg-top1000-v1");
+    if (old && !Object.keys(top.R).length) { top = old.data; topAt = old.at; }
+    scheduleRetry();
+  }
+  function scheduleRetry() {
+    if (retryTimer) return;
+    retryTimer = setTimeout(async () => { retryTimer = null; if (!(await fetchTop())) scheduleRetry(); }, 5 * 60e3);
+  }
+  // 코인게코에서 새로 받기. 성공하면 true
+  async function fetchTop() {
     const L = {}, N = {}, R = {};
     for (let page = 1; page <= 4; page++) {               // 250개씩 4번 = 1000위까지
       try {
@@ -42,10 +59,11 @@
       } catch (e) { break; }
       if (page < 4) await wait(1200);
     }
-    if (!Object.keys(R).length) return;
-    top = { L, N, R };
+    if (!Object.keys(R).length) return false;
+    top = { L, N, R }; topAt = Date.now();
     put("cg-top1000-v1", top);
     put("cg-logos-v1", L); put("cg-names-v1", N);         // 다른 페이지(common.js)도 같이 씀
+    return true;
   }
   async function loadKo() {
     const hit = get("upbit-ko-v1", DAY);
@@ -109,5 +127,7 @@
     bitgetRwa,
     isLoaded: () => loaded,
     hasTop: () => Object.keys(top.R).length > 0,
+    // 순위 정보가 하루 넘은 저장값이면 몇 시간 전인지, 최신이면 0
+    staleHours: () => topAt && Date.now() - topAt > DAY ? Math.round((Date.now() - topAt) / 3600e3) : 0,
   };
 })();

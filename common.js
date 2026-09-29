@@ -28,12 +28,25 @@ function cacheGet(key, maxAgeMs) {
   return null;
 }
 function cacheSet(key, data) { try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} }
+// 요청이 실패하면(요청 제한 등) 기간이 지난 저장값이라도 돌려주고, 그 시각을 staleAt[key] 에 적어둠
+const staleAt = {};
 async function cached(key, maxAgeMs, fn) {
   const hit = cacheGet(key, maxAgeMs);
-  if (hit) return hit;
-  const data = await fn();
-  cacheSet(key, data);
-  return data;
+  if (hit) { delete staleAt[key]; return hit; }
+  try {
+    const data = await fn();
+    cacheSet(key, data);
+    delete staleAt[key];
+    return data;
+  } catch (e) {
+    try { const v = JSON.parse(localStorage.getItem(key)); if (v && v.data) { staleAt[key] = v.at; return v.data; } } catch (e2) {}
+    throw e;
+  }
+}
+// "12분 전" 처럼 저장 시각 표시
+function agoText(at) {
+  const m = Math.round((Date.now() - at) / 60e3);
+  return m < 60 ? `${Math.max(1, m)}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`;
 }
 
 // ── 숫자 보기 좋게 ─────────────────────────────────────────────

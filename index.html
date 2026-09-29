@@ -307,10 +307,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260929223744"></script>
-<script src="chart.js?v=20260929223744"></script>
-<script src="nav.js?v=20260929223744"></script>
-<script src="meta.js?v=20260929223744"></script>
+<script src="fib-core.js?v=20260929224512"></script>
+<script src="chart.js?v=20260929224512"></script>
+<script src="nav.js?v=20260929224512"></script>
+<script src="meta.js?v=20260929224512"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -476,7 +476,9 @@ async function runOnce() {
       const maxRank = +$("mcap").value;
       if (maxRank) {
         await logosReady;                                  // 시가총액 순위 (코인게코) 받을 때까지
-        if (CoinMeta.hasTop()) list = list.filter(x => { const r = CoinMeta.rank(x.sym); return r && r <= maxRank; });   // 시총 순위 밖 잡코인 제외
+        // 순위를 한 번도 못 받았으면 필터 없이 잡코인까지 섞이지 않게 여기서 멈춤 (표는 이전 결과 그대로)
+        if (!CoinMeta.hasTop()) throw new Error("시가총액 순위(코인게코)를 아직 못 받아왔어요 (요청 제한). 몇 분 뒤 자동으로 다시 시도해요");
+        list = list.filter(x => { const r = CoinMeta.rank(x.sym); return r && r <= maxRank; });   // 시총 순위 밖 잡코인 제외
       }
       coins = list.slice(0, +$("topN").value).map(x => x.sym);
     } else {
@@ -509,12 +511,14 @@ async function runOnce() {
   results = mode === "scan" ? out.filter(r => !r.error) : out;
   curEx = ex;
   Live.applyLatest();          // 분석하는 사이에 들어온 실시간 가격을 바로 반영
-  renderTable();
+  // 차트를 펼쳐 둔 상태면 숫자만 바꿔서 트레이딩뷰가 새로고침되지 않게 (종목이 바뀌었으면 어쩔 수 없이 다시 그림)
+  if (!(openCoin && refreshInPlace())) renderTable();
   Live.connect(ex, results.filter(r => !r.error).map(r => r.market));
   if (openCoin && !results.find(r => r.market === openCoin && !r.error)) { openCoin = null; renderTable(); }
   if (openCoin && view === "lw") drawChart();            // 펼쳐 둔 차트도 새 데이터로 (트레이딩뷰는 스스로 실시간 갱신)
   $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개 · `
-    + (mode === "scan" ? (+$("mcap").value ? `시총 ${$("mcap").value}위 안에서 ` : "") + `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`);
+    + (mode === "scan" ? (+$("mcap").value ? `시총 ${$("mcap").value}위 안에서 ` : "") + `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`)
+    + (CoinMeta.staleHours() ? ` · 시총 순위는 ${CoinMeta.staleHours()}시간 전 저장값 (코인게코 요청 제한)` : "");
   $("run").disabled = false;
 }
 
@@ -553,24 +557,13 @@ function renderSummary() {
     <span style="color:var(--muted)">진입 가격에 가까운 순서</span>`;
 }
 let shownOrder = "";     // 지금 화면에 보이는 코인 순서 (실시간 정렬 때 바뀌었는지 비교용)
-const chartPanel = $("chartPanel");      // 차트 묶음 (표를 다시 그려도 지워지지 않게 따로 잡아둠)
-function renderTable() {
-  $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
-  const rows = sortedRows();
-  shownOrder = rows.map(r => r.market).join(",");
-  renderSummary();
-  let rank = 0;
-  $("tbody").innerHTML = rows.map(r => {
-    // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
-    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
-    const logo = logoHtml(r.market);
-    const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
-      + `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a></div>`;
-    if (r.error) return `<tr><td class="rk">-</td><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
-    const s = r.stats, c = r.current;
-    const few = s.count < 5 ? "few" : "";
-    const row = `<tr data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}" title="누르면 차트가 펼쳐져요">
-      <td class="rk">${++rank}</td>
+let shownSet = "";       // 지금 화면에 보이는 코인 묶음 (순서 무시, 재분석 때 종목이 바뀌었는지 비교용)
+const setKey = rows => rows.map(r => r.market + (r.error ? "!" : "")).sort().join(",");
+// 표 한 줄의 칸들 (표를 새로 그릴 때와 숫자만 바꿀 때 같이 씀)
+function rowTds(r, rank, name) {
+  const s = r.stats, c = r.current;
+  const few = s.count < 5 ? "few" : "";
+  return `<td class="rk">${rank}</td>
       <td>${name}</td>
       <td class="px">${won(r.price)}</td>
       <td class="lv">${won(c?.level)}</td>
@@ -580,8 +573,46 @@ function renderTable() {
       <td class="up">${pct(s.reboundAvg)}${err(s.reboundErr)}</td>
       <td class="down">${pct(s.fallAvg)}${err(s.fallErr)}</td>
       <td>${pct(s.winRate)}</td>
-      <td class="xp">${won(c?.expected)}</td>
-    </tr>`;
+      <td class="xp">${won(c?.expected)}</td>`;
+}
+// 재분석 결과를 표에 반영할 때, 종목이 그대로면 표를 다시 그리지 않고 숫자만 바꿈
+// → 펼쳐 둔 차트 묶음을 옮기지 않으니 트레이딩뷰(iframe)가 새로고침되지 않음
+// (순서는 그대로 둠: 차트를 펼쳐 보는 중엔 원래도 줄이 안 움직임. 접으면 다시 정렬됨)
+function refreshInPlace() {
+  if (setKey(results) !== shownSet) return false;
+  renderSummary();
+  for (const r of results) {
+    if (r.error) continue;
+    const tr = $("tbody").querySelector(`tr[data-m="${r.market}"]`);
+    if (tr) tr.innerHTML = rowTds(r, tr.querySelector(".rk").textContent, tr.children[1].innerHTML);
+    const card = $("cards").querySelector(`.ccard[data-m="${r.market}"]`);
+    if (card) {
+      const p = cardParts(r);
+      card.querySelector(".st").innerHTML = p.st;
+      card.querySelector(".c2").innerHTML = p.c2;
+      card.querySelector(".c3").innerHTML = p.c3;
+      const det = card.querySelector(".cdet"); if (det) det.innerHTML = p.cdet;
+    }
+  }
+  if (openCoin) fitPanel();
+  return true;
+}
+const chartPanel = $("chartPanel");      // 차트 묶음 (표를 다시 그려도 지워지지 않게 따로 잡아둠)
+function renderTable() {
+  $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
+  const rows = sortedRows();
+  shownOrder = rows.map(r => r.market).join(",");
+  shownSet = setKey(rows);
+  renderSummary();
+  let rank = 0;
+  $("tbody").innerHTML = rows.map(r => {
+    // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+    const logo = logoHtml(r.market);
+    const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
+      + `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a></div>`;
+    if (r.error) return `<tr><td class="rk">-</td><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
+    const row = `<tr data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}" title="누르면 차트가 펼쳐져요">${rowTds(r, ++rank, name)}</tr>`;
     // 펼친 코인이면 바로 아래에 차트 줄을 하나 더
     return r.market === openCoin ? row + `<tr class="exp"><td colspan="11" id="expCell"></td></tr>` : row;
   }).join("");
@@ -597,6 +628,23 @@ function renderTable() {
 const mq = matchMedia("(max-width:700px)");
 const isMobile = () => mq.matches;
 mq.addEventListener("change", () => { chartPanel.style.width = ""; renderTable(); if (openCoin) drawChart(); });
+// 카드 한 장 안의 숫자 부분 (카드를 새로 그릴 때와 숫자만 바꿀 때 같이 씀)
+function cardParts(r) {
+  const s = r.stats, c = r.current;
+  const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+  const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
+  const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
+  return {
+    st: badge(c),
+    c2: `<span class="px">${won(r.price)}</span><span class="arrow">→</span>진입 <span class="lv">${won(c?.level)}</span>${dist}`,
+    c3: `평균 반등 <span class="up">${pct(s.reboundAvg)}</span> · 터치 <span class="${s.count < 5 ? "few" : ""}">${s.count}회</span>${more}`,
+    cdet: `
+          <div><span>평균 추가하락</span><b class="down">${pct(s.fallAvg)}</b></div>
+          <div><span>반등 우세</span><b>${pct(s.winRate)}</b></div>
+          <div><span>예상 반등가</span><b class="xp">${won(c?.expected)}</b></div>
+        `,
+  };
+}
 function renderCards(rows) {
   let rank = 0;
   $("cards").innerHTML = rows.filter(r => !r.error || mode === "watch").map(r => {
@@ -604,17 +652,12 @@ function renderCards(rows) {
     const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
     if (r.error) return `<div class="ccard"><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
       <div class="c3">${r.error}${more}</div></div>`;
-    const s = r.stats, c = r.current, open = r.market === openCoin;
-    const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
+    const open = r.market === openCoin, p = cardParts(r);
     return `<div class="ccard${open ? " open" : ""}" data-m="${r.market}">
-      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}<span class="st" style="margin-left:auto;text-align:right">${badge(c)}</span></div>
-      <div class="c2"><span class="px">${won(r.price)}</span><span class="arrow">→</span>진입 <span class="lv">${won(c?.level)}</span>${dist}</div>
-      <div class="c3">평균 반등 <span class="up">${pct(s.reboundAvg)}</span> · 터치 <span class="${s.count < 5 ? "few" : ""}">${s.count}회</span>${more}</div>
-      ${open ? `<div class="cdet">
-          <div><span>평균 추가하락</span><b class="down">${pct(s.fallAvg)}</b></div>
-          <div><span>반등 우세</span><b>${pct(s.winRate)}</b></div>
-          <div><span>예상 반등가</span><b class="xp">${won(c?.expected)}</b></div>
-        </div>
+      <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}<span class="st" style="margin-left:auto;text-align:right">${p.st}</span></div>
+      <div class="c2">${p.c2}</div>
+      <div class="c3">${p.c3}</div>
+      ${open ? `<div class="cdet">${p.cdet}</div>
         <div class="cchart" id="expCard" onclick="event.stopPropagation()"></div>` : ""}
     </div>`;
   }).join("") || `<div class="muted-c">결과가 없어요</div>`;
