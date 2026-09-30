@@ -40,7 +40,7 @@
       });
     }
 
-    const cs = r.candles, cur = r.current;
+    const cs = r.candles, cur = r.current, short = r.direction === "short";
     const T = c => Math.floor(c.t / 1000) + KST;
     const p = precisionFor(r.price, opts.krw);
     series.applyOptions({ priceFormat: { type: "price", precision: p, minMove: Math.pow(10, -p) } });
@@ -57,15 +57,15 @@
     if (cur && cur.level) {
       add(cur.L, cssVar("--down"), "L", 2, 1);
       add(cur.level, cssVar("--accent"), "진입", 0, 2);
-      add(cur.expected, cssVar("--accent"), "예상 반등", 1, 1);
+      add(cur.expected, cssVar("--accent"), short ? "예상 되밀림" : "예상 반등", 1, 1);
     }
 
-    // 과거 -1 터치 지점 ▲ 표시 (시간 순서대로 넣어야 함)
+    // 과거 -1 터치 지점 ▲(숏은 ▼) 표시 (시간 순서대로 넣어야 함)
     const seen = new Set();
-    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: "belowBar", color: cssVar("--accent"), shape: "arrowUp", text: "진입" }));
+    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: short ? "aboveBar" : "belowBar", color: cssVar("--accent"), shape: short ? "arrowDown" : "arrowUp", text: "진입" }));
     // 지금 스윙에서 진입가에 닿은 봉 → 초록색 "진입" 표시 (과거 기록보다 우선)
     const now = cur && cur.touched && cur.touchIdx != null && cs[cur.touchIdx]
-      ? [{ time: T(cs[cur.touchIdx]), position: "belowBar", color: "#16a34a", shape: "arrowUp", text: "진입", size: 2 }] : [];
+      ? [{ time: T(cs[cur.touchIdx]), position: short ? "aboveBar" : "belowBar", color: cssVar("--accent"), shape: short ? "arrowDown" : "arrowUp", text: "진입", size: 2 }] : [];
     const markers = now.concat(past)
       .filter(m => !seen.has(m.time) && seen.add(m.time))
       .sort((a, b) => a.time - b.time);
