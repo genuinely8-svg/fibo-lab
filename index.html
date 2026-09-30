@@ -244,9 +244,10 @@
       </label>
       <label>진입가 재계산 (가격은 실시간)
         <select id="auto">
+          <option value="close" selected>봉 마감 시</option>
           <option value="0">끔</option>
           <option value="60">1분</option>
-          <option value="300" selected>5분</option>
+          <option value="300">5분</option>
         </select>
       </label>
       <label>왕복 수수료 (%)
@@ -338,10 +339,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260930224015"></script>
-<script src="chart.js?v=20260930224015"></script>
-<script src="nav.js?v=20260930224015"></script>
-<script src="meta.js?v=20260930224015"></script>
+<script src="fib-core.js?v=20260930230832"></script>
+<script src="chart.js?v=20260930230832"></script>
+<script src="nav.js?v=20260930230832"></script>
+<script src="meta.js?v=20260930230832"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -466,13 +467,13 @@ let watch = DEFAULT_WATCH.slice();
 let shared = null;                 // 링크로 공유받은 목록 (저장 전)
 const SETTINGS = ["ex", "unit", "n", "k", "count", "auto", "topN", "mcap", "fee", "sort"];
 function saveSettings() {
-  const o = { mode, dir }; for (const id of SETTINGS) o[id] = $(id).value;
+  const o = { mode, dir, autoV: 2 }; for (const id of SETTINGS) o[id] = $(id).value;
   try { localStorage.setItem("main-settings-v1", JSON.stringify(o)); } catch (e) {}
 }
 function loadSettings() {
   try {
     const o = JSON.parse(localStorage.getItem("main-settings-v1") || "null");
-    if (o) { for (const id of SETTINGS) if (o[id] != null) $(id).value = o[id]; if (o.mode) mode = o.mode; if (o.dir === "long" || o.dir === "short") dir = o.dir; }
+    if (o) { for (const id of SETTINGS) if (o[id] != null) $(id).value = o[id]; if (o.mode) mode = o.mode; if (o.dir === "long" || o.dir === "short") dir = o.dir; if (o.autoV !== 2) $("auto").value = "close"; }   // 예전에 저장된 재계산 주기는 새 기본값(봉 마감 시)으로
     const w = JSON.parse(localStorage.getItem("watch-v1") || "null");
     if (Array.isArray(w) && w.length) watch = w;
   } catch (e) {}
@@ -502,6 +503,7 @@ async function runOnce() {
   const ex = $("ex").value, unit = $("unit").value, n = +$("n").value, k = +$("k").value;
   const count = +$("count").value;
   $("run").disabled = true;
+  lastBar = barIdx();
   let coins;
   try {
     if (mode === "scan") {
@@ -899,13 +901,28 @@ for (const b of $("mode").querySelectorAll("button")) b.onclick = () => { if (b.
 
 // ── 이벤트 ───────────────────────────────────────────────────────
 $("run").onclick = run;
-function setAuto() {
-  clearInterval(timer);
-  const s = +$("auto").value;
-  if (s) timer = setInterval(() => { if (!running && !document.hidden) run(); }, s * 1000);
+// "봉 마감 시": 선택한 봉 단위가 마감된 직후(5초 뒤)에만 재계산. 바이낸스 봉은 UTC 기준 단위 배수 시각에 열리고 닫힘
+const CLOSE_DELAY = 5000;
+const unitMs = () => +$("unit").value * 60000;
+const barIdx = () => Math.floor(Date.now() / unitMs());
+let lastBar = null;                // 마지막으로 분석을 시작했을 때의 봉 번호
+function scheduleClose() {
+  const u = unitMs();
+  const wait = (barIdx() + 1) * u + CLOSE_DELAY - Date.now();
+  timer = setTimeout(() => { if (!document.hidden) run(); scheduleClose(); }, wait);
 }
+function setAuto() {
+  clearInterval(timer); clearTimeout(timer);
+  const v = $("auto").value;
+  if (v === "close") scheduleClose();
+  else if (+v) timer = setInterval(() => { if (!running && !document.hidden) run(); }, +v * 1000);
+}
+// 화면이 꺼져 있는 동안 봉이 마감됐으면, 돌아왔을 때 한 번 재계산
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && $("auto").value === "close" && lastBar != null && lastBar !== barIdx() && Date.now() % unitMs() > CLOSE_DELAY) run();
+});
 $("auto").onchange = () => { setAuto(); saveSettings(); };
-for (const id of ["ex", "unit", "n", "k", "count", "topN", "mcap"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); run(); });
+for (const id of ["ex", "unit", "n", "k", "count", "topN", "mcap"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); if (id === "unit") setAuto(); run(); });
 // 수수료·정렬은 다시 받을 필요 없이 표만 다시 그림
 $("fee").addEventListener("input", () => { saveSettings(); if (results.length && !(openCoin && refreshInPlace())) renderTable(); });
 $("sort").addEventListener("change", () => { saveSettings(); if (results.length) renderTable(); });
