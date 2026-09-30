@@ -57,7 +57,7 @@
     if (cur && cur.level) {
       add(cur.L, cssVar("--down"), "L", 2, 1);
       add(cur.level, cssVar("--accent"), "진입", 0, 2);
-      add(cur.expected, cssVar("--accent"), short ? "예상 되밀림" : "예상 반등", 1, 1);
+      add(cur.expected, cssVar("--accent"), short ? "예상 하락" : "예상 반등", 1, 1);
     }
 
     // 과거 -1 터치 지점 ▲(숏은 ▼) 표시 (시간 순서대로 넣어야 함)

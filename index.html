@@ -306,7 +306,7 @@
       <thead><tr>
         <th style="text-align:left">#</th><th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
         <th>과거 터치</th><th class="mv" id="thAvg">평균 반등</th><th class="mv" id="thAdv">평균 추가하락</th><th class="mv" id="thWin">반등 우세</th><th class="mv" id="thExp">예상 반등가</th>
-        <th class="mv" id="thEv" title="승률 × 평균 반등(되밀림) − (1−승률) × 평균 추가하락(추가상승) − 왕복 수수료">기대값(참고)</th>
+        <th class="mv" id="thEv" title="승률 × 평균 반등(하락) − (1−승률) × 평균 추가하락(추가상승) − 왕복 수수료">기대값(참고)</th>
       </tr></thead>
       <tbody id="tbody"><tr><td colspan="12" style="text-align:center;color:var(--muted)">분석 준비 중…</td></tr></tbody>
     </table>
@@ -338,10 +338,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260930222437"></script>
-<script src="chart.js?v=20260930222437"></script>
-<script src="nav.js?v=20260930222437"></script>
-<script src="meta.js?v=20260930222437"></script>
+<script src="fib-core.js?v=20260930224015"></script>
+<script src="chart.js?v=20260930224015"></script>
+<script src="nav.js?v=20260930224015"></script>
+<script src="meta.js?v=20260930224015"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -861,7 +861,7 @@ $("setBar").onclick = () => $("setCard").classList.toggle("collapsed");
 // ── LONG / SHORT 전환 ────────────────────────────────────────────
 const LBL = {
   long:  { avg: "평균 반등",   adv: "평균 추가하락", win: "반등 우세",   exp: "예상 반등가",   mark: "▲" },
-  short: { avg: "평균 되밀림", adv: "평균 추가상승", win: "되밀림 우세", exp: "예상 되밀림가", mark: "▼" },
+  short: { avg: "평균 하락", adv: "평균 추가상승", win: "하락 우세", exp: "예상 하락가", mark: "▼" },
 };
 function applyDirUI() {
   const L = LBL[dir];

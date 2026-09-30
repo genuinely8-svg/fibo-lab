@@ -7,10 +7,10 @@
          롱 : 하락 스윙(H→L)의 아래쪽 확장   level = L - (H - L) × 비율
          숏 : 상승 스윙(L→H)의 위쪽 확장     level = H + (H - L) × 비율
     3) 과거에 가격이 레벨에 닿았을 때, 그 뒤 K개 봉 동안
-         유리한 쪽으로 최대 몇 % 움직였는지 (롱: 반등 / 숏: 되밀림)
+         유리한 쪽으로 최대 몇 % 움직였는지 (롱: 반등 / 숏: 하락)
          불리한 쪽으로 최대 몇 % 더 갔는지 (롱: 추가하락 / 숏: 추가상승) 통계를 냅니다.
   direction 은 "long"(기본) | "short". 롱과 숏은 같은 코드를 쓰고 방향만 뒤집어요.
-  결과 필드 이름은 롱 기준 그대로(rebound / fall …)이고, 숏에서는 되밀림 / 추가상승 값이 들어가요.
+  결과 필드 이름은 롱 기준 그대로(rebound / fall …)이고, 숏에서는 하락 / 추가상승 값이 들어가요.
   캔들 형식: { t: 시각(ms), o, h, l, c }
 */
 (function (root) {
@@ -67,7 +67,7 @@
       level: (H, L, ratio) => H + (H - L) * ratio,     // 위쪽 확장
       broken: (c, H, L) => c.l < L,                    // 스윙 저점을 아래로 깨면 스윙 무효
       hit: (c, level) => c.h >= level,                 // 고가가 레벨에 닿음
-      favor: (c) => c.l, better: Math.min,             // 유리한 쪽 극값: 가장 낮은 저가 (되밀림)
+      favor: (c) => c.l, better: Math.min,             // 유리한 쪽 극값: 가장 낮은 저가 (하락)
       adverse: (c) => c.h, worse: Math.max,            // 불리한 쪽 극값: 가장 높은 고가 (추가상승)
       favorPct: (level, x) => (level - x) / level * 100,
       adversePct: (level, x) => (x - level) / level * 100,
@@ -133,10 +133,10 @@
         // 터치 이후 K개 봉(터치한 봉 포함) 동안의 유리한 쪽 / 불리한 쪽 극값
         let fav = R.short ? Infinity : -Infinity, adv = R.short ? -Infinity : Infinity;
         for (let x = touchIdx; x <= touchIdx + K; x++) {
-          if (x > touchIdx) fav = R.better(fav, R.favor(candles[x])); // 반등(되밀림)은 다음 봉부터
+          if (x > touchIdx) fav = R.better(fav, R.favor(candles[x])); // 반등(하락)은 다음 봉부터
           adv = R.worse(adv, R.adverse(candles[x]));
         }
-        const rebound = R.favorPct(level, fav);  // 레벨에서 최대 몇 % 유리하게 움직였나 (롱: 반등 / 숏: 되밀림)
+        const rebound = R.favorPct(level, fav);  // 레벨에서 최대 몇 % 유리하게 움직였나 (롱: 반등 / 숏: 하락)
         const fall = R.adversePct(level, adv);   // 레벨을 넘어 최대 몇 % 더 불리했나 (롱: 추가하락 / 숏: 추가상승)
         touches.push({ ...info, touchIdx, t: candles[touchIdx].t, rebound, fall, win: rebound > fall });
       }
@@ -197,7 +197,7 @@
 
   /*
     진입가 도달 후 지금 어떤 상황인지 (과거 통계와 비교)  — 롱 기준 설명, 숏은 위아래만 뒤집힘
-      목표 도달 : 도달 후 예상 반등(되밀림)가까지 한 번이라도 감 → 이번 기회는 지나감
+      목표 도달 : 도달 후 예상 반등(하락)가까지 한 번이라도 감 → 이번 기회는 지나감
       이탈      : 지금 가격이 진입가에서 "평균 추가하락(추가상승) + 오차"보다 더 불리한 쪽에 있음
                   (다시 그 범위 안으로 돌아오면 진입 구간으로 돌아옴)
       반등 중   : 지금 진입가보다 유리한 쪽 (예상 반등까지 몇 % 왔는지 progress)
@@ -266,7 +266,7 @@
   }
 
   /*
-    기대값(참고) % = 승률 × 평균 반등(되밀림) − (1 − 승률) × 평균 추가하락(추가상승) − 왕복 수수료
+    기대값(참고) % = 승률 × 평균 반등(하락) − (1 − 승률) × 평균 추가하락(추가상승) − 왕복 수수료
     stats.winRate 는 0~100 (%), fee 는 % 단위 (0.1 = 0.1%)
   */
   function expectancy(stats, fee = 0.1) {
