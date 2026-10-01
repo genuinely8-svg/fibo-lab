@@ -318,7 +318,7 @@
   <!-- 차트 묶음: 평소엔 숨겨져 있다가, 코인을 누르면 그 줄 바로 아래로 옮겨져서 펼쳐짐 -->
   <div id="chartHolder" hidden><div id="chartPanel">
     <div class="chead">
-      <h2 id="chartTitle">차트</h2>
+      <h2 id="chartTitle"><span id="chartTitleText">차트</span> <span id="barCd" style="margin-left:10px;font-size:13px;font-weight:400"></span></h2>
       <div class="tabs">
         <button id="tabLw" class="on">분석 차트</button>
         <button id="tabTv"><img class="tvlogo" src="https://static.tradingview.com/static/images/favicon.ico" alt="TradingView" onerror="this.remove()">트레이딩뷰</button>
@@ -339,10 +339,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20260930230832"></script>
-<script src="chart.js?v=20260930230832"></script>
-<script src="nav.js?v=20260930230832"></script>
-<script src="meta.js?v=20260930230832"></script>
+<script src="fib-core.js?v=20261001220704"></script>
+<script src="chart.js?v=20261001220704"></script>
+<script src="nav.js?v=20261001220704"></script>
+<script src="meta.js?v=20261001220704"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -754,7 +754,7 @@ function tvSymbol(m) {
 function drawChart() {
   const r = results.find(x => x.market === openCoin);
   if (!r || r.error) return;
-  $("chartTitle").textContent = `${r.market} · ${EX[curEx].name} · 과거 진입가 터치 ${r.stats.count}회`;
+  $("chartTitleText").textContent = `${r.market} · ${EX[curEx].name} · 과거 진입가 터치 ${r.stats.count}회`;
   if (view === "lw") FiboChart.draw($("chart"), r, { krw: false });
   else FiboChart.tradingView($("tv"), tvSymbol(r.market), $("unit").value);
 }
@@ -921,6 +921,16 @@ function setAuto() {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && $("auto").value === "close" && lastBar != null && lastBar !== barIdx() && Date.now() % unitMs() > CLOSE_DELAY) run();
 });
+// 차트 제목 옆 봉 마감 카운트다운 (1초마다). 마지막 분석 후 봉이 하나 이상 지났는데 30초 넘게 갱신이 없으면 "갱신 지연"
+const STALE_GRACE = 30000;
+function tickCountdown() {
+  const el = $("barCd"); if (!el) return;
+  const u = unitMs(), left = Math.max(0, Math.ceil(((barIdx() + 1) * u - Date.now()) / 1000));
+  const h = Math.floor(left / 3600), m = String(Math.floor(left % 3600 / 60)).padStart(2, "0"), s = String(left % 60).padStart(2, "0");
+  const stale = lastBar != null && barIdx() > lastBar && Date.now() % u > STALE_GRACE;
+  el.innerHTML = `봉 마감까지 ${h ? h + ":" : ""}${m}:${s}` + (stale ? ` <span style="color:#e5484d;font-weight:700">갱신 지연</span>` : "");
+}
+setInterval(tickCountdown, 1000); tickCountdown();
 $("auto").onchange = () => { setAuto(); saveSettings(); };
 for (const id of ["ex", "unit", "n", "k", "count", "topN", "mcap"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); if (id === "unit") setAuto(); run(); });
 // 수수료·정렬은 다시 받을 필요 없이 표만 다시 그림
