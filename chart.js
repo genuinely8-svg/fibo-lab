@@ -11,6 +11,8 @@
   const KST = 9 * 3600;   // 차트 시간을 한국 시간으로 보이게 9시간 더함
 
   let chart = null, series = null, lines = [];
+  let lastEl = null, lastOpts = null, tvArgs = null;   // 모드가 바뀔 때 다시 그리려고 기억해 둠
+  const isDark = () => (window.Theme ? Theme.get() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
   let drawnR = null, drawnKey = null, lastN = 0, lastFirstT = 0;   // 지금 그려진 분석 결과 / 코인+봉 단위 / 캔들 수 / 첫 캔들 시각
   const T = c => Math.floor(c.t / 1000) + KST;
 
@@ -53,6 +55,7 @@
       });
     }
 
+    lastEl = el; lastOpts = opts;
     const cs = r.candles, cur = r.current, short = r.direction === "short";
     const key = r.market + "|" + (cs.length > 1 ? cs[1].t - cs[0].t : 0);
     const prev = chart.timeScale().getVisibleLogicalRange(), sameChart = key === drawnKey && prev;
@@ -107,6 +110,23 @@
     if (cur && cur.touched && cur.touchIdx == null) { cur.touchIdx = cs.length - 1; series.setMarkers(buildMarkers(r)); }
   }
 
+  // 다크/라이트를 바꾸면 차트 색을 바로 다시 칠함 (보던 위치는 그대로)
+  function restyle() {
+    if (chart) {
+      chart.applyOptions({
+        layout: { background: { color: cssVar("--card") }, textColor: cssVar("--muted") },
+        grid: { vertLines: { color: cssVar("--line") }, horzLines: { color: cssVar("--line") } },
+        rightPriceScale: { borderColor: cssVar("--line") },
+        timeScale: { borderColor: cssVar("--line") },
+      });
+      series.applyOptions({ upColor: cssVar("--up"), downColor: cssVar("--down"), wickUpColor: cssVar("--up"), wickDownColor: cssVar("--down") });
+      if (drawnR && lastEl) draw(lastEl, drawnR, lastOpts);          // 가로선·화살표 색도 새로
+    }
+    // 트레이딩뷰는 색을 만들 때만 정할 수 있어서 보이는 중이면 다시 만듦
+    if (tvArgs && tvArgs.el.querySelector("#tv-widget") && tvArgs.el.offsetParent !== null) tradingView(tvArgs.el, tvArgs.symbol, tvArgs.interval);
+  }
+  addEventListener("themechange", restyle);
+
   // ── 트레이딩뷰 위젯 ────────────────────────────────────────────
   let tvLoading = null;
   function loadTV() {
@@ -121,13 +141,14 @@
   }
 
   async function tradingView(el, symbol, interval) {
+    tvArgs = { el, symbol, interval };
     el.innerHTML = '<p style="color:var(--muted);padding:20px">트레이딩뷰 불러오는 중…</p>';
     try { await loadTV(); } catch (e) { el.innerHTML = `<p style="color:var(--muted);padding:20px">${e.message}</p>`; return; }
     el.innerHTML = '<div id="tv-widget" style="height:100%"></div>';
     new TradingView.widget({
       container_id: "tv-widget", autosize: true, symbol, interval: String(interval),
       timezone: "Asia/Seoul", locale: "kr", style: "1",
-      theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+      theme: isDark() ? "dark" : "light",
       allow_symbol_change: true, hide_side_toolbar: false,
     });
   }

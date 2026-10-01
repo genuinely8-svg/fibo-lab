@@ -16,7 +16,12 @@
   ];
   const style = document.createElement("style");
   style.textContent = `
-    .navtabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:0 0 16px;scrollbar-width:none}
+    .navwrap{display:flex;align-items:stretch;margin:0 0 16px}
+    .navtabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
+    /* 다크/라이트 전환 버튼: 탭 오른쪽 끝에 고정 (탭이 옆으로 밀려도 안 가려짐) */
+    .navwrap button.themebtn{flex:none;width:44px;padding:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;
+                             color:var(--text);font-size:17px;line-height:1;cursor:pointer}
+    .navwrap button.themebtn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
     .navtabs::-webkit-scrollbar{display:none}
     .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;
                border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
@@ -30,11 +35,23 @@
   document.head.appendChild(style);
 
   const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
-  const el = document.getElementById("nav");
-  if (!el) return;
-  el.className = "navtabs";
-  el.innerHTML = TABS.map(([href, label]) =>
-    `<a href="${href}"${href === here ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("");
+  const wrap = document.getElementById("nav");
+  if (!wrap) return;
+  wrap.className = "navwrap";
+  wrap.innerHTML = '<div class="navtabs">' + TABS.map(([href, label]) =>
+    `<a href="${href}"${href === here ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("") +
+    '</div><button type="button" class="themebtn"></button>';
+  const el = wrap.querySelector(".navtabs");
+  // 다크 ↔ 라이트 전환 (theme.js): 다크일 때 ☀️, 라이트일 때 🌙
+  const tbtn = wrap.querySelector(".themebtn");
+  const paintTheme = () => {
+    const dark = (window.Theme ? Theme.get() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+    tbtn.textContent = dark ? "☀️" : "🌙";
+    tbtn.title = tbtn.ariaLabel = dark ? "라이트 모드로 바꾸기" : "다크 모드로 바꾸기";
+  };
+  tbtn.onclick = () => window.Theme && Theme.toggle();
+  addEventListener("themechange", paintTheme);
+  paintTheme();
   // 옆으로 더 있는지 확인해서 가장자리 흐림 표시
   const edges = () => {
     el.classList.toggle("more-l", el.scrollLeft > 4);
