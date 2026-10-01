@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시장 방향 · ath TEST (참고용)</title>
+<link rel="stylesheet" href="common.css?v=20261001223513">
+<style>
+  :root{ --btc:#f59e0b }
+  .gbox{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center;justify-content:center}
+  .gwrap{width:100%;max-width:340px}
+  #gauge{width:100%;height:auto;display:block}
+  .gcap{text-align:center;color:var(--muted);font-size:11px;margin-top:2px}
+  .verdict{text-align:center}
+  .verdict .score{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .verdict .word{font-size:20px;font-weight:700;margin-top:2px}
+  .verdict .s{color:var(--muted);font-size:12px;margin-top:6px}
+  .tile .k{display:flex;align-items:center;gap:6px}
+  .help{padding:0;width:18px;height:18px;border-radius:50%;background:transparent;border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1;font-weight:700;flex:none}
+  .help.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .helptxt{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+  .prog{height:8px;border-radius:4px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin-top:8px}
+  .prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .legend b{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+  svg.ch{width:100%;height:auto;display:block;overflow:visible}
+  svg.ch text{fill:var(--muted);font-size:10px;font-family:inherit}
+  .head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+  .head h2{margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ath TEST (참고용)</h1>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <div class="head">
+      <h2>시장 방향 점수 <button class="help" id="hScore" type="button" title="설명">?</button></h2>
+      <button id="run" type="button">다시 분석</button>
+    </div>
+    <div class="helptxt" id="hScoreTxt" hidden>코인마다 롱·숏을 모두 분석해 세 지표를 −100~+100으로 맞추고 평균낸 값이에요. +30 이상이면 상승장, −30 이하면 하락장, 그 사이는 횡보로 봐요.</div>
+    <div class="status" id="status">준비 중…</div>
+    <div class="prog" id="progWrap"><i id="prog"></i></div>
+    <div class="status" id="setSum"></div>
+  </div>
+
+  <div class="card" id="topCard" hidden>
+    <div class="gbox">
+      <div class="gwrap"><svg id="gauge" viewBox="0 0 300 175" role="img" aria-label="시장 방향 게이지"></svg><div class="gcap">최근 30일 기준</div></div>
+      <div class="verdict"><div class="score" id="vScore">-</div><div class="word" id="vWord"></div><div class="s" id="vSub"></div></div>
+    </div>
+    <div class="tiles" id="tiles" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card" id="lineCard" hidden>
+    <h2>점수 변화 (1주일 간격 · 그 시점까지 최근 30일)</h2>
+    <div class="legend"><span><b style="background:var(--accent)"></b>시장 방향 점수 (왼쪽 축)</span><span><b style="background:var(--btc)"></b>BTC 가격 (오른쪽 축)</span></div>
+    <div id="line"></div>
+  </div>
+
+  <div class="card" id="barCard" hidden>
+    <h2>코인별 점수 (최근 30일 · 높은 순)</h2>
+    <div class="legend"><span><b style="background:var(--up)"></b>위쪽 = 상승 쪽</span><span><b style="background:var(--down)"></b>아래쪽 = 하락 쪽</span></div>
+    <div id="bars"></div>
+  </div>
+
+  <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식(FibCore)으로 롱·숏을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
+</div>
+
+<script src="common.js?v=20261001223513"></script>
+<script src="nav.js?v=20261001223513"></script>
+<script src="meta.js?v=20261001223513"></script>
+<script src="fib-core.js?v=20261001223513"></script>
+<script>
+"use strict";
+const FUT = "https://fapi.binance.com/fapi/v1";
+const STABLES = new Set(["USDC", "FDUSD", "TUSD", "BUSD", "USDP", "DAI", "EUR", "AEUR", "USDE", "XUSD", "BFUSD", "RLUSD", "USD1", "PYUSD", "EURI"]);
+const HOUR = 3600e3, WEEK = 7 * 24 * HOUR, WIN = 720;      // 점수 구간 = 최근 30일(1시간봉 720개)
+const TOTAL = 2880, MAX_RANK = 100, GAP = 350;             // 약 4달(점수 30일 + 선 그래프 3달) / 시총 100위 안 / 요청 사이 쉬는 시간(ms)
+const EV_SCALE = 5;                                        // 기대값 차이 ±5%p 를 ±100 으로 봄
+const GREEN = "var(--up)", RED = "var(--down)", FLAT = "#9aa1ab";   // 사이트 기본색: 상승 = 빨강, 하락 = 파랑
+const clamp = v => Math.max(-100, Math.min(100, v));
+const avg = a => { const b = a.filter(x => x != null && isFinite(x)); return b.length ? b.reduce((s, x) => s + x, 0) / b.length : null; };
+const sgn = v => v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(1);
+const verdictOf = s => s == null ? ["-", FLAT] : s >= 30 ? ["상승장", GREEN] : s <= -30 ? ["하락장", RED] : ["횡보", FLAT];
+
+// 메인 화면 설정값 (없으면 기본값)
+function mainSettings() {
+  let o = {};
+  try { o = JSON.parse(localStorage.getItem("main-settings-v1") || "null") || {}; } catch (e) {}
+  const num = (v, d, lo, hi) => { v = +v; return isFinite(v) && v >= lo && v <= hi ? v : d; };
+  return { n: num(o.n, 5, 2, 30), k: num(o.k, 20, 3, 100), topN: num(o.topN, 50, 1, 100), fee: num(o.fee, 0.1, 0, 5) };
+}
+
+// ── 데이터 받기 ────────────────────────────────────────────────
+async function universe(topN) {
+  await CoinMeta.load();
+  if (!CoinMeta.hasTop()) throw new Error("시가총액 순위(코인게코)를 아직 못 받아왔어요 (요청 제한). 몇 분 뒤 다시 눌러주세요");
+  const rows = await getJSON(FUT + "/ticker/24hr");
+  const dayAgo = Date.now() - 86400e3;
+  return rows
+    .filter(x => x.symbol.endsWith("USDT") && !x.symbol.includes("_") && +x.quoteVolume > 0 && x.closeTime > dayAgo)
+    .map(x => ({ sym: x.symbol.slice(0, -4), vol: +x.quoteVolume }))
+    .filter(x => !STABLES.has(x.sym) && CoinMeta.isCrypto(x.sym))        // 코인만
+    .filter(x => { const r = CoinMeta.rank(x.sym); return r && r <= MAX_RANK; })
+    .sort((a, b) => b.vol - a.vol).slice(0, topN).map(x => x.sym);
+}
+const toCandles = rows => rows.map(r => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4] }));
+// 선물 klines 는 한 번에 최대 1500개 → 2번에 나눠 받음 (순서대로, 사이에 쉼)
+async function candles(sym) {
+  const a = await getJSON(`${FUT}/klines?symbol=${sym}USDT&interval=1h&limit=1500`);
+  await sleep(GAP);
+  if (!a.length || a.length < 1500) return toCandles(a);
+  const b = await getJSON(`${FUT}/klines?symbol=${sym}USDT&interval=1h&limit=${TOTAL - 1500}&endTime=${a[0][0] - 1}`);
+  await sleep(GAP);
+  return toCandles(b.concat(a));
+}
+
+// ── 점수 계산 (FibCore.analyze 를 롱·숏으로 그대로 호출) ───────────────
+// 지표 3개 (각각 −100~+100):  [터치 비율, 반등 우세 차이, 기대값 차이]
+function metrics(cs, o) {
+  const L = FibCore.analyze(cs, { n: o.n, k: o.k, direction: "long" });
+  const S = FibCore.analyze(cs, { n: o.n, k: o.k, direction: "short" });
+  const tot = L.stats.count + S.stats.count;
+  const ratio = tot ? S.stats.count / tot * 100 : null;                                  // 숏 터치 ÷ (롱+숏)
+  const win = L.stats.winRate != null && S.stats.winRate != null ? L.stats.winRate - S.stats.winRate : null;
+  const el = FibCore.expectancy(L.stats, o.fee), es = FibCore.expectancy(S.stats, o.fee);
+  const ev = el != null && es != null ? el - es : null;
+  const raw = [ratio, win, ev];
+  const s = [ratio == null ? null : clamp((ratio - 50) * 2), win == null ? null : clamp(win), ev == null ? null : clamp(ev / EV_SCALE * 100)];
+  return { raw, s, score: avg(s) };
+}
+// 코인별 결과 → 전체 평균 (지표별로 코인 평균을 낸 뒤, 세 지표를 평균)
+function aggregate(list) {
+  const rawAvg = [0, 1, 2].map(j => avg(list.map(x => x.raw[j])));
+  const sAvg = [0, 1, 2].map(j => avg(list.map(x => x.s[j])));
+  return { rawAvg, sAvg, score: avg(sAvg) };
+}
+function upTo(cs, T) {            // T 시각까지의 마지막 캔들 번호 (이진 탐색)
+  let lo = 0, hi = cs.length - 1, ans = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (cs[m].t <= T) { ans = m; lo = m + 1; } else hi = m - 1; }
+  return ans;
+}
+
+// ── 화면 ────────────────────────────────────────────────────────
+const HELP = [
+  ["터치 비율", "숏 터치 ÷ (롱+숏 터치). 가격이 위쪽 진입가에 닿은 횟수가 아래쪽보다 많을수록 높아요(상승 쪽). 50%가 중립.", v => v == null ? "-" : v.toFixed(1) + "%"],
+  ["반등 우세 차이", "롱 반등 우세 − 숏 하락 우세 (%p). 아래쪽 진입가에서 반등이 더 잘 나왔으면 +, 위쪽에서 하락이 더 잘 나왔으면 −예요.", v => sgn(v) + "%p"],
+  ["기대값 차이", "롱 기대값 − 숏 기대값 (%p, 수수료 포함). 롱 쪽이 더 유리했으면 +예요. ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
+];
+function drawGauge(score) {
+  const cx = 150, cy = 150, R = 120, W = 26;
+  const pt = (v, r) => { const a = Math.PI * (1 - (v + 100) / 200); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
+  const arc = (a, b, col) => { const [x1, y1] = pt(a, R), [x2, y2] = pt(b, R), [x3, y3] = pt(b, R - W), [x4, y4] = pt(a, R - W);
+    return `<path d="M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${R - W} ${R - W} 0 0 0 ${x4} ${y4}Z" fill="${col}" opacity=".85"/>`; };
+  let s = arc(-100, -30, RED) + arc(-30, 30, FLAT) + arc(30, 100, GREEN);
+  for (const v of [-100, -30, 0, 30, 100]) { const [x, y] = pt(v, R + 12); s += `<text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:var(--muted);font-size:10px">${v > 0 ? "+" + v : v}</text>`; }
+  if (score != null) {
+    const [nx, ny] = pt(clamp(score), R - 6), col = verdictOf(score)[1];
+    s += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="7" fill="var(--text)"/><circle cx="${nx}" cy="${ny}" r="4" fill="${col}" stroke="var(--text)" stroke-width="1.5"/>`;
+  }
+  $("gauge").innerHTML = s;
+}
+function showTop(agg, nCoins) {
+  $("topCard").hidden = false;
+  drawGauge(agg.score);
+  const [word, col] = verdictOf(agg.score);
+  $("vScore").textContent = agg.score == null ? "-" : sgn(agg.score); $("vScore").style.color = col;
+  $("vWord").textContent = word; $("vWord").style.color = col;
+  $("vSub").textContent = `${nCoins}개 코인 평균 · 최근 30일`;
+  $("tiles").innerHTML = HELP.map(([name, tip, fmt], j) => `
+    <div class="tile"><div class="k">${name}<button class="help" type="button" data-h="${j}" title="설명">?</button></div>
+      <div class="v">${fmt(agg.rawAvg[j])}</div>
+      <div class="s">환산 ${sgn(agg.sAvg[j])}</div>
+      <div class="helptxt" id="ht${j}" hidden>${tip}</div></div>`).join("");
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".help"); if (!b) return;
+  const t = b.id === "hScore" ? $("hScoreTxt") : $("ht" + b.dataset.h);
+  if (t) { t.hidden = !t.hidden; b.classList.toggle("on", !t.hidden); }
+});
+
+let lineData = null, barData = null;
+function drawLine() {
+  if (!lineData) return;
+  const { pts, btc } = lineData, el = $("line");
+  const W = Math.max(280, el.clientWidth), H = 260, ml = 34, mr = 54, mt = 12, mb = 26, pw = W - ml - mr, ph = H - mt - mb;
+  const t0 = pts[0].T, t1 = pts[pts.length - 1].T, X = t => ml + (t1 === t0 ? pw / 2 : (t - t0) / (t1 - t0) * pw);
+  const Y = v => mt + (100 - v) / 200 * ph;
+  const bs = btc.filter(c => c.t >= t0 && c.t <= t1);
+  const lo = Math.min(...bs.map(c => c.c)), hi = Math.max(...bs.map(c => c.c)), pad = (hi - lo) * 0.08 || 1;
+  const YB = v => mt + (1 - (v - (lo - pad)) / (hi - lo + 2 * pad)) * ph;
+  let s = `<svg class="ch" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+  for (const v of [-100, -30, 0, 30, 100]) s += `<line x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v === 0 ? "" : 'stroke-dasharray="3 3"'}/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`;
+  for (let i = 0; i <= 4; i++) { const v = lo - pad + (hi - lo + 2 * pad) * i / 4; s += `<text x="${W - mr + 5}" y="${YB(v) + 3}" fill="var(--btc)" style="fill:var(--btc)">${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(0)}</text>`; }
+  s += `<polyline fill="none" stroke="var(--btc)" stroke-width="1.5" opacity=".9" points="${bs.filter((_, i) => i % 4 === 0).map(c => X(c.t).toFixed(1) + "," + YB(c.c).toFixed(1)).join(" ")}"/>`;
+  const sp = pts.filter(p => p.score != null);
+  s += `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" points="${sp.map(p => X(p.T).toFixed(1) + "," + Y(clamp(p.score)).toFixed(1)).join(" ")}"/>`;
+  for (const p of pts) {
+    const d = new Date(p.T + 9 * HOUR), lab = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+    s += `<text x="${X(p.T)}" y="${H - 8}" text-anchor="middle">${lab}</text>`;
+    if (p.score != null) s += `<circle cx="${X(p.T)}" cy="${Y(clamp(p.score))}" r="4" fill="${verdictOf(p.score)[1]}" stroke="var(--card)" stroke-width="1.5"><title>${lab} · ${sgn(p.score)} · ${verdictOf(p.score)[0]} (${p.n}개 코인)</title></circle>`;
+  }
+  el.innerHTML = s + "</svg>";
+}
+function drawBars() {
+  if (!barData) return;
+  const el = $("bars"), list = barData;
+  const W = Math.max(280, el.clientWidth), plotH = 200, labH = 52, mt = 8, H = mt + plotH + labH;
+  const M = Math.max(30, Math.ceil(Math.max(...list.map(x => Math.abs(x.score))) / 10) * 10), zero = mt + plotH / 2;
+  const ml = 30, slot = (W - ml) / list.length, bw = Math.max(2, slot * 0.7);
+  let s = `<svg class="ch" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+  for (const v of [M, 0, -M]) { const y = zero - v / M * plotH / 2; s += `<line x1="${ml}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" ${v === 0 ? "" : 'stroke-dasharray="3 3"'}/><text x="${ml - 4}" y="${y + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`; }
+  list.forEach((x, i) => {
+    const h = Math.abs(x.score) / M * plotH / 2, cx = ml + slot * (i + 0.5), y = x.score >= 0 ? zero - h : zero;
+    s += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(h, 1)}" rx="1.5" fill="${x.score >= 0 ? GREEN : RED}"><title>${x.sym} · ${sgn(x.score)}</title></rect>`;
+    s += `<text transform="translate(${cx + 3},${mt + plotH + 6}) rotate(-90)" text-anchor="end" style="font-size:${slot < 12 ? 8 : 10}px">${x.sym}</text>`;
+  });
+  el.innerHTML = s + "</svg>";
+}
+addEventListener("resize", () => { drawLine(); drawBars(); });
+
+// ── 실행 ────────────────────────────────────────────────────────
+let running = false;
+async function run() {
+  if (running) return; running = true; $("run").disabled = true;
+  const o = mainSettings();
+  const setP = (txt, f) => { $("status").textContent = txt; $("prog").style.width = Math.round(f * 100) + "%"; };
+  $("setSum").textContent = `메인 화면 설정: 스윙 민감도 ${o.n} · 관찰 봉 수 ${o.k} · 거래량 상위 ${o.topN}개 · 수수료 ${o.fee}% · 시총 ${MAX_RANK}위 안`;
+  $("progWrap").hidden = false;
+  try {
+    setP("거래량 상위 코인 고르는 중…", 0);
+    const coins = await universe(o.topN);
+    if (!coins.length) throw new Error("분석할 코인을 못 찾았어요");
+    const need = coins.includes("BTC") ? coins : ["BTC"].concat(coins);
+    const data = {};
+    for (let i = 0; i < need.length; i++) {
+      setP(`캔들 받는 중… ${i + 1}/${need.length} · ${need[i]}`, i / need.length);
+      try { data[need[i]] = await candles(need[i]); } catch (e) { /* 이 코인은 건너뜀 */ }
+    }
+    setP("계산 중…", 1);
+    await sleep(30);
+    const usable = coins.filter(s => data[s] && data[s].length >= 300);
+    if (!usable.length) throw new Error("캔들을 받지 못했어요. 잠시 뒤 다시 눌러주세요");
+    // 1주일 간격, 그 시점까지 최근 30일로 점수 → 선 그래프 (BTC 가격과 겹침). 마지막 점(지금)의 결과를 게이지·지표·막대에도 그대로 씀
+    const btc = data.BTC || data[usable[0]];
+    const last = btc[btc.length - 1].t, pts = [];
+    for (let T = last; T - (WIN - 1) * HOUR >= btc[0].t && pts.length < 13; T -= WEEK) pts.unshift({ T });
+    for (const p of pts) {
+      const rows = [];
+      for (const sym of usable) {
+        const cs = data[sym], e = upTo(cs, p.T);
+        if (e + 1 < 300) continue;
+        const m = metrics(cs.slice(Math.max(0, e + 1 - WIN), e + 1), o);
+        if (m.score != null) rows.push({ sym, ...m });
+      }
+      p.score = rows.length ? aggregate(rows).score : null; p.n = rows.length; p.rows = rows;
+      await sleep(0);
+    }
+    const per = pts[pts.length - 1].rows;
+    if (!per.length) throw new Error("점수를 계산할 데이터가 부족해요");
+    showTop(aggregate(per), per.length);
+    barData = per.slice().sort((a, b) => b.score - a.score);
+    $("barCard").hidden = false; drawBars();
+    lineData = { pts, btc }; $("lineCard").hidden = false; drawLine();
+    setP(`완료 · 코인 ${per.length}개 · ${new Date().toLocaleTimeString("ko-KR")}`, 1);
+  } catch (e) {
+    setP(e.message, 0);
+  }
+  $("progWrap").hidden = $("prog").style.width === "100%" ? true : false;
+  running = false; $("run").disabled = false;
+}
+$("run").onclick = run;
+run();
+</script>
+</body>
+</html>

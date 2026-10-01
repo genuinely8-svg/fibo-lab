@@ -6,6 +6,7 @@
 (function () {
   const TABS = [
     ["index.html", "TEST 참고용"],
+    ["market.html", "시장 방향"],
     ["liquidation.html", "청산히트맵"],
     ["oi.html", "OI"],
     ["rank.html", "코인순위"],
