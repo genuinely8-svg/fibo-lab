@@ -3,76 +3,112 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261001231630"></script>
-<title>시장 방향 · ath TEST (참고용)</title>
-<link rel="stylesheet" href="common.css?v=20261001231630">
+<script src="theme.js?v=20261002013440"></script>
+<title>시장 방향</title>
+<link rel="stylesheet" href="common.css?v=20261002013440">
 <style>
   :root{ --btc:#f59e0b }
-  .gbox{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center;justify-content:center}
-  .gwrap{width:100%;max-width:340px}
+  /* 상단 핵심 카드 */
+  .top{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
+  .topL{flex:1 1 300px;min-width:0}
+  .topR{flex:1 1 260px;max-width:340px;margin:0 auto;min-width:0}
+  .bar1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:6px}
+  #run{padding:6px 12px;font-size:13px}
+  .bigscore{font-size:64px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;margin:6px 0 4px;letter-spacing:-.02em}
+  .state{font-size:20px;font-weight:700}
+  .official{font-size:12px;color:var(--muted);margin-top:4px}
+  .mom{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+  .mom .k{font-size:12px;color:var(--muted);width:100%}
+  .mom .num{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .mom .lab{font-size:15px;font-weight:700}
+  .interp{margin-top:12px;font-size:14px;line-height:1.6;padding-left:10px;border-left:3px solid var(--line)}
   #gauge{width:100%;height:auto;display:block}
   .gcap{text-align:center;color:var(--muted);font-size:11px;margin-top:2px}
-  .verdict{text-align:center}
-  .verdict .score{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
-  .verdict .word{font-size:20px;font-weight:700;margin-top:2px}
-  .verdict .s{color:var(--muted);font-size:12px;margin-top:6px}
   .tile .k{display:flex;align-items:center;gap:6px}
+  .dir{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px}
+  .mini{position:relative;flex:1;min-width:60px;height:6px;border-radius:3px;background:var(--line)}
+  .mini i{position:absolute;top:-3px;width:3px;height:12px;border-radius:2px;background:var(--text);transform:translateX(-50%)}
+  .mini::after{content:"";position:absolute;left:50%;top:-2px;width:1px;height:10px;background:var(--muted)}
   .help{padding:0;width:18px;height:18px;border-radius:50%;background:transparent;border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1;font-weight:700;flex:none}
   .help.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .helptxt{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
-  .prog{height:8px;border-radius:4px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin-top:8px}
+  .helptxt{font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+  .prog{height:6px;border-radius:3px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin-top:8px}
   .prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
   .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-bottom:6px}
   .legend b{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+  .chwrap{position:relative}
   svg.ch{width:100%;height:auto;display:block;overflow:visible}
   svg.ch text{fill:var(--muted);font-size:10px;font-family:inherit}
-  .head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
-  .head h2{margin:0}
+  .tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.6;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap;z-index:5}
+  .tip b{font-variant-numeric:tabular-nums}
+  .coininfo{margin-top:8px;font-size:12px;color:var(--muted);line-height:1.7;min-height:1.7em}
+  .coininfo b{color:var(--text)}
+  details.about{font-size:13px;line-height:1.7;color:var(--muted)}
+  details.about summary{cursor:pointer;color:var(--text);font-weight:600}
+  details.about p{margin:8px 0 0}
+  @media (max-width:600px){
+    .bigscore{font-size:56px}
+    .topR{max-width:300px}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>ath TEST (참고용)</h1>
+  <h1>시장 방향</h1>
   <nav id="nav"></nav>
 
-  <div class="card">
-    <div class="head">
-      <h2>시장 방향 점수 <button class="help" id="hScore" type="button" title="설명">?</button></h2>
-      <button id="run" type="button">다시 분석</button>
+  <div class="card" id="topCard">
+    <div class="top">
+      <div class="topL">
+        <div class="bar1"><span class="eyebrow">MARKET SCORE <button class="help" id="hScore" type="button" title="설명">?</button></span><button id="run" type="button">다시 분석</button></div>
+        <div class="helptxt" id="hScoreTxt" hidden>코인마다 위쪽·아래쪽 피보나치 확장 레벨 반응을 모두 분석해 세 요소를 −100~+100으로 맞추고 평균낸 값이에요. 공식 판정은 +30 이상 상승장, −30 이하 하락장, 그 사이는 횡보예요.</div>
+        <div class="bigscore" id="vScore">-</div>
+        <div class="state" id="vWord">분석 중…</div>
+        <div class="official" id="vSub"></div>
+        <div class="mom"><span class="k">4주 변화 <span class="muted">(지금 점수 − 4주 전 점수)</span></span><span class="num" id="mNum">-</span><span class="lab" id="mLab"></span></div>
+        <div class="interp" id="interp">현재 시장 해석을 계산하고 있어요.</div>
+      </div>
+      <div class="topR"><svg id="gauge" viewBox="0 0 300 180" role="img" aria-label="Market Score 게이지"></svg><div class="gcap">최근 30일 기준 · −100 ~ +100</div></div>
     </div>
-    <div class="helptxt" id="hScoreTxt" hidden>코인마다 롱·숏을 모두 분석해 세 지표를 −100~+100으로 맞추고 평균낸 값이에요. +30 이상이면 상승장, −30 이하면 하락장, 그 사이는 횡보로 봐요.</div>
     <div class="status" id="status">준비 중…</div>
     <div class="prog" id="progWrap"><i id="prog"></i></div>
-    <div class="status" id="setSum"></div>
+    <div class="status" id="setSum" style="margin-top:4px"></div>
   </div>
 
-  <div class="card" id="topCard" hidden>
-    <div class="gbox">
-      <div class="gwrap"><svg id="gauge" viewBox="0 0 300 175" role="img" aria-label="시장 방향 게이지"></svg><div class="gcap">최근 30일 기준</div></div>
-      <div class="verdict"><div class="score" id="vScore">-</div><div class="word" id="vWord"></div><div class="s" id="vSub"></div></div>
-    </div>
-    <div class="tiles" id="tiles" style="margin-top:14px"></div>
+  <div class="card" id="compCard" hidden>
+    <h2>점수 구성 요소</h2>
+    <div class="tiles" id="tiles"></div>
   </div>
 
   <div class="card" id="lineCard" hidden>
-    <h2>점수 변화 (1주일 간격 · 그 시점까지 최근 30일)</h2>
-    <div class="legend"><span><b style="background:var(--accent)"></b>시장 방향 점수 (왼쪽 축)</span><span><b style="background:var(--btc)"></b>BTC 가격 (오른쪽 축)</span></div>
-    <div id="line"></div>
+    <h2>Market Score 흐름 (1주일 간격 · 그 시점까지 최근 30일)</h2>
+    <div class="legend"><span><b style="background:var(--accent)"></b>Market Score (왼쪽 축)</span><span><b style="background:var(--btc)"></b>BTC 가격 (오른쪽 축)</span><span>점을 누르거나 올리면 자세히 보여요</span></div>
+    <div class="chwrap" id="lineWrap"><div id="line"></div><div class="tip" id="lineTip" hidden></div></div>
   </div>
 
   <div class="card" id="barCard" hidden>
     <h2>코인별 점수 (최근 30일 · 높은 순)</h2>
-    <div class="legend"><span><b style="background:var(--up)"></b>위쪽 = 상승 쪽</span><span><b style="background:var(--down)"></b>아래쪽 = 하락 쪽</span></div>
+    <div class="legend"><span><b style="background:var(--up)"></b>위쪽 = 상승 우위</span><span><b style="background:var(--down)"></b>아래쪽 = 하락 우위</span><span>막대를 누르면 구성 요소가 보여요</span></div>
     <div id="bars"></div>
+    <div class="coininfo" id="coinInfo"></div>
   </div>
 
-  <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식(FibCore)으로 롱·숏을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
+  <div class="card">
+    <details class="about"><summary>Market Score란?</summary>
+      <p>Market Score는 여러 암호화폐의 Fibonacci 반응 데이터를 종합해 현재 시장 내부의 상승·하락 구조 강도를 −100부터 +100까지 나타낸 지표입니다.</p>
+      <p>이 점수는 미래 가격을 예측하거나 매수·매도 시점을 제시하기 위한 신호가 아니라, 현재 시장 상태를 한눈에 파악하기 위한 정보입니다.</p>
+      <p>4주 변화는 현재 Market Score와 4주 전 Market Score의 차이입니다. 최근 시장 내부 상태가 개선되고 있는지 악화되고 있는지를 보여줍니다.</p>
+    </details>
+  </div>
+
+  <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식(FibCore)으로 위쪽·아래쪽 양방향을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
 </div>
 
-<script src="common.js?v=20261001231630"></script>
-<script src="nav.js?v=20261001231630"></script>
-<script src="meta.js?v=20261001231630"></script>
-<script src="fib-core.js?v=20261001231630"></script>
+<script src="common.js?v=20261002013440"></script>
+<script src="nav.js?v=20261002013440"></script>
+<script src="meta.js?v=20261002013440"></script>
+<script src="fib-core.js?v=20261002013440"></script>
 <script>
 "use strict";
 const FUT = "https://fapi.binance.com/fapi/v1";
@@ -80,7 +116,7 @@ const STABLES = new Set(["USDC", "FDUSD", "TUSD", "BUSD", "USDP", "DAI", "EUR", 
 const HOUR = 3600e3, WEEK = 7 * 24 * HOUR, WIN = 720;      // 점수 구간 = 최근 30일(1시간봉 720개)
 const TOTAL = 2880, MAX_RANK = 100, GAP = 350;             // 약 4달(점수 30일 + 선 그래프 3달) / 시총 100위 안 / 요청 사이 쉬는 시간(ms)
 const EV_SCALE = 5;                                        // 기대값 차이 ±5%p 를 ±100 으로 봄
-const GREEN = "var(--up)", RED = "var(--down)", FLAT = "#9aa1ab";   // 사이트 기본색: 상승 = 빨강, 하락 = 파랑
+const GREEN = "var(--up)", RED = "var(--down)", FLAT = "#9aa1ab";   // 이름은 예전 그대로지만 실제 색은 사이트 기본색: GREEN = --up = 상승 = 빨강, RED = --down = 하락 = 파랑, FLAT = 회색
 const clamp = v => Math.max(-100, Math.min(100, v));
 const avg = a => { const b = a.filter(x => x != null && isFinite(x)); return b.length ? b.reduce((s, x) => s + x, 0) / b.length : null; };
 const sgn = v => v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(1);
@@ -144,37 +180,70 @@ function upTo(cs, T) {            // T 시각까지의 마지막 캔들 번호 (
   return ans;
 }
 
-// ── 화면 ────────────────────────────────────────────────────────
+// ── 화면 (표시만 담당. 점수 계산은 위의 metrics / aggregate 그대로) ───────────────
+// 강도 표현: 공식 판정(±30)은 그대로 두고, ±40을 더해 5단계 글자로만 보여줌
+const LEVELS = [
+  [s => s >= 40, "매우 강한 상승 우위", GREEN, 1], [s => s >= 30, "상승 우위", GREEN, 1],
+  [s => s > -30, "중립 / 횡보", "var(--text)", 0], [s => s > -40, "하락 우위", RED, -1], [() => true, "매우 강한 하락 우위", RED, -1]];
+const levelOf = s => s == null ? ["-", FLAT, 0] : LEVELS.find(([f]) => f(s)).slice(1);
+// 4주 변화 글자 (경계 중복 없음): ≥+20 / +10 이상 +20 미만 / −10 초과 +10 미만 / −20 초과 −10 이하 / ≤−20
+const MOM_STRONG = 20, MOM_MILD = 10;
+function momOf(c) {
+  if (c == null || !isFinite(c)) return ["-", FLAT, 0];
+  if (c >= MOM_STRONG) return ["강한 개선 ↑", GREEN, 2];
+  if (c >= MOM_MILD) return ["개선 ↑", GREEN, 1];
+  if (c > -MOM_MILD) return ["중립 →", "var(--text)", 0];
+  if (c > -MOM_STRONG) return ["악화 ↓", RED, -1];
+  return ["강한 악화 ↓", RED, -2];
+}
+// 현재 시장 해석 (정해진 규칙으로 1~2문장. 미래 전망 없음)
+function interpret(score, chg) {
+  const [lv, , d] = levelOf(score), m = momOf(chg)[2];
+  const a = d === 0 ? "현재 시장은 중립 구간입니다." : `현재 시장은 ${lv} 상태입니다.`;
+  if (chg == null || !isFinite(chg)) return a + " 4주 전 점수가 없어 최근 변화는 계산하지 않았습니다.";
+  const verb = m === 2 ? "빠르게 개선되고 있습니다" : m === 1 ? "개선되고 있습니다" : m === 0 ? "큰 변화가 없습니다" : m === -1 ? "약화되고 있습니다" : "빠르게 약화되고 있습니다";
+  const but = (d > 0 && m < 0) || (d < 0 && m > 0) ? "다만 " : "";
+  return `${a} ${but}최근 4주 동안 시장 내부 상태는 ${verb}.`;
+}
 const HELP = [
-  ["터치 비율", "숏 터치 ÷ (롱+숏 터치). 가격이 위쪽 진입가에 닿은 횟수가 아래쪽보다 많을수록 높아요(상승 쪽). 50%가 중립.", v => v == null ? "-" : v.toFixed(1) + "%"],
-  ["반등 우세 차이", "롱 반등 우세 − 숏 하락 우세 (%p). 아래쪽 진입가에서 반등이 더 잘 나왔으면 +, 위쪽에서 하락이 더 잘 나왔으면 −예요.", v => sgn(v) + "%p"],
-  ["기대값 차이", "롱 기대값 − 숏 기대값 (%p, 수수료 포함). 롱 쪽이 더 유리했으면 +예요. ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
+  ["터치 비율", "시장 전체에서 위쪽 Fibonacci 레벨과 아래쪽 Fibonacci 레벨 중 어느 방향의 반응이 더 많이 나타나는지 봅니다. 위쪽 확장 레벨 터치 ÷ (위쪽 + 아래쪽 터치). 가격이 위쪽 레벨에 닿은 횟수가 아래쪽보다 많을수록 높아요. 50%가 중립이에요.", v => v == null ? "-" : v.toFixed(1) + "%"],
+  ["반등/하락 우위", "아래쪽 레벨의 반등과 위쪽 레벨의 하락 중 어느 반응이 더 강했는지 비교합니다. 아래쪽 레벨에서 반등이 우세했던 비율 − 위쪽 레벨에서 하락이 우세했던 비율 (%p). 아래쪽 반응이 더 강했으면 +, 위쪽 반응이 더 강했으면 −예요.", v => sgn(v) + "%p"],
+  ["기대값 우위", "각 Fibonacci 반응 이후 실제 가격 움직임의 평균적인 우위를 비교합니다. 아래쪽 레벨 반응의 기대값 − 위쪽 레벨 반응의 기대값 (%p, 수수료 포함). ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
 ];
+const compDir = v => v == null ? ["-", FLAT] : v >= 30 ? ["상승 우위", GREEN] : v <= -30 ? ["하락 우위", RED] : ["중립", "var(--text)"];
 function drawGauge(score) {
-  const cx = 150, cy = 150, R = 120, W = 26;
+  const cx = 150, cy = 152, R = 118, W = 22;
   const pt = (v, r) => { const a = Math.PI * (1 - (v + 100) / 200); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
-  const arc = (a, b, col) => { const [x1, y1] = pt(a, R), [x2, y2] = pt(b, R), [x3, y3] = pt(b, R - W), [x4, y4] = pt(a, R - W);
-    return `<path d="M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${R - W} ${R - W} 0 0 0 ${x4} ${y4}Z" fill="${col}" opacity=".85"/>`; };
-  let s = arc(-100, -30, RED) + arc(-30, 30, FLAT) + arc(30, 100, GREEN);
-  for (const v of [-100, -30, 0, 30, 100]) { const [x, y] = pt(v, R + 12); s += `<text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:var(--muted);font-size:10px">${v > 0 ? "+" + v : v}</text>`; }
+  const arc = (a, b, col, op) => { const [x1, y1] = pt(a, R), [x2, y2] = pt(b, R), [x3, y3] = pt(b, R - W), [x4, y4] = pt(a, R - W);
+    return `<path d="M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${R - W} ${R - W} 0 0 0 ${x4} ${y4}Z" fill="${col}" opacity="${op}"/>`; };
+  let s = arc(-100, -40, RED, .85) + arc(-40, -30, RED, .45) + arc(-30, 30, FLAT, .3) + arc(30, 40, GREEN, .45) + arc(40, 100, GREEN, .85);
+  for (const v of [-100, -40, -30, 0, 30, 40, 100]) {
+    const [a1, b1] = pt(v, R + 1), [a2, b2] = pt(v, R + 6), far = Math.abs(v) === 40 ? 24 : 15, [x, y] = pt(v, R + far);
+    s += `<line x1="${a1}" y1="${b1}" x2="${a2}" y2="${b2}" stroke="var(--muted)" stroke-width="1"/><text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:var(--muted);font-size:10px">${v > 0 ? "+" + v : v}</text>`;
+  }
   if (score != null) {
-    const [nx, ny] = pt(clamp(score), R - 6), col = verdictOf(score)[1];
-    s += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="7" fill="var(--text)"/><circle cx="${nx}" cy="${ny}" r="4" fill="${col}" stroke="var(--text)" stroke-width="1.5"/>`;
+    const [nx, ny] = pt(clamp(score), R - W / 2), col = levelOf(score)[1];
+    s += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--text)" stroke-width="2.5" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="6" fill="var(--text)"/><circle cx="${nx}" cy="${ny}" r="7" fill="${col}" stroke="var(--text)" stroke-width="2"/>`;
   }
   $("gauge").innerHTML = s;
 }
-function showTop(agg, nCoins) {
-  $("topCard").hidden = false;
+function showTop(agg, nCoins, chg) {
   drawGauge(agg.score);
-  const [word, col] = verdictOf(agg.score);
+  const [word, col] = levelOf(agg.score);
   $("vScore").textContent = agg.score == null ? "-" : sgn(agg.score); $("vScore").style.color = col;
   $("vWord").textContent = word; $("vWord").style.color = col;
-  $("vSub").textContent = `${nCoins}개 코인 평균 · 최근 30일`;
-  $("tiles").innerHTML = HELP.map(([name, tip, fmt], j) => `
-    <div class="tile"><div class="k">${name}<button class="help" type="button" data-h="${j}" title="설명">?</button></div>
+  $("vSub").textContent = `공식 판정 ${verdictOf(agg.score)[0]} (±30 기준) · ${nCoins}개 코인 평균 · 최근 30일`;
+  const [ml, mc] = momOf(chg);
+  $("mNum").textContent = chg == null ? "-" : sgn(chg); $("mNum").style.color = mc;
+  $("mLab").textContent = ml; $("mLab").style.color = mc;
+  $("interp").textContent = interpret(agg.score, chg);
+  $("compCard").hidden = false;
+  $("tiles").innerHTML = HELP.map(([name, tip, fmt], j) => { const v = agg.sAvg[j], [dl, dc] = compDir(v), pos = v == null ? 50 : (clamp(v) + 100) / 2;
+    return `<div class="tile"><div class="k">${name}<button class="help" type="button" data-h="${j}" title="설명">?</button></div>
       <div class="v">${fmt(agg.rawAvg[j])}</div>
-      <div class="s">환산 ${sgn(agg.sAvg[j])}</div>
-      <div class="helptxt" id="ht${j}" hidden>${tip}</div></div>`).join("");
+      <div class="s">환산 ${sgn(v)} · <b style="color:${dc}">${dl}</b></div>
+      <div class="dir"><span style="color:var(--down)">하락</span><span class="mini"><i style="left:${pos}%"></i></span><span style="color:var(--up)">상승</span></div>
+      <div class="helptxt" id="ht${j}" hidden>${tip}</div></div>`; }).join("");
 }
 document.addEventListener("click", e => {
   const b = e.target.closest(".help"); if (!b) return;
@@ -183,6 +252,8 @@ document.addEventListener("click", e => {
 });
 
 let lineData = null, barData = null;
+const dLab = T => { const d = new Date(T + 9 * HOUR); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`; };
+const fmtUsd = v => v == null ? "-" : "$" + (v >= 1000 ? Math.round(v).toLocaleString("en-US") : v.toFixed(2));
 function drawLine() {
   if (!lineData) return;
   const { pts, btc } = lineData, el = $("line");
@@ -193,17 +264,42 @@ function drawLine() {
   const lo = Math.min(...bs.map(c => c.c)), hi = Math.max(...bs.map(c => c.c)), pad = (hi - lo) * 0.08 || 1;
   const YB = v => mt + (1 - (v - (lo - pad)) / (hi - lo + 2 * pad)) * ph;
   let s = `<svg class="ch" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
-  for (const v of [-100, -30, 0, 30, 100]) s += `<line x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v === 0 ? "" : 'stroke-dasharray="3 3"'}/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`;
+  // 영역 배경 (옅게): 매우 강한 상승 / 상승 / 중립 / 하락 / 매우 강한 하락
+  for (const [a, b, col, op] of [[100, 40, GREEN, .10], [40, 30, GREEN, .05], [-30, -40, RED, .05], [-40, -100, RED, .10]])
+    s += `<rect x="${ml}" width="${pw}" y="${Y(a)}" height="${Y(b) - Y(a)}" fill="${col}" opacity="${op}"/>`;
+  for (const v of [100, 40, 30, 0, -30, -40, -100]) {
+    const key = v === 0 || Math.abs(v) === 30;
+    s += `<line x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v === 0 ? 'stroke-width="1.5"' : key ? 'stroke-dasharray="4 3"' : 'stroke-dasharray="1 3"'}/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`;
+  }
   for (let i = 0; i <= 4; i++) { const v = lo - pad + (hi - lo + 2 * pad) * i / 4; s += `<text x="${W - mr + 5}" y="${YB(v) + 3}" fill="var(--btc)" style="fill:var(--btc)">${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(0)}</text>`; }
   s += `<polyline fill="none" stroke="var(--btc)" stroke-width="1.5" opacity=".9" points="${bs.filter((_, i) => i % 4 === 0).map(c => X(c.t).toFixed(1) + "," + YB(c.c).toFixed(1)).join(" ")}"/>`;
   const sp = pts.filter(p => p.score != null);
   s += `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" points="${sp.map(p => X(p.T).toFixed(1) + "," + Y(clamp(p.score)).toFixed(1)).join(" ")}"/>`;
-  for (const p of pts) {
-    const d = new Date(p.T + 9 * HOUR), lab = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-    s += `<text x="${X(p.T)}" y="${H - 8}" text-anchor="middle">${lab}</text>`;
-    if (p.score != null) s += `<circle cx="${X(p.T)}" cy="${Y(clamp(p.score))}" r="4" fill="${verdictOf(p.score)[1]}" stroke="var(--card)" stroke-width="1.5"><title>${lab} · ${sgn(p.score)} · ${verdictOf(p.score)[0]} (${p.n}개 코인)</title></circle>`;
-  }
+  pts.forEach((p, i) => {
+    const every = pw / pts.length < 34 ? 2 : 1;
+    if ((pts.length - 1 - i) % every === 0) s += `<text x="${X(p.T)}" y="${H - 8}" text-anchor="middle">${dLab(p.T)}</text>`;
+    if (p.score != null) s += `<circle cx="${X(p.T)}" cy="${Y(clamp(p.score))}" r="4" fill="${levelOf(p.score)[1]}" stroke="var(--card)" stroke-width="1.5"/>`;
+  });
+  // 점 근처 어디를 눌러도/올려도 잡히도록 세로 띠
+  const half = pts.length > 1 ? (X(pts[1].T) - X(pts[0].T)) / 2 : pw / 2;
+  pts.forEach((p, i) => { s += `<rect class="hit" data-i="${i}" x="${X(p.T) - half}" y="${mt}" width="${half * 2}" height="${ph}" fill="transparent"/>`; });
   el.innerHTML = s + "</svg>";
+  const tip = $("lineTip"), wrap = $("lineWrap");
+  const show = i => {
+    const p = pts[i]; if (!p || p.score == null) { tip.hidden = true; return; }
+    const bi = upTo(btc, p.T), bp = bi >= 0 ? btc[bi].c : null, [lv, lc] = levelOf(p.score), [mlab, mc] = momOf(p.chg);
+    tip.innerHTML = `<div>${new Date(p.T + 9 * HOUR).toISOString().slice(0, 10)}</div><div>Market Score <b style="color:${lc}">${sgn(p.score)}</b></div><div>시장 상태 <b style="color:${lc}">${lv}</b></div><div>4주 변화 <b style="color:${mc}">${p.chg == null ? "-" : sgn(p.chg) + " " + mlab}</b></div><div>BTC <b>${fmtUsd(bp)}</b></div>`;
+    tip.hidden = false;
+    const x = X(p.T), tw = tip.offsetWidth, ww = wrap.clientWidth;
+    tip.style.left = Math.max(0, Math.min(ww - tw, x - tw / 2)) + "px";
+    tip.style.top = Math.max(0, Y(clamp(p.score)) - tip.offsetHeight - 12) + "px";
+  };
+  el.querySelectorAll(".hit").forEach(r => { r.addEventListener("mouseenter", () => show(+r.dataset.i)); r.addEventListener("click", () => show(+r.dataset.i)); });
+  el.querySelector("svg").addEventListener("mouseleave", () => tip.hidden = true);
+}
+function coinText(x) {
+  const r = x.raw, c = x.s;
+  return `<b>${x.sym}</b> · Market Score <b style="color:${x.score >= 0 ? GREEN : RED}">${sgn(x.score)}</b><br>터치 비율 ${r[0] == null ? "-" : r[0].toFixed(1) + "%"} (환산 ${sgn(c[0])}) · 반등/하락 우위 ${sgn(r[1])}%p (환산 ${sgn(c[1])}) · 기대값 우위 ${sgn(r[2])}%p (환산 ${sgn(c[2])})`;
 }
 function drawBars() {
   if (!barData) return;
@@ -212,13 +308,15 @@ function drawBars() {
   const M = Math.max(30, Math.ceil(Math.max(...list.map(x => Math.abs(x.score))) / 10) * 10), zero = mt + plotH / 2;
   const ml = 30, slot = (W - ml) / list.length, bw = Math.max(2, slot * 0.7);
   let s = `<svg class="ch" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
-  for (const v of [M, 0, -M]) { const y = zero - v / M * plotH / 2; s += `<line x1="${ml}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" ${v === 0 ? "" : 'stroke-dasharray="3 3"'}/><text x="${ml - 4}" y="${y + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`; }
+  for (const v of [M, 0, -M]) { const y = zero - v / M * plotH / 2; s += `<line x1="${ml}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" ${v === 0 ? 'stroke-width="1.5" stroke="var(--muted)"' : 'stroke-dasharray="3 3"'}/><text x="${ml - 4}" y="${y + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`; }
   list.forEach((x, i) => {
     const h = Math.abs(x.score) / M * plotH / 2, cx = ml + slot * (i + 0.5), y = x.score >= 0 ? zero - h : zero;
-    s += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(h, 1)}" rx="1.5" fill="${x.score >= 0 ? GREEN : RED}"><title>${x.sym} · ${sgn(x.score)}</title></rect>`;
-    s += `<text transform="translate(${cx + 3},${mt + plotH + 6}) rotate(-90)" text-anchor="end" style="font-size:${slot < 12 ? 8 : 10}px">${x.sym}</text>`;
+    s += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(h, 1)}" rx="1.5" fill="${x.score >= 0 ? GREEN : RED}"/>`;
+    s += `<rect class="hit" data-i="${i}" x="${ml + slot * i}" y="${mt}" width="${slot}" height="${plotH + labH}" fill="transparent" style="cursor:pointer"/>`;
+    s += `<text transform="translate(${cx + 3},${mt + plotH + 6}) rotate(-90)" text-anchor="end" style="font-size:${slot < 12 ? 8 : 10}px;pointer-events:none">${x.sym}</text>`;
   });
   el.innerHTML = s + "</svg>";
+  el.querySelectorAll(".hit").forEach(r => { const f = () => $("coinInfo").innerHTML = coinText(list[+r.dataset.i]); r.addEventListener("mouseenter", f); r.addEventListener("click", f); });
 }
 addEventListener("resize", () => { drawLine(); drawBars(); });
 
@@ -261,13 +359,15 @@ async function run() {
     }
     const per = pts[pts.length - 1].rows;
     if (!per.length) throw new Error("점수를 계산할 데이터가 부족해요");
-    showTop(aggregate(per), per.length);
+    // 4주 변화 = 각 주 점수 − 정확히 4주 전 점수 (화면 표시용, 점수 계산과 무관)
+    pts.forEach((p, i) => { const q = pts[i - 4]; p.chg = q && p.score != null && q.score != null && p.T - q.T === 4 * WEEK ? p.score - q.score : null; });
+    showTop(aggregate(per), per.length, pts[pts.length - 1].chg);
     barData = per.slice().sort((a, b) => b.score - a.score);
     $("barCard").hidden = false; drawBars();
     lineData = { pts, btc }; $("lineCard").hidden = false; drawLine();
     setP(`완료 · 코인 ${per.length}개 · ${new Date().toLocaleTimeString("ko-KR")}`, 1);
   } catch (e) {
-    setP(e.message, 0);
+    setP(e.message, 0); $("vWord").textContent = "-"; $("interp").textContent = "데이터를 받지 못해 해석을 표시할 수 없어요.";
   }
   $("progWrap").hidden = $("prog").style.width === "100%" ? true : false;
   running = false; $("run").disabled = false;

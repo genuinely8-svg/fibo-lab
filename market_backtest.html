@@ -1,0 +1,558 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FIBO LAB · 시장 방향 백테스트</title>
+<link rel="stylesheet" href="common.css?v=20261002013440"><script src="theme.js?v=20261002013440"></script><style>:root{--bg:#0b0f14;--card:#111720;--line:#273142;--text:#e8edf5;--muted:#93a0b3;--accent:#4f7cff;--up:#27c281;--down:#ef5b67}html{background:var(--bg);color:var(--text)}body{background:var(--bg);color:var(--text)}</style>
+<style>
+body{max-width:1180px;margin:auto;padding:18px}.hero{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;flex-wrap:wrap}.muted{color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0}.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.controls label{display:grid;gap:5px;font-size:12px;color:var(--muted)}select,input,button{font:inherit;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);padding:9px 11px}button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:white;border-color:transparent}button:disabled{opacity:.5;cursor:not-allowed}
+.progress{height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:10px}.progress>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}.status{font-size:13px;margin-top:8px;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.kpi{border:1px solid var(--line);border-radius:12px;padding:12px}.kpi b{font-size:22px;display:block;margin-top:5px}.tablewrap{overflow:auto;max-width:100%}table{width:100%;border-collapse:collapse;min-width:780px}th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;font-size:13px}th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.pos{color:var(--up)}.neg{color:var(--down)}canvas{width:100%;height:320px}.note{font-size:12px;line-height:1.55;color:var(--muted)}
+.rg h3{font-size:15px;margin:18px 0 8px}.kpi .small{display:block;margin-top:4px;font-size:12px}.grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+table.cm,table.cards{min-width:0}table.cm td,table.cm th{text-align:center}table.cm td:first-child,table.cm th:first-child{text-align:left}table.cm td.hit{font-weight:700;color:var(--accent)}
+@media(max-width:700px){table.cm td,table.cm th{padding:7px 4px;font-size:12px}
+table.cards thead{display:none}table.cards,table.cards tbody,table.cards tr,table.cards td{display:block;width:100%}
+table.cards tr{border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-bottom:8px}
+table.cards td{display:flex;justify-content:space-between;gap:10px;border:0;padding:4px 0;text-align:right;position:static;background:none}
+table.cards td::before{content:attr(data-label);color:var(--muted);text-align:left}}
+@media(max-width:700px){body{padding:12px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}#kpis .kpi:last-child{grid-column:1/-1}.controls>*{flex:1 1 130px}.panel{padding:12px}.hero h1{font-size:22px}}
+</style></head><body>
+<div class="hero"><div><h1>시장 방향 백테스트</h1><div class="muted">현재 시장 방향 산식을 과거 데이터에 그대로 적용 · fib-core.js 수정 없음</div></div><a href="market.html">← 시장 방향으로</a></div>
+<div class="panel"><div class="controls">
+<label>기간<select id="months"><option value="6">6개월</option><option value="12" selected>12개월</option><option value="18">18개월</option><option value="24">24개월</option></select></label>
+<label>코인 수<input id="topN" type="number" min="5" max="100" value="20"></label>
+<label>n<input id="n" type="number" min="2" max="30" value="5"></label>
+<label>k<input id="k" type="number" min="3" max="100" value="20"></label>
+<label>수수료 %<input id="fee" type="number" min="0" max="5" step="0.01" value="0.1"></label>
+<button class="primary" id="run">백테스트 시작</button><button id="stop" disabled>중단</button></div>
+<div class="progress"><i id="bar"></i></div><div id="status" class="status muted">준비됨</div>
+<div class="note">처음에는 12개월·20코인으로 확인하는 것을 권장합니다. 24개월·50코인은 Binance 1시간봉 요청량이 많아 오래 걸릴 수 있습니다. 모든 요청은 순차 처리합니다.</div></div>
+<div id="results" hidden>
+<div class="panel"><h2>요약</h2><div class="grid" id="kpis"></div></div>
+<div class="panel"><h2>시장점수 vs BTC</h2><canvas id="chart" width="1100" height="320"></canvas><div id="lag" class="note"></div></div>
+<div class="panel"><h2>신호 이후 BTC 성과</h2><div class="tablewrap"><table><thead><tr><th>이벤트</th><th>표본</th><th>1일 평균 / 상승률</th><th>3일 평균 / 상승률</th><th>7일 평균 / 상승률</th><th>14일 평균 / 상승률</th><th>30일 평균 / 상승률</th></tr></thead><tbody id="events"></tbody></table></div></div>
+<div class="panel"><h2>구간별 BTC 성과</h2><div class="note">상승장(≥ +30) · 횡보 · 하락장(≤ −30) 판정은 미래 가격 예측 신호가 아니라 현재 시장 상태를 나타내는 값입니다.</div><div class="tablewrap"><table><thead><tr><th>시장 판정</th><th>표본</th><th>7일 평균</th><th>7일 상승률</th><th>30일 평균</th><th>30일 상승률</th></tr></thead><tbody id="regimes"></tbody></table></div></div>
+<div class="panel"><h2>4주 변화량 구간별 BTC 성과</h2><div class="note">4주 변화량 = 현재 시장점수 − 4주 전 시장점수. 강한 개선 ≥ +30 · 개선 +15 이상 +30 미만 · 중립 −15 초과 +15 미만 · 악화 −30 초과 −15 이하 · 강한 악화 ≤ −30<br>주의: 주간 표본은 이후 수익률 구간이 서로 겹쳐서(예: 30일 수익률은 다음 4주와 대부분 겹침) 실제로 독립적인 표본은 표본 수보다 적습니다. 결과는 참고용 데이터이며 매매 신호가 아닙니다.</div><div class="tablewrap"><table><thead><tr><th>모멘텀</th><th>표본</th><th>1일 평균 / 상승률</th><th>3일 평균 / 상승률</th><th>7일 평균 / 상승률</th><th>14일 평균 / 상승률</th><th>30일 평균 / 상승률</th></tr></thead><tbody id="moms"></tbody></table></div><div id="momNote" class="note"></div></div>
+<div class="panel"><h2>주간 점수 원자료</h2><button id="csv">CSV 저장</button><div class="tablewrap"><table><thead><tr><th>날짜</th><th>점수</th><th>판정</th><th>4주 변화</th><th>모멘텀</th><th>코인수</th><th>BTC</th></tr></thead><tbody id="raw"></tbody></table></div></div>
+<div class="panel rg"><h2>시장 국면 일치도 검증</h2>
+<div class="note">FIBO 시장 방향 점수가 미래 가격이 아니라 <b>그 시점의 BTC 시장 상태</b>와 얼마나 비슷한지 보는 표입니다. BTC 가격은 점수 계산에 쓰지 않고 비교 기준으로만 씁니다(단, 점수 산출 코인 목록에는 기존대로 BTC의 피보 터치 통계가 한 코인으로 포함돼 있습니다).<br>
+BTC 국면 = 30일 수익률(+5% 초과 +1 / −5% 미만 −1 / 그 외 0) + 현재가 vs 30일 이동평균(위 +1 / 아래 −1) + 30일 이동평균의 7일 전 대비 기울기(상승 +1 / 하락 −1). 합계 +2 이상 상승 추세, −2 이하 하락 추세, 그 외 중립. 각 주의 계산은 그 주 시점까지의 BTC 데이터만 씁니다.</div>
+<h3>1. 전체 일치율</h3><div class="grid g2" id="rgAll"></div>
+<h3>2. 방향성 일치율</h3><div class="grid" id="rgDir"></div>
+<h3>3. FIBO vs BTC Confusion Matrix</h3><div class="tablewrap"><table class="cm"><thead><tr><th></th><th>BTC 상승</th><th>BTC 중립</th><th>BTC 하락</th><th>합계</th></tr></thead><tbody id="rgCm"></tbody></table></div><div id="rgCmNote" class="note"></div>
+<h3>4. FIBO 판정별 BTC 시장상태</h3><div class="tablewrap"><table class="cards"><thead><tr><th>FIBO 판정</th><th>표본</th><th>BTC 상승 추세</th><th>BTC 중립</th><th>BTC 하락 추세</th></tr></thead><tbody id="rgByFibo"></tbody></table></div>
+<h3>5. Market Score 구간별 BTC 시장상태</h3><div class="tablewrap"><table class="cards"><thead><tr><th>점수 구간</th><th>표본</th><th>평균 BTC 30일 수익률</th><th>BTC 상승 추세</th><th>BTC 중립</th><th>BTC 하락 추세</th></tr></thead><tbody id="rgBins"></tbody></table></div>
+<h3>6. 상관관계</h3><div class="tablewrap"><table class="cards"><thead><tr><th>항목</th><th>Pearson r</th></tr></thead><tbody id="rgCorr"></tbody></table></div>
+<h3>7. 주간 원자료</h3><div class="tablewrap"><table class="cards"><thead><tr><th>날짜</th><th>marketScore</th><th>FIBO 판정</th><th>BTC</th><th>BTC 30일</th><th>MA30</th><th>MA30 기울기</th><th>BTC 점수</th><th>BTC 국면</th></tr></thead><tbody id="rgRaw"></tbody></table></div>
+</div>
+</div>
+<script>
+/*
+  meta.js — 코인 부가 정보 (로고, 이름, 시가총액 순위, 주식·원자재 구분)
+  ---------------------------------------------------------------
+  - 코인게코 시가총액 상위 1000개: 로고, 영문 이름, 순위        → 하루 동안 저장
+  - 업비트 원화 마켓: 한글 이름                                → 하루 동안 저장
+  - 바이낸스 선물 상품 정보: 코인이 아닌 것(금·은·주식 등) 구분  → 6시간 저장
+  - 금·은 담보 토큰(PAXG, XAUT 등)도 원자재로 봄
+  - 비트겟 선물의 실물자산(isRwa) 목록                         → 6시간 저장 (24시간변동률 페이지)
+  사용: await CoinMeta.load();  CoinMeta.rank("BTC") → 1
+*/
+(function () {
+  "use strict";
+  const DAY = 24 * 3600e3;
+  const get = (k, age) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); if (v && Date.now() - v.at < age) return v.data; } catch (e) {} return null; };
+  const put = (k, d) => { try { localStorage.setItem(k, JSON.stringify({ at: Date.now(), data: d })); } catch (e) {} };
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  let top = { L: {}, N: {}, R: {} }, ko = {}, types = {}, loaded = false, loading = null;
+  let topAt = 0;            // 지금 쓰는 순위 정보를 받은 시각 (하루 넘었으면 오래된 저장값)
+  let retryTimer = null;
+  // 기간과 상관없이 저장값 꺼내기 (코인게코가 막혔을 때 비상용)
+  const getAny = k => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); if (v && v.data) return v; } catch (e) {} return null; };
+
+  // 1000PEPE, 1000000MOG, 1MBABYDOGE 같은 선물 이름 → PEPE, MOG, BABYDOGE
+  const base = s => String(s).toUpperCase().replace(/^(1000000|10000|1000|1M)(?=[A-Z])/, "");
+
+  const TYPE_LABEL = { COMMODITY: "원자재", COMMODITY_TOKEN: "원자재 토큰", EQUITY: "미국 주식", KR_EQUITY: "한국 주식",
+                      HK_EQUITY: "홍콩 주식", CN_EQUITY: "중국 주식", FX: "외환", PREMARKET: "상장 전 주식", INDEX: "지수", ETF: "ETF" };
+  // 금·은·백금 가격을 따라가는 토큰 (코인 형태지만 원자재)
+  const COMMODITY_TOKENS = new Set(["PAXG", "XAUT", "XAUM", "KAU", "KAG", "DGX", "PMGT", "XAU", "XAG", "XPT", "XPD"]);
+  const typeOf = s => { const S = String(s).toUpperCase(); return types[S] || (COMMODITY_TOKENS.has(base(S)) ? "COMMODITY_TOKEN" : null); };
+
+  async function loadTop() {
+    const hit = get("cg-top1000-v1", DAY);
+    if (hit) { top = hit; topAt = getAny("cg-top1000-v1").at; return; }
+    const ok = await fetchTop();
+    if (ok) return;
+    // 코인게코 요청 제한 등으로 실패 → 하루 지난 저장값이라도 사용하고, 5분 뒤 다시 받아보기
+    const old = getAny("cg-top1000-v1");
+    if (old && !Object.keys(top.R).length) { top = old.data; topAt = old.at; }
+    scheduleRetry();
+  }
+  function scheduleRetry() {
+    if (retryTimer) return;
+    retryTimer = setTimeout(async () => { retryTimer = null; if (!(await fetchTop())) scheduleRetry(); }, 5 * 60e3);
+  }
+  // 코인게코에서 새로 받기. 성공하면 true
+  async function fetchTop() {
+    const L = {}, N = {}, R = {};
+    for (let page = 1; page <= 4; page++) {               // 250개씩 4번 = 1000위까지
+      try {
+        const res = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}`);
+        if (!res.ok) break;                               // 요청 제한이면 받은 데까지만
+        for (const c of await res.json()) {
+          const s = c.symbol.toUpperCase();
+          if (R[s]) continue;                             // 같은 기호면 순위 높은 쪽
+          R[s] = c.market_cap_rank; N[s] = c.name; L[s] = (c.image || "").replace("/large/", "/small/");
+        }
+      } catch (e) { break; }
+      if (page < 4) await wait(1200);
+    }
+    if (!Object.keys(R).length) return false;
+    top = { L, N, R }; topAt = Date.now();
+    put("cg-top1000-v1", top);
+    put("cg-logos-v1", L); put("cg-names-v1", N);         // 다른 페이지(common.js)도 같이 씀
+    return true;
+  }
+  async function loadKo() {
+    const hit = get("upbit-ko-v1", DAY);
+    if (hit) { ko = hit; return; }
+    try {
+      const res = await fetch("https://api.upbit.com/v1/market/all?isDetails=false");
+      if (!res.ok) return;
+      for (const m of await res.json()) if (m.market.startsWith("KRW-")) ko[m.market.slice(4)] = m.korean_name;
+      put("upbit-ko-v1", ko);
+    } catch (e) {}
+  }
+  async function loadTypes() {
+    const hit = get("bn-fut-types-v1", 6 * 3600e3);
+    if (hit) { types = hit; return; }
+    try {
+      const j = await (await fetch("https://fapi.binance.com/fapi/v1/exchangeInfo")).json();
+      const t = {};
+      for (const x of j.symbols) if (x.quoteAsset === "USDT" && x.underlyingType && x.underlyingType !== "COIN") t[x.baseAsset] = x.underlyingType;
+      types = t; put("bn-fut-types-v1", t);
+    } catch (e) {}
+  }
+
+  // 비트겟 선물에서 실물자산(주식·원자재) 상품의 기호 목록
+  let rwaP = null;
+  function bitgetRwa() {
+    if (rwaP) return rwaP;
+    rwaP = (async () => {
+      let list = get("bitget-rwa-v1", 6 * 3600e3);
+      if (!list) {
+        const j = await (await fetch("https://api.bitget.com/api/v2/mix/market/contracts?productType=USDT-FUTURES")).json();
+        list = (j.data || []).filter(x => x.isRwa === "YES").map(x => x.baseCoin);
+        put("bitget-rwa-v1", list);
+      }
+      return new Set(list);
+    })();
+    rwaP.catch(() => { rwaP = null; });
+    return rwaP;
+  }
+
+  // 코인/주식·원자재 구분 정보만 먼저 필요할 때 (자동 스캔은 이것만 기다림)
+  let typesP = null;
+  const typesLoaded = () => typesP || (typesP = loadTypes());
+
+  function load() {
+    if (loaded) return Promise.resolve();
+    if (!loading) loading = Promise.all([loadTop(), loadKo(), typesLoaded()]).then(() => { loaded = true; });
+    return loading;
+  }
+
+  window.CoinMeta = {
+    load,
+    typesLoaded,
+    base,
+    rank: s => top.R[base(s)] || null,
+    logo: s => top.L[base(s)] || null,
+    name: s => top.N[base(s)] || null,
+    ko: s => ko[base(s)] || null,
+    type: typeOf,                                                        // "COMMODITY" 등, 코인이면 null
+    typeLabel: s => { const t = typeOf(s); return t ? (TYPE_LABEL[t] || "전통 금융") : null; },
+    isCrypto: s => !typeOf(s),
+    bitgetRwa,
+    isLoaded: () => loaded,
+    hasTop: () => Object.keys(top.R).length > 0,
+    // 순위 정보가 하루 넘은 저장값이면 몇 시간 전인지, 최신이면 0
+    staleHours: () => topAt && Date.now() - topAt > DAY ? Math.round((Date.now() - topAt) / 3600e3) : 0,
+  };
+})();
+
+</script>
+<script>
+/*
+  fib-core.js — 피보나치 -1 계산 엔진 (롱 / 숏 공용)
+  ---------------------------------------------------------------
+  캔들 배열(오래된 것 → 최신 순)을 받아서
+    1) 스윙 고점(H) / 스윙 저점(L)을 찾고
+    2) 스윙마다 확장 레벨(진입가)을 계산하고
+         롱 : 하락 스윙(H→L)의 아래쪽 확장   level = L - (H - L) × 비율
+         숏 : 상승 스윙(L→H)의 위쪽 확장     level = H + (H - L) × 비율
+    3) 과거에 가격이 레벨에 닿았을 때, 그 뒤 K개 봉 동안
+         유리한 쪽으로 최대 몇 % 움직였는지 (롱: 반등 / 숏: 하락)
+         불리한 쪽으로 최대 몇 % 더 갔는지 (롱: 추가하락 / 숏: 추가상승) 통계를 냅니다.
+  direction 은 "long"(기본) | "short". 롱과 숏은 같은 코드를 쓰고 방향만 뒤집어요.
+  결과 필드 이름은 롱 기준 그대로(rebound / fall …)이고, 숏에서는 하락 / 추가상승 값이 들어가요.
+  캔들 형식: { t: 시각(ms), o, h, l, c }
+*/
+(function (root) {
+  "use strict";
+
+  // ── 1. 스윙(피벗) 찾기 ────────────────────────────────────────
+  // i번째 봉의 고가가 좌우 n개 봉보다 모두 높거나 같으면 "스윙 고점"
+  function findPivots(candles, n) {
+    const pivots = [];
+    for (let i = n; i < candles.length - n; i++) {
+      let isHigh = true, isLow = true;
+      for (let j = i - n; j <= i + n; j++) {
+        if (j === i) continue;
+        // 왼쪽은 "같아도 탈락", 오른쪽은 "더 커야 탈락" → 횡보 구간에서 피벗이 줄줄이 생기는 것 방지
+        if (j < i ? candles[j].h >= candles[i].h : candles[j].h > candles[i].h) isHigh = false;
+        if (j < i ? candles[j].l <= candles[i].l : candles[j].l < candles[i].l) isLow = false;
+      }
+      if (isHigh) pivots.push({ type: "H", i, price: candles[i].h });
+      if (isLow) pivots.push({ type: "L", i, price: candles[i].l });
+    }
+    // 같은 종류가 연달아 나오면 더 극단적인 것 하나만 남김 (H-L-H-L 번갈아 나오게)
+    const out = [];
+    for (const p of pivots) {
+      const last = out[out.length - 1];
+      if (last && last.type === p.type) {
+        const better = p.type === "H" ? p.price > last.price : p.price < last.price;
+        if (better) out[out.length - 1] = p;
+      } else {
+        out.push(p);
+      }
+    }
+    return out;
+  }
+
+  // ── 2. 스윙 목록 만들기 ───────────────────────────────────────
+  // 롱: 하락 스윙(H → L) / 숏: 상승 스윙(L → H)
+  function swingsOf(pivots, dir) {
+    const from = dir === "short" ? "L" : "H", to = dir === "short" ? "H" : "L";
+    const swings = [];
+    for (let k = 0; k < pivots.length - 1; k++) {
+      if (pivots[k].type === from && pivots[k + 1].type === to) {
+        swings.push({ high: dir === "short" ? pivots[k + 1] : pivots[k], low: dir === "short" ? pivots[k] : pivots[k + 1], end: pivots[k + 1] });
+      }
+    }
+    return swings;
+  }
+  const downSwings = pivots => swingsOf(pivots, "long");
+  const upSwings = pivots => swingsOf(pivots, "short");
+
+  // ── 방향별 규칙 (롱과 숏이 다른 부분은 전부 여기에만 있음) ──────────
+  function rules(dir) {
+    if (dir === "short") return {
+      short: true,
+      level: (H, L, ratio) => H + (H - L) * ratio,     // 위쪽 확장
+      broken: (c, H, L) => c.l < L,                    // 스윙 저점을 아래로 깨면 스윙 무효
+      hit: (c, level) => c.h >= level,                 // 고가가 레벨에 닿음
+      favor: (c) => c.l, better: Math.min,             // 유리한 쪽 극값: 가장 낮은 저가 (하락)
+      adverse: (c) => c.h, worse: Math.max,            // 불리한 쪽 극값: 가장 높은 고가 (추가상승)
+      favorPct: (level, x) => (level - x) / level * 100,
+      adversePct: (level, x) => (x - level) / level * 100,
+      distance: (price, level) => (level - price) / price * 100,   // 진입까지 거리 = (진입가 − 현재가) / 현재가
+      expected: (level, pct) => level * (1 - pct / 100),
+      startIdx: (s) => s.high.i + 1,                   // 고점이 확정된 다음 봉부터 지켜봄
+    };
+    return {
+      short: false,
+      level: (H, L, ratio) => L - (H - L) * ratio,
+      broken: (c, H, L) => c.h > H,
+      hit: (c, level) => c.l <= level,
+      favor: (c) => c.h, better: Math.max,
+      adverse: (c) => c.l, worse: Math.min,
+      favorPct: (level, x) => (x - level) / level * 100,
+      adversePct: (level, x) => (level - x) / level * 100,
+      distance: (price, level) => (price - level) / level * 100,
+      expected: (level, pct) => level * (1 + pct / 100),
+      startIdx: (s) => s.low.i + 1,
+    };
+  }
+
+  // ── 3. 통계 계산 ──────────────────────────────────────────────
+  function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; }
+  // 표준오차 = 표준편차 / √표본수  → "이 평균이 얼마나 흔들릴 수 있나"
+  function stdErr(a) {
+    if (a.length < 2) return null;
+    const m = mean(a);
+    const v = a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1);
+    return Math.sqrt(v) / Math.sqrt(a.length);
+  }
+
+  /*
+    analyze(candles, opts)
+      opts.n         : 스윙 민감도 (좌우 몇 개 봉과 비교할지). 기본 5
+      opts.k         : 터치 후 몇 개 봉 동안 지켜볼지. 기본 20
+      opts.ratio     : 확장 비율. 1이면 -1 레벨. 기본 1
+      opts.direction : "long"(기본) | "short"
+  */
+  function analyze(candles, opts = {}) {
+    const n = opts.n ?? 5, K = opts.k ?? 20, ratio = opts.ratio ?? 1;
+    const direction = opts.direction === "short" ? "short" : "long";
+    const R = rules(direction);
+    const swings = swingsOf(findPivots(candles, n), direction);
+    const touches = [];   // 과거에 레벨을 찍은 사건들
+    let current = null;   // 지금 진행 중인 스윙
+
+    for (const s of swings) {
+      const H = s.high.price, L = s.low.price;
+      const level = R.level(H, L, ratio);
+      if (level <= 0) continue;
+      const start = R.startIdx(s);
+      let touchIdx = -1, broken = false;
+
+      for (let x = start; x < candles.length; x++) {
+        if (R.broken(candles[x], H, L)) { broken = true; break; }   // 반대쪽 끝을 넘음 → 스윙 무효
+        if (R.hit(candles[x], level)) { touchIdx = x; break; }       // 레벨 터치!
+      }
+
+      const info = { highIdx: s.high.i, lowIdx: s.low.i, H, L, level };
+
+      if (touchIdx >= 0 && touchIdx + K < candles.length) {
+        // 터치 이후 K개 봉(터치한 봉 포함) 동안의 유리한 쪽 / 불리한 쪽 극값
+        let fav = R.short ? Infinity : -Infinity, adv = R.short ? -Infinity : Infinity;
+        for (let x = touchIdx; x <= touchIdx + K; x++) {
+          if (x > touchIdx) fav = R.better(fav, R.favor(candles[x])); // 반등(하락)은 다음 봉부터
+          adv = R.worse(adv, R.adverse(candles[x]));
+        }
+        const rebound = R.favorPct(level, fav);  // 레벨에서 최대 몇 % 유리하게 움직였나 (롱: 반등 / 숏: 하락)
+        const fall = R.adversePct(level, adv);   // 레벨을 넘어 최대 몇 % 더 불리했나 (롱: 추가하락 / 숏: 추가상승)
+        touches.push({ ...info, touchIdx, t: candles[touchIdx].t, rebound, fall, win: rebound > fall });
+      }
+    }
+
+    // ── 지금 진행 중인 스윙 (과거 통계와 똑같은 규칙) ──
+    // 극값(롱: 저점 / 숏: 고점)이 "확정된" 스윙만 씀 → 진입가는 한 번 정해지면 고정 (가격을 따라 움직이지 않음)
+    // 최근 스윙부터 거꾸로 보면서, 아직 반대쪽 끝을 깨지 않은 스윙을 고름
+    //   · 아직 진입가를 안 찍었으면 → "대기" (진입가까지 남은 거리 표시)
+    //   · 최근 K개 봉 안에 진입가를 찍었으면 → "도달" (진입 신호)
+    //   · 찍은 지 K개 봉이 지났으면 → 끝난 스윙이라 건너뜀
+    for (let si = swings.length - 1; si >= 0 && !current; si--) {
+      const s = swings[si];
+      const H = s.high.price, L = s.low.price;
+      const level = R.level(H, L, ratio);
+      if (level <= 0) continue;
+      let touchIdx = -1, broken = false;
+      for (let x = R.startIdx(s); x < candles.length; x++) {
+        if (R.broken(candles[x], H, L)) { broken = true; break; }
+        if (touchIdx < 0 && R.hit(candles[x], level)) touchIdx = x;
+      }
+      if (broken) continue;
+      const since = touchIdx >= 0 ? candles.length - 1 - touchIdx : null;
+      if (touchIdx >= 0 && since > K) continue;
+      current = { state: touchIdx >= 0 ? "도달" : "대기", highIdx: s.high.i, lowIdx: s.low.i, H, L, level,
+                  touched: touchIdx >= 0, touchIdx: touchIdx >= 0 ? touchIdx : null, barsSinceTouch: since };
+      if (touchIdx >= 0) {
+        // 도달한 뒤 가장 낮았던 가격 / 가장 높았던 가격
+        // (유리한 쪽 극값은 다음 봉부터 — 롱은 최고가, 숏은 최저가. 과거 통계와 같은 기준)
+        let lo = Infinity, hi = -Infinity;
+        for (let x = touchIdx; x < candles.length; x++) {
+          if (!R.short || x > touchIdx) lo = Math.min(lo, candles[x].l);
+          if (R.short || x > touchIdx) hi = Math.max(hi, candles[x].h);
+        }
+        current.minSince = lo < Infinity ? lo : null;
+        current.maxSince = hi > -Infinity ? hi : null;
+      }
+    }
+    // 살아있는 스윙이 없음 = 반대쪽 끝을 깼거나 아직 극값이 확정 전 → 확정되길 기다리는 중
+    if (!current && candles.length) current = { state: R.short ? "고점 형성 중" : "저점 형성 중", level: null };
+
+    const reb = touches.map(x => x.rebound), fal = touches.map(x => x.fall);
+    const stats = {
+      count: touches.length,
+      reboundAvg: mean(reb), reboundErr: stdErr(reb),
+      fallAvg: mean(fal), fallErr: stdErr(fal),
+      winRate: touches.length ? touches.filter(x => x.win).length / touches.length * 100 : null,
+    };
+
+    const price = candles.length ? candles[candles.length - 1].c : null;
+    if (current && current.level) {
+      current.distance = R.distance(price, current.level);
+      current.expected = stats.reboundAvg != null ? R.expected(current.level, stats.reboundAvg) : null;
+      if (current.touched) touchPhase(current, stats, price, direction);
+    }
+    return { direction, price, stats, current, touches };
+  }
+
+  /*
+    진입가 도달 후 지금 어떤 상황인지 (과거 통계와 비교)  — 롱 기준 설명, 숏은 위아래만 뒤집힘
+      목표 도달 : 도달 후 예상 반등(하락)가까지 한 번이라도 감 → 이번 기회는 지나감
+      이탈      : 지금 가격이 진입가에서 "평균 추가하락(추가상승) + 오차"보다 더 불리한 쪽에 있음
+                  (다시 그 범위 안으로 돌아오면 진입 구간으로 돌아옴)
+      반등 중   : 지금 진입가보다 유리한 쪽 (예상 반등까지 몇 % 왔는지 progress)
+      진입 구간 : 지금 진입가보다 불리한 쪽이지만 평소에 더 가던 범위 안
+    (도달 후 최저·최고 가격 minSince / maxSince 는 실시간 가격으로도 갱신 가능)
+  */
+  function touchPhase(cur, stats, price, direction) {
+    const R = rules(direction);
+    const lv = cur.level;
+    const limit = stats.fallAvg != null ? stats.fallAvg + (stats.fallErr || 0) : null;   // 이탈 기준 (%)
+    cur.outLimit = limit;
+    cur.lowPct = cur.minSince != null ? (cur.minSince - lv) / lv * 100 : null;          // 도달 후 최저 (진입가 대비 %)
+    cur.highPct = cur.maxSince != null ? (cur.maxSince - lv) / lv * 100 : null;         // 도달 후 최고
+    const gain = R.short ? lv - price : price - lv;                  // 유리한 쪽으로 얼마나 왔나
+    const room = R.short ? lv - cur.expected : cur.expected - lv;    // 목표까지 전체 거리
+    cur.progress = cur.expected && room > 0 ? gain / room * 100 : null;
+    const goal = R.short ? cur.minSince : cur.maxSince;              // 도달 후 유리한 쪽 극값
+    const reached = goal != null && (R.short ? goal <= cur.expected : goal >= cur.expected);
+    if (cur.expected != null && reached) cur.phase = "목표 도달";
+    else if (limit != null && (R.short ? price - lv : lv - price) / lv * 100 > limit) cur.phase = "이탈";
+    else if (R.short ? price < lv : price > lv) cur.phase = "반등 중";
+    else cur.phase = "진입 구간";
+    cur.state = cur.phase;
+    return cur;
+  }
+
+  /*
+    실시간 가격 한 틱을 지금 스윙(res.current)에 반영. 진입가는 고정 (analyze 와 같은 규칙)
+    반대쪽 끝을 깨면 그 스윙은 끝 → 다음 재계산 때 새 스윙을 찾음
+  */
+  function applyPrice(res, px, direction) {
+    const R = rules(direction || res.direction);
+    res.price = px;
+    const c = res.current;
+    if (!c || !c.level) return;
+    if (R.short ? px < c.L : px > c.H) {
+      res.current = { state: R.short ? "고점 형성 중" : "저점 형성 중", level: null };
+      return;
+    }
+    if (!c.touched && (R.short ? px >= c.level : px <= c.level)) {   // 진입가 도달!
+      c.touched = true; c.barsSinceTouch = 0;
+      c.minSince = R.short ? null : px; c.maxSince = R.short ? px : null;
+    } else if (c.touched) {                                           // 도달 후 최저·최고 갱신
+      c.minSince = Math.min(c.minSince ?? px, px);
+      c.maxSince = Math.max(c.maxSince ?? px, px);
+    }
+    c.distance = R.distance(px, c.level);
+    if (c.touched) touchPhase(c, res.stats, px, direction || res.direction);
+  }
+
+  /*
+    화면에 보여줄 상태 4가지
+      진입 구간 : 진입가에 도달했고, 아직 평소 추가하락(추가상승) 범위 안
+      진입 근접 : 진입가까지 5% 이내 (도달 후 살짝 반등한 경우 포함)
+      이탈      : 진입가 도달 후 평소보다 깊게 갔음
+      대기      : 그 밖 (멀리 있음 · 반등이 끝남 · 극값 형성 중)
+  */
+  function label(cur, near = 5) {
+    if (!cur || !cur.level) return "대기";
+    if (cur.touched) {
+      if (cur.phase === "진입 구간") return "진입 구간";
+      if (cur.phase === "이탈") return "이탈";
+      if (cur.phase === "목표 도달") return "대기";
+    }
+    return cur.distance <= near ? "진입 근접" : "대기";
+  }
+
+  /*
+    기대값(참고) % = 승률 × 평균 반등(하락) − (1 − 승률) × 평균 추가하락(추가상승) − 왕복 수수료
+    stats.winRate 는 0~100 (%), fee 는 % 단위 (0.1 = 0.1%)
+  */
+  function expectancy(stats, fee = 0.1) {
+    if (!stats || !stats.count || stats.winRate == null || stats.reboundAvg == null || stats.fallAvg == null) return null;
+    const w = stats.winRate / 100;
+    return w * stats.reboundAvg - (1 - w) * stats.fallAvg - fee;
+  }
+
+  const api = { findPivots, downSwings, upSwings, swingsOf, analyze, touchPhase, applyPrice, label, expectancy, mean, stdErr };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; // node 테스트용
+  else root.FibCore = api;                                                  // 브라우저용
+})(this);
+
+</script>
+<script>
+'use strict';
+const FUT='https://fapi.binance.com/fapi/v1', STABLES=new Set(['USDC','FDUSD','TUSD','BUSD','USDP','DAI','EUR','AEUR','USDE','XUSD','BFUSD','RLUSD','USD1','PYUSD','EURI']);
+const HOUR=3600e3, DAY=24*HOUR, WEEK=7*DAY, WIN=720, MAX_RANK=100, GAP=300, EV_SCALE=5; let abort=false, lastRows=[];
+const $=id=>document.getElementById(id), sleep=ms=>new Promise(r=>setTimeout(r,ms)), clamp=v=>Math.max(-100,Math.min(100,v));
+const avg=a=>{a=a.filter(Number.isFinite);return a.length?a.reduce((s,v)=>s+v,0)/a.length:null}; const pct=v=>v==null?'-':(v>=0?'+':'')+v.toFixed(2)+'%';
+function settings(){let o={};try{o=JSON.parse(localStorage.getItem('main-settings-v1')||'null')||{}}catch(e){}; for(const k of ['n','k','topN','fee']) if(o[k]!=null && Number.isFinite(+o[k])) $(k).value=o[k]}
+async function j(url){const r=await fetch(url);if(!r.ok)throw Error('HTTP '+r.status);return r.json()}
+async function universe(topN){await CoinMeta.load();if(!CoinMeta.hasTop())throw Error('CoinGecko 시총 순위를 받지 못했습니다. 잠시 후 다시 시도하세요.');const rows=await j(FUT+'/ticker/24hr');return rows.filter(x=>x.symbol.endsWith('USDT')&&!x.symbol.includes('_')&&+x.quoteVolume>0).map(x=>({sym:x.symbol.slice(0,-4),vol:+x.quoteVolume})).filter(x=>!STABLES.has(x.sym)&&CoinMeta.isCrypto(x.sym)).filter(x=>{const r=CoinMeta.rank(x.sym);return r&&r<=MAX_RANK}).sort((a,b)=>b.vol-a.vol).slice(0,topN).map(x=>x.sym)}
+function toC(rows){return rows.map(r=>({t:r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4]}))}
+async function history(sym,start,end,onPage){let out=[], cursor=start, guard=0;while(cursor<end&&!abort&&guard++<100){const url=`${FUT}/klines?symbol=${sym}USDT&interval=1h&limit=1500&startTime=${cursor}&endTime=${end}`;const a=await j(url);onPage();if(!a.length)break;out.push(...a);const next=a[a.length-1][0]+HOUR;if(next<=cursor)break;cursor=next;await sleep(GAP)}const seen=new Map();for(const r of out)seen.set(r[0],r);return toC([...seen.values()].sort((a,b)=>a[0]-b[0]))}
+function metrics(cs,o){const L=FibCore.analyze(cs,{n:o.n,k:o.k,direction:'long'}),S=FibCore.analyze(cs,{n:o.n,k:o.k,direction:'short'}),tot=L.stats.count+S.stats.count;const ratio=tot?S.stats.count/tot*100:null,win=L.stats.winRate!=null&&S.stats.winRate!=null?L.stats.winRate-S.stats.winRate:null,el=FibCore.expectancy(L.stats,o.fee),es=FibCore.expectancy(S.stats,o.fee),ev=el!=null&&es!=null?el-es:null;const s=[ratio==null?null:clamp((ratio-50)*2),win==null?null:clamp(win),ev==null?null:clamp(ev/EV_SCALE*100)];return {s,score:avg(s)}}
+function aggregate(list){const s=[0,1,2].map(k=>avg(list.map(x=>x.s[k])));return avg(s)}
+function sliceTo(cs,T){let lo=0,hi=cs.length-1,ans=-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t<=T){ans=m;lo=m+1}else hi=m-1}if(ans<WIN-1)return null;return cs.slice(ans-WIN+1,ans+1)}
+function priceAt(cs,T){let lo=0,hi=cs.length-1,ans=-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t<=T){ans=m;lo=m+1}else hi=m-1}return ans>=0?cs[ans].c:null}
+// 미래 수익률: 정확히 그 시각의 봉이 있고, 이미 마감된 경우에만 계산. 없으면 null (마지막 가격으로 대신하지 않음)
+function closeAtExact(cs,T){let lo=0,hi=cs.length-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t===T)return cs[m].t+HOUR<=Date.now()?cs[m].c:null;if(cs[m].t<T)lo=m+1;else hi=m-1}return null}
+function ret(cs,T,d){const a=closeAtExact(cs,T),b=closeAtExact(cs,T+d*DAY);return a!=null&&b!=null?(b/a-1)*100:null}
+// 4주 변화량 → 시장 모멘텀 5단계 (기준값은 여기서만 바꾸면 됨)
+const MOM_STRONG=30, MOM_MILD=15;
+const MOM_STATES=['강한 개선','개선','중립','악화','강한 악화'];
+function momentum(c){if(c==null||!Number.isFinite(c))return null;if(c>=MOM_STRONG)return '강한 개선';if(c>=MOM_MILD)return '개선';if(c>-MOM_MILD)return '중립';if(c>-MOM_STRONG)return '악화';return '강한 악화'}
+const MOM_ARROW={'강한 개선':'↑','개선':'↗','중립':'→','악화':'↘','강한 악화':'↓'};
+// 4주 변화량 = 지금 점수 − 정확히 4주 전 점수. 4주 전 점수가 없으면 null
+function addChange4w(rows){const byT=new Map(rows.map(r=>[r.T,r]));for(const r of rows){const p=byT.get(r.T-4*WEEK);r.change4w=p?r.score-p.score:null;r.mom=momentum(r.change4w)}return rows}
+function verdict(s){return s>=30?'상승장':s<=-30?'하락장':'횡보'}
+// ── 시장 국면 일치도 검증 ─────────────────────────────────────────
+// BTC 가격은 점수 계산에 쓰지 않고, 점수와 비교하는 독립 기준(benchmark)으로만 씀
+// 각 주의 BTC 상태는 점수와 같은 시점(그 주 시각 T에 열린 봉까지)의 데이터만 사용 → 미래 데이터 없음
+function fiboRegime(s){return s>=30?'bull':s<=-30?'bear':'neutral'}
+const FIBO_KO={bull:'FIBO 상승장',neutral:'FIBO 횡보',bear:'FIBO 하락장'}, BTC_KO={bull:'BTC 상승 추세',neutral:'BTC 중립',bear:'BTC 하락 추세'}, REGS=['bull','neutral','bear'];
+const BTC_RET_TH=5;                                                   // 30일 수익률 ±5% 기준
+function lastIdxAtOrBefore(cs,T){let lo=0,hi=cs.length-1,ans=-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t<=T){ans=m;lo=m+1}else hi=m-1}return ans}
+function closeAtTime(cs,t){let lo=0,hi=cs.length-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t===t)return cs[m].c;if(cs[m].t<t)lo=m+1;else hi=m-1}return null}
+// 일봉 기준 30일 이동평균: 기준 시각에서 24시간 간격으로 30개 종가 평균 (하나라도 없으면 null)
+function ma30At(cs,t){let sum=0;for(let d=0;d<30;d++){const c=closeAtTime(cs,t-d*DAY);if(c==null)return null;sum+=c}return sum/30}
+function btcState(cs,T){
+  const i=lastIdxAtOrBefore(cs,T);if(i<0)return {};
+  const t0=cs[i].t, p=cs[i].c;                                        // t0 <= T (미래 봉 없음)
+  const p30=closeAtTime(cs,t0-30*DAY), p28=closeAtTime(cs,t0-28*DAY);
+  const r30=p30!=null?(p/p30-1)*100:null, r4w=p28!=null?(p/p28-1)*100:null;
+  const m0=ma30At(cs,t0), m7=ma30At(cs,t0-7*DAY);
+  const slope=m0!=null&&m7!=null?(m0/m7-1)*100:null;                  // 7일 전 MA30 대비 %
+  const A=r30==null?null:r30>BTC_RET_TH?1:r30<-BTC_RET_TH?-1:0;
+  const B=m0==null?null:p>m0?1:p<m0?-1:0;
+  const C=m0==null||m7==null?null:m0>m7?1:m0<m7?-1:0;
+  const sc=A==null||B==null||C==null?null:A+B+C;
+  return {btcAsOf:t0,btc30dReturn:r30,btc4wReturn:r4w,btcMA30:m0,btcMA30Slope:slope,btcRegimeScore:sc,btcRegime:sc==null?null:sc>=2?'bull':sc<=-2?'bear':'neutral'};
+}
+// 점수 구간 (경계 중복 없음): ≥40 / 20~40 / 0~20 / -20~0 / -40~-20 / ≤-40
+const SCORE_BINS=[['+40 이상',s=>s>=40],['+20 ~ +40 미만',s=>s>=20&&s<40],['0 ~ +20 미만',s=>s>=0&&s<20],['-20 ~ 0 미만',s=>s>=-20&&s<0],['-40 초과 ~ -20 미만',s=>s>-40&&s<-20],['-40 이하',s=>s<=-40]];
+const f1=v=>v==null||!Number.isFinite(v)?'-':v.toFixed(1)+'%', sg=v=>v==null||!Number.isFinite(v)?'-':(v>=0?'+':'')+v.toFixed(2)+'%';
+const td=(label,html,c='')=>`<td data-label="${label}" class="${c}">${html}</td>`;
+function shares(list){const n=list.length;const c=r=>list.filter(x=>x.btcRegime===r).length;return {n,bull:n?c('bull')/n*100:null,neutral:n?c('neutral')/n*100:null,bear:n?c('bear')/n*100:null}}
+function renderRegime(rows){
+  rows.forEach(r=>r.fiboRegime=fiboRegime(r.score));
+  const V=rows.filter(r=>r.btcRegime), N=V.length, same=V.filter(r=>r.fiboRegime===r.btcRegime).length;
+  const D=V.filter(r=>r.fiboRegime!=='neutral'), dSame=D.filter(r=>r.fiboRegime===r.btcRegime).length, dNeu=D.filter(r=>r.btcRegime==='neutral').length, dOpp=D.length-dSame-dNeu;
+  const p=(a,b)=>b?(a/b*100).toFixed(1)+'%':'-';
+  $('rgAll').innerHTML=`<div class="kpi">전체 일치율<b>${p(same,N)}</b><span class="muted small">${same} / ${N}주</span></div><div class="kpi">제외된 주<b>${rows.length-N}</b><span class="muted small">BTC 기준 계산에 필요한 과거 데이터 부족</span></div>`;
+  $('rgDir').innerHTML=`<div class="kpi">방향 판정 표본<b>${D.length}</b><span class="muted small">FIBO 상승장·하락장인 주</span></div><div class="kpi">같은 방향<b>${p(dSame,D.length)}</b><span class="muted small">${dSame}주</span></div><div class="kpi">BTC 중립<b>${p(dNeu,D.length)}</b><span class="muted small">${dNeu}주</span></div><div class="kpi">반대 방향<b>${p(dOpp,D.length)}</b><span class="muted small">${dOpp}주</span></div>`;
+  // Confusion Matrix
+  let tot=0;const cell=(f,b)=>V.filter(r=>r.fiboRegime===f&&r.btcRegime===b).length;
+  $('rgCm').innerHTML=REGS.map(f=>{const cs=REGS.map(b=>cell(f,b));tot+=cs.reduce((a,b)=>a+b,0);return `<tr><td>${FIBO_KO[f]}</td>${cs.map((c,j)=>`<td class="${f===REGS[j]?'hit':''}">${c}</td>`).join('')}<td class="muted">${cs.reduce((a,b)=>a+b,0)}</td></tr>`}).join('')
+    +`<tr><td class="muted">합계</td>${REGS.map(b=>`<td class="muted">${V.filter(r=>r.btcRegime===b).length}</td>`).join('')}<td><b>${tot}</b></td></tr>`;
+  $('rgCmNote').textContent=`행 = FIBO 판정, 열 = BTC 국면. 표 합계 ${tot}주 = 유효 표본 ${N}주.`;
+  // FIBO 판정별 BTC 상태
+  $('rgByFibo').innerHTML=REGS.map(f=>{const s=shares(V.filter(r=>r.fiboRegime===f));return `<tr>${td('FIBO 판정',FIBO_KO[f])}${td('표본',s.n)}${td('BTC 상승 추세',f1(s.bull))}${td('BTC 중립',f1(s.neutral))}${td('BTC 하락 추세',f1(s.bear))}</tr>`}).join('');
+  // 점수 구간별
+  $('rgBins').innerHTML=SCORE_BINS.map(([lab,fn])=>{const L=V.filter(r=>fn(r.score)),s=shares(L),a=avg(L.map(r=>r.btc30dReturn));return `<tr>${td('점수 구간',lab)}${td('표본',s.n)}${td('평균 BTC 30일 수익률',sg(a),cls(a))}${td('BTC 상승 추세',f1(s.bull))}${td('BTC 중립',f1(s.neutral))}${td('BTC 하락 추세',f1(s.bear))}</tr>`}).join('');
+  // 상관관계
+  const cr=(a,b)=>{const n=a.filter((x,i)=>Number.isFinite(x)&&Number.isFinite(b[i])).length,c=corr(a,b);return `${c==null?'-':c.toFixed(3)} <span class="muted small">(n=${n})</span>`};
+  $('rgCorr').innerHTML=[['marketScore vs BTC 지난 30일 수익률',cr(rows.map(r=>r.score),rows.map(r=>r.btc30dReturn))],['marketScore vs btcRegimeScore',cr(rows.map(r=>r.score),rows.map(r=>r.btcRegimeScore))],['change4w vs BTC 지난 4주 수익률',cr(rows.map(r=>r.change4w),rows.map(r=>r.btc4wReturn))]]
+    .map(([k,v])=>`<tr>${td('항목',k)}${td('Pearson r',v)}</tr>`).join('');
+  // 주간 원자료
+  $('rgRaw').innerHTML=rows.map(r=>`<tr>${td('날짜',new Date(r.T).toLocaleDateString('ko-KR'))}${td('marketScore',r.score.toFixed(1),cls(r.score))}${td('FIBO 판정',FIBO_KO[r.fiboRegime].replace('FIBO ',''))}${td('BTC',r.btc!=null?r.btc.toFixed(0):'-')}${td('BTC 30일',sg(r.btc30dReturn),cls(r.btc30dReturn))}${td('MA30',r.btcMA30!=null?r.btcMA30.toFixed(0):'-')}${td('MA30 기울기',sg(r.btcMA30Slope),cls(r.btcMA30Slope))}${td('BTC 점수',r.btcRegimeScore??'-')}${td('BTC 국면',r.btcRegime?BTC_KO[r.btcRegime].replace('BTC ',''):'-')}</tr>`).join('');
+}
+function cross(prev,cur){const e=[];if(prev<30&&cur>=30)e.push('+30 진입');if(prev>=30&&cur<30)e.push('+30 이탈');if(prev<=0&&cur>0)e.push('0 상향돌파');if(prev>=0&&cur<0)e.push('0 하향돌파');if(prev>-30&&cur<=-30)e.push('-30 진입');if(prev<=-30&&cur>-30)e.push('-30 이탈');return e}
+function corr(a,b){const pairs=a.map((x,i)=>[x,b[i]]).filter(p=>p.every(Number.isFinite));if(pairs.length<3)return null;const ax=avg(pairs.map(p=>p[0])),bx=avg(pairs.map(p=>p[1]));let n=0,da=0,db=0;for(const [x,y] of pairs){n+=(x-ax)*(y-bx);da+=(x-ax)**2;db+=(y-bx)**2}return da&&db?n/Math.sqrt(da*db):null}
+function lagCorr(rows){const out=[];for(let lag=-4;lag<=4;lag++){const a=[],b=[];for(let i=0;i<rows.length;i++){const j=i+lag;if(j<0||j>=rows.length)continue;a.push(rows[i].score);b.push(rows[j].btcRet7)}out.push({lag,c:corr(a,b)})}return out.sort((x,y)=>Math.abs(y.c||0)-Math.abs(x.c||0))[0]}
+function stats(vals){vals=vals.filter(Number.isFinite);return {n:vals.length,mean:avg(vals),up:vals.length?vals.filter(x=>x>0).length/vals.length*100:null}}
+function cls(v){return v>0?'pos':v<0?'neg':''}
+function draw(rows){lastRows=rows;$('results').hidden=false;addChange4w(rows);const current=rows.at(-1), changes=current.change4w,best=lagCorr(rows);$('kpis').innerHTML=`<div class="kpi">현재 점수<b class="${cls(current.score)}">${current.score.toFixed(1)}</b></div><div class="kpi">현재 판정<b>${verdict(current.score)}</b></div><div class="kpi">4주 변화<b class="${cls(changes)}">${changes==null?'-':(changes>=0?'+':'')+changes.toFixed(1)}</b></div><div class="kpi">시장 모멘텀<b>${current.mom?current.mom+' '+MOM_ARROW[current.mom]:'-'}</b></div><div class="kpi">주간 표본<b>${rows.length}</b></div>`;
+const horizons=[1,3,7,14,30], map={};for(let i=1;i<rows.length;i++)for(const e of cross(rows[i-1].score,rows[i].score)){(map[e]??=[]).push(rows[i])}const order=['+30 진입','+30 이탈','0 상향돌파','0 하향돌파','-30 진입','-30 이탈'];$('events').innerHTML=order.map(e=>{const rs=map[e]||[];return `<tr><td>${e}</td><td>${rs.length}</td>`+horizons.map(h=>{const s=stats(rs.map(r=>r['r'+h]));return `<td class="${cls(s.mean)}">${pct(s.mean)} / ${s.up==null?'-':s.up.toFixed(0)+'%'}</td>`}).join('')+'</tr>'}).join('');
+$('regimes').innerHTML=['상승장','횡보','하락장'].map(v=>{const rs=rows.filter(r=>verdict(r.score)===v),s7=stats(rs.map(r=>r.r7)),s30=stats(rs.map(r=>r.r30));return `<tr><td>${v}</td><td>${rs.length}</td><td class="${cls(s7.mean)}">${pct(s7.mean)}</td><td>${s7.up==null?'-':s7.up.toFixed(0)+'%'}</td><td class="${cls(s30.mean)}">${pct(s30.mean)}</td><td>${s30.up==null?'-':s30.up.toFixed(0)+'%'}</td></tr>`}).join('');
+$('moms').innerHTML=MOM_STATES.map(m=>{const rs=rows.filter(r=>r.mom===m);return `<tr><td>${m} ${MOM_ARROW[m]}</td><td>${rs.length}</td>`+horizons.map(h=>{const s=stats(rs.map(r=>r['r'+h]));return `<td class="${cls(s.mean)}">${pct(s.mean)} / ${s.up==null?'-':s.up.toFixed(0)+'%'} <span class="muted">(${s.n})</span></td>`}).join('')+'</tr>'}).join('');
+$('momNote').textContent=`4주 전 점수가 없는 처음 ${rows.filter(r=>r.change4w==null).length}주는 제외했습니다. 각 칸의 (숫자)는 그 기간 미래 데이터가 있는 표본 수입니다.`;
+$('raw').innerHTML=rows.map(r=>`<tr><td>${new Date(r.T).toLocaleDateString('ko-KR')}</td><td class="${cls(r.score)}">${r.score.toFixed(1)}</td><td>${verdict(r.score)}</td><td class="${cls(r.change4w)}">${r.change4w==null?'-':(r.change4w>=0?'+':'')+r.change4w.toFixed(1)}</td><td>${r.mom||'-'}</td><td>${r.n}</td><td>${r.btc.toFixed(0)}</td></tr>`).join('');$('lag').textContent=best&&best.c!=null?`참고: 시장점수와 BTC 향후 7일 수익률의 주간 시차 상관 중 절대값 최대는 ${best.lag>0?'+':''}${best.lag}주, r=${best.c.toFixed(3)}입니다. 상관은 인과관계를 뜻하지 않습니다.`:'';renderRegime(rows);drawChart(rows)}
+function drawChart(rows){const c=$('chart'),ctx=c.getContext('2d'),W=c.width,H=c.height,p={l:48,r:64,t:20,b:32};ctx.clearRect(0,0,W,H);const minB=Math.min(...rows.map(r=>r.btc)),maxB=Math.max(...rows.map(r=>r.btc)),x=i=>p.l+i/(rows.length-1)*(W-p.l-p.r),ys=s=>p.t+(100-s)/200*(H-p.t-p.b),yb=b=>p.t+(maxB-b)/(maxB-minB||1)*(H-p.t-p.b);ctx.font='11px sans-serif';ctx.fillStyle='#8b93a1';for(const v of [-100,-30,0,30,100]){ctx.strokeStyle='#343945';ctx.beginPath();ctx.moveTo(p.l,ys(v));ctx.lineTo(W-p.r,ys(v));ctx.stroke();ctx.fillText(v,p.l-34,ys(v)+4)}ctx.strokeStyle='#f2a900';ctx.lineWidth=1.5;ctx.beginPath();rows.forEach((r,i)=>{const X=x(i),Y=yb(r.btc);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});ctx.stroke();ctx.strokeStyle='#5b8cff';ctx.lineWidth=2.5;ctx.beginPath();rows.forEach((r,i)=>{const X=x(i),Y=ys(r.score);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});ctx.stroke();ctx.fillStyle='#8b93a1';ctx.fillText('시장점수',p.l,12);ctx.fillText('BTC',W-p.r-20,12)}
+$('csv').onclick=()=>{const h=['date','score','regime','coins','btc','r1','r3','r7','r14','r30','marketScore','change4w','momentumState','marketState','btcPrice','fiboRegime','btc30dReturn','btcMA30','btcMA30Slope','btcRegimeScore','btcRegime'];const v=x=>x==null||(typeof x==='number'&&!Number.isFinite(x))?'':x;const s=[h.join(','),...lastRows.map(r=>[new Date(r.T).toISOString(),r.score,verdict(r.score),r.n,r.btc,r.r1,r.r3,r.r7,r.r14,r.r30,r.score,r.change4w,r.mom,verdict(r.score),r.btc,r.fiboRegime,r.btc30dReturn,r.btcMA30,r.btcMA30Slope,r.btcRegimeScore,r.btcRegime].map(v).join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));a.download='market_direction_backtest.csv';a.click();URL.revokeObjectURL(a.href)};
+$('stop').onclick=()=>abort=true;
+$('run').onclick=async()=>{abort=false;if(typeof CoinMeta==='undefined'){alert('CoinMeta 로딩 실패');return;}if(typeof FibCore==='undefined'){alert('FibCore 로딩 실패');return;}$('run').disabled=true;$('stop').disabled=false;$('results').hidden=true;try{const o={months:+$('months').value,topN:+$('topN').value,n:+$('n').value,k:+$('k').value,fee:+$('fee').value};const now=Date.now(), testStart=now-o.months*30.4375*DAY, dataStart=testStart-35*DAY, end=now+31*DAY; $('status').textContent='대상 코인 목록을 불러오는 중...';const syms=await universe(o.topN);if(!syms.includes('BTC'))syms.unshift('BTC');const estPages=Math.ceil((end-dataStart)/(1500*HOUR))*syms.length;let pages=0;const all={};for(let i=0;i<syms.length&&!abort;i++){const sym=syms[i];$('status').textContent=`데이터 받는 중 ${i+1}/${syms.length} · ${sym}\n요청 ${pages}/${estPages}`;all[sym]=await history(sym,sym==='BTC'?dataStart-10*DAY:dataStart,end,()=>{$('bar').style.width=Math.min(70,pages++/estPages*70)+'%'});await sleep(GAP)}if(abort)throw Error('사용자가 중단했습니다.');const btcFull=all.BTC||[];all.BTC=btcFull.filter(c=>c.t>=dataStart);const btc=all.BTC;if(!btc||btc.length<WIN)throw Error('BTC 데이터가 부족합니다.');const points=[];let T=testStart;T-=T%WEEK;const totalPts=Math.floor((now-T)/WEEK)+1;let pi=0;for(;T<=now&&!abort;T+=WEEK){const list=[];for(const sym of syms){if(sym==='BTC'&&o.topN<1)continue;const cs=sliceTo(all[sym]||[],T);if(!cs)continue;try{list.push(metrics(cs,o))}catch(e){}}const score=aggregate(list);if(Number.isFinite(score)){const row={T,score,n:list.length,btc:priceAt(btc,T)};Object.assign(row,btcState(btcFull,T));for(const d of [1,3,7,14,30])row['r'+d]=ret(btc,T,d);row.btcRet7=row.r7;points.push(row)}pi++;$('bar').style.width=(70+pi/totalPts*30)+'%';$('status').textContent=`점수 계산 중 ${pi}/${totalPts} · ${new Date(T).toLocaleDateString('ko-KR')}`;await new Promise(r=>setTimeout(r,0))}if(abort)throw Error('사용자가 중단했습니다.');draw(points);$('bar').style.width='100%';$('status').textContent=`완료 · ${syms.length}개 심볼 데이터 · ${points.length}개 주간 점수`; }catch(e){$('status').textContent='중단/오류: '+e.message}finally{$('run').disabled=false;$('stop').disabled=true}};
+settings();
+</script></body></html>
