@@ -11,6 +11,19 @@
   const KST = 9 * 3600;   // 차트 시간을 한국 시간으로 보이게 9시간 더함
 
   let chart = null, series = null, lines = [];
+  let drawnR = null, drawnKey = null, lastN = 0, lastFirstT = 0;   // 지금 그려진 분석 결과 / 코인+봉 단위 / 캔들 수 / 첫 캔들 시각
+  const T = c => Math.floor(c.t / 1000) + KST;
+
+  // 화살표 표시 만들기: 과거 터치 ("터치") + 지금 스윙에서 진입가에 닿은 봉 (초록색 "진입", 과거 기록보다 우선)
+  function buildMarkers(r) {
+    const cs = r.candles, cur = r.current, short = r.direction === "short";
+    const pos = short ? "aboveBar" : "belowBar", shape = short ? "arrowDown" : "arrowUp";
+    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: pos, color: cssVar("--accent"), shape, text: "터치" }));
+    const now = cur && cur.touched && cur.touchIdx != null && cs[cur.touchIdx]
+      ? [{ time: T(cs[cur.touchIdx]), position: pos, color: cssVar("--accent"), shape, text: "진입", size: 2 }] : [];
+    const seen = new Set();
+    return now.concat(past).filter(m => !seen.has(m.time) && seen.add(m.time)).sort((a, b) => a.time - b.time);
+  }
 
   // 가격 크기에 맞춰 소수점 자릿수 정하기
   function precisionFor(price, krw) {
@@ -41,7 +54,8 @@
     }
 
     const cs = r.candles, cur = r.current, short = r.direction === "short";
-    const T = c => Math.floor(c.t / 1000) + KST;
+    const key = r.market + "|" + (cs.length > 1 ? cs[1].t - cs[0].t : 0);
+    const prev = chart.timeScale().getVisibleLogicalRange(), sameChart = key === drawnKey && prev;
     const p = precisionFor(r.price, opts.krw);
     series.applyOptions({ priceFormat: { type: "price", precision: p, minMove: Math.pow(10, -p) } });
     series.setData(cs.map(c => ({ time: T(c), open: c.o, high: c.h, low: c.l, close: c.c })));
@@ -60,23 +74,37 @@
       add(cur.expected, cssVar("--accent"), short ? "예상 하락" : "예상 반등", 1, 1);
     }
 
-    // 과거 -1 터치 지점 ▲(숏은 ▼) 표시 (시간 순서대로 넣어야 함)
-    const seen = new Set();
-    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: short ? "aboveBar" : "belowBar", color: cssVar("--accent"), shape: short ? "arrowDown" : "arrowUp", text: "터치" }));
-    // 지금 스윙에서 진입가에 닿은 봉 → 초록색 "진입" 표시 (과거 기록보다 우선)
-    const now = cur && cur.touched && cur.touchIdx != null && cs[cur.touchIdx]
-      ? [{ time: T(cs[cur.touchIdx]), position: short ? "aboveBar" : "belowBar", color: cssVar("--accent"), shape: short ? "arrowDown" : "arrowUp", text: "진입", size: 2 }] : [];
-    const markers = now.concat(past)
-      .filter(m => !seen.has(m.time) && seen.add(m.time))
-      .sort((a, b) => a.time - b.time);
-    series.setMarkers(markers);
+    series.setMarkers(buildMarkers(r));
 
     // 이전 코인에서 가격 눈금을 손으로 늘리거나 줄였으면 자동 맞춤이 꺼져 있음 → 코인 바뀔 때마다 다시 켜기
     chart.priceScale("right").applyOptions({ autoScale: true });
 
-    // 최근 300개 봉이 보이게 (마우스 휠·드래그로 과거도 볼 수 있음)
     const n = cs.length;
-    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 300), to: n + 5 });
+    if (sameChart) {
+      // 같은 코인을 다시 그릴 때는 보던 위치를 유지: 오른쪽 끝을 보고 있었으면 끝에서의 거리를, 과거를 보고 있었으면 같은 봉들을 그대로
+      const step = cs.length > 1 ? cs[1].t - cs[0].t : 1, dropped = Math.round((cs[0].t - lastFirstT) / step);
+      const atEnd = prev.to >= lastN - 1;
+      const shift = atEnd ? n - lastN : -dropped;
+      chart.timeScale().setVisibleLogicalRange({ from: prev.from + shift, to: prev.to + shift });
+    } else {
+      // 최근 300개 봉이 보이게 (마우스 휠·드래그로 과거도 볼 수 있음)
+      chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 300), to: n + 5 });
+    }
+    drawnR = r; drawnKey = key; lastN = n; lastFirstT = cs[0].t;
+  }
+
+  // 실시간 가격으로 마지막 캔들만 갱신 (봉이 바뀌었으면 새 캔들 추가). r 은 draw 로 그린 그 결과여야 함
+  function live(r, px, unitMs) {
+    if (!series || r !== drawnR || !r.candles.length) return;
+    const cs = r.candles, barT = Math.floor(Date.now() / unitMs) * unitMs;
+    let last = cs[cs.length - 1];
+    if (barT > last.t) { last = { t: barT, o: px, h: px, l: px, c: px }; cs.push(last); lastN = cs.length; }
+    else if (barT === last.t) { last.h = Math.max(last.h, px); last.l = Math.min(last.l, px); last.c = px; }
+    else return;
+    series.update({ time: T(last), open: last.o, high: last.h, low: last.l, close: last.c });
+    // 방금 진입가에 닿았으면 이 캔들에 바로 "진입" 화살표
+    const cur = r.current;
+    if (cur && cur.touched && cur.touchIdx == null) { cur.touchIdx = cs.length - 1; series.setMarkers(buildMarkers(r)); }
   }
 
   // ── 트레이딩뷰 위젯 ────────────────────────────────────────────
@@ -104,5 +132,5 @@
     });
   }
 
-  window.FiboChart = { draw, tradingView };
+  window.FiboChart = { draw, live, tradingView };
 })();

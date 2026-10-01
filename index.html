@@ -339,10 +339,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261001220704"></script>
-<script src="chart.js?v=20261001220704"></script>
-<script src="nav.js?v=20261001220704"></script>
-<script src="meta.js?v=20261001220704"></script>
+<script src="fib-core.js?v=20261001221553"></script>
+<script src="chart.js?v=20261001221553"></script>
+<script src="nav.js?v=20261001221553"></script>
+<script src="meta.js?v=20261001221553"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -1023,6 +1023,7 @@ const Live = (() => {
       const before = r.price, oldBadge = badge(r.current);
       applyPrice(r, px);
       if (px === before) continue;
+      if (coin === openCoin && view === "lw") FiboChart.live(r, px, unitMs());   // 펼쳐 둔 차트의 마지막 캔들 실시간 갱신
       changed = true;
       const c = r.current, dir = px > before ? 1 : -1, newBadge = badge(c);
       const targets = [$("tbody").querySelector(`tr[data-m="${coin}"]`), $("cards").querySelector(`.ccard[data-m="${coin}"]`)];
