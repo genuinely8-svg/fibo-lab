@@ -3,28 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261002013440"></script>
+<script src="theme.js?v=20261002014912"></script>
 <title>시장 방향</title>
-<link rel="stylesheet" href="common.css?v=20261002013440">
+<link rel="stylesheet" href="common.css?v=20261002014912">
 <style>
   :root{ --btc:#f59e0b }
   /* 상단 핵심 카드 */
-  .top{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
-  .topL{flex:1 1 300px;min-width:0}
-  .topR{flex:1 1 260px;max-width:340px;margin:0 auto;min-width:0}
-  .bar1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .head1{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:6px}
   #run{padding:6px 12px;font-size:13px}
-  .bigscore{font-size:64px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;margin:6px 0 4px;letter-spacing:-.02em}
-  .state{font-size:20px;font-weight:700}
+  .hero{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 24px;margin-top:6px}
+  .bigscore{font-size:64px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .state{font-size:20px;font-weight:700;margin-top:6px}
   .official{font-size:12px;color:var(--muted);margin-top:4px}
-  .mom{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-  .mom .k{font-size:12px;color:var(--muted);width:100%}
-  .mom .num{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
-  .mom .lab{font-size:15px;font-weight:700}
-  .interp{margin-top:12px;font-size:14px;line-height:1.6;padding-left:10px;border-left:3px solid var(--line)}
-  #gauge{width:100%;height:auto;display:block}
-  .gcap{text-align:center;color:var(--muted);font-size:11px;margin-top:2px}
+  .dirbox{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);min-width:220px}
+  .dirbox .arrow{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:800;border:1.5px solid currentColor;flex:none}
+  .dirbox .k{font-size:12px;color:var(--muted)}
+  .dirbox .lab{font-size:18px;font-weight:800;margin-top:1px}
+  .dirbox .sub{font-size:12px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+  /* 가로 스케일 */
+  .scale{position:relative;height:92px;margin:26px 6px 4px}
+  .scale .track{position:absolute;left:0;right:0;top:40px;height:8px;border-radius:4px;overflow:hidden;display:flex}
+  .scale .track i{display:block;height:100%}
+  .scale .tk{position:absolute;top:52px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:center}
+  .scale .tk::before{content:"";display:block;width:1px;height:5px;background:var(--muted);margin:0 auto 3px;opacity:.6}
+  .scale .tk.z{color:var(--text)}
+  .scale .zl{position:absolute;top:74px;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}
+  .scale .trail{position:absolute;top:43px;height:2px;border-radius:1px}
+  .scale .past{position:absolute;top:44px;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);background:var(--card);border:1.5px solid}
+  .scale .head{position:absolute;top:44px;width:0;height:0;transform:translate(-50%,-50%)}
+  .scale .knob{position:absolute;top:44px;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);background:var(--card);border:3px solid;box-shadow:0 0 0 4px var(--card)}
+  .scale .pill{position:absolute;top:2px;transform:translateX(-50%);padding:3px 9px;border-radius:999px;font-size:13px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .scale .pill::after{content:"";position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);border:5px solid transparent;border-bottom:0;border-top-color:inherit}
+  .scale .over{position:absolute;top:36px;font-size:11px;font-weight:700}
+  .scap{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
+  .interp{margin-top:14px;font-size:14px;line-height:1.6;padding-left:10px;border-left:3px solid var(--line)}
+  #tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
   .tile .k{display:flex;align-items:center;gap:6px}
   .dir{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px}
   .mini{position:relative;flex:1;min-width:60px;height:6px;border-radius:3px;background:var(--line)}
@@ -49,7 +63,10 @@
   details.about p{margin:8px 0 0}
   @media (max-width:600px){
     .bigscore{font-size:56px}
-    .topR{max-width:300px}
+    .dirbox{width:100%}
+    #tiles{grid-template-columns:1fr}
+    .scale .zl{display:none}
+    .scale{height:76px}
   }
 </style>
 </head>
@@ -59,18 +76,22 @@
   <nav id="nav"></nav>
 
   <div class="card" id="topCard">
-    <div class="top">
-      <div class="topL">
-        <div class="bar1"><span class="eyebrow">MARKET SCORE <button class="help" id="hScore" type="button" title="설명">?</button></span><button id="run" type="button">다시 분석</button></div>
-        <div class="helptxt" id="hScoreTxt" hidden>코인마다 위쪽·아래쪽 피보나치 확장 레벨 반응을 모두 분석해 세 요소를 −100~+100으로 맞추고 평균낸 값이에요. 공식 판정은 +30 이상 상승장, −30 이하 하락장, 그 사이는 횡보예요.</div>
+    <div class="head1"><span class="eyebrow">MARKET SCORE <button class="help" id="hScore" type="button" title="설명">?</button></span><button id="run" type="button">다시 분석</button></div>
+    <div class="helptxt" id="hScoreTxt" hidden>코인마다 위쪽·아래쪽 피보나치 확장 레벨 반응을 모두 분석해 세 요소를 −100~+100으로 맞추고 평균낸 값이에요. 공식 판정은 +30 이상 상승장, −30 이하 하락장, 그 사이는 횡보예요. 실제로는 대부분 −60~+60 사이에서 움직여서, 아래 스케일도 그 범위로 보여줘요.</div>
+    <div class="hero">
+      <div>
         <div class="bigscore" id="vScore">-</div>
         <div class="state" id="vWord">분석 중…</div>
         <div class="official" id="vSub"></div>
-        <div class="mom"><span class="k">4주 변화 <span class="muted">(지금 점수 − 4주 전 점수)</span></span><span class="num" id="mNum">-</span><span class="lab" id="mLab"></span></div>
-        <div class="interp" id="interp">현재 시장 해석을 계산하고 있어요.</div>
       </div>
-      <div class="topR"><svg id="gauge" viewBox="0 0 300 180" role="img" aria-label="Market Score 게이지"></svg><div class="gcap">최근 30일 기준 · −100 ~ +100</div></div>
+      <div class="dirbox" id="dirBox">
+        <div class="arrow" id="dArrow">·</div>
+        <div><div class="k">점수 진행 방향 · 최근 4주</div><div class="lab" id="dLab">-</div><div class="sub" id="dSub"></div></div>
+      </div>
     </div>
+    <div class="scale" id="scale"></div>
+    <div class="scap" id="scap"></div>
+    <div class="interp" id="interp">현재 시장 해석을 계산하고 있어요.</div>
     <div class="status" id="status">준비 중…</div>
     <div class="prog" id="progWrap"><i id="prog"></i></div>
     <div class="status" id="setSum" style="margin-top:4px"></div>
@@ -105,10 +126,10 @@
   <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식(FibCore)으로 위쪽·아래쪽 양방향을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
 </div>
 
-<script src="common.js?v=20261002013440"></script>
-<script src="nav.js?v=20261002013440"></script>
-<script src="meta.js?v=20261002013440"></script>
-<script src="fib-core.js?v=20261002013440"></script>
+<script src="common.js?v=20261002014912"></script>
+<script src="nav.js?v=20261002014912"></script>
+<script src="meta.js?v=20261002014912"></script>
+<script src="fib-core.js?v=20261002014912"></script>
 <script>
 "use strict";
 const FUT = "https://fapi.binance.com/fapi/v1";
@@ -189,12 +210,12 @@ const levelOf = s => s == null ? ["-", FLAT, 0] : LEVELS.find(([f]) => f(s)).sli
 // 4주 변화 글자 (경계 중복 없음): ≥+20 / +10 이상 +20 미만 / −10 초과 +10 미만 / −20 초과 −10 이하 / ≤−20
 const MOM_STRONG = 20, MOM_MILD = 10;
 function momOf(c) {
-  if (c == null || !isFinite(c)) return ["-", FLAT, 0];
-  if (c >= MOM_STRONG) return ["강한 개선 ↑", GREEN, 2];
-  if (c >= MOM_MILD) return ["개선 ↑", GREEN, 1];
-  if (c > -MOM_MILD) return ["중립 →", "var(--text)", 0];
-  if (c > -MOM_STRONG) return ["악화 ↓", RED, -1];
-  return ["강한 악화 ↓", RED, -2];
+  if (c == null || !isFinite(c)) return ["-", FLAT, 0, "·"];
+  if (c >= MOM_STRONG) return ["빠른 상승 방향", GREEN, 2, "↑"];
+  if (c >= MOM_MILD) return ["상승 방향", GREEN, 1, "↗"];
+  if (c > -MOM_MILD) return ["보합", "var(--text)", 0, "→"];
+  if (c > -MOM_STRONG) return ["하락 방향", RED, -1, "↘"];
+  return ["빠른 하락 방향", RED, -2, "↓"];
 }
 // 현재 시장 해석 (정해진 규칙으로 1~2문장. 미래 전망 없음)
 function interpret(score, chg) {
@@ -211,31 +232,42 @@ const HELP = [
   ["기대값 우위", "각 Fibonacci 반응 이후 실제 가격 움직임의 평균적인 우위를 비교합니다. 아래쪽 레벨 반응의 기대값 − 위쪽 레벨 반응의 기대값 (%p, 수수료 포함). ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
 ];
 const compDir = v => v == null ? ["-", FLAT] : v >= 30 ? ["상승 우위", GREEN] : v <= -30 ? ["하락 우위", RED] : ["중립", "var(--text)"];
-function drawGauge(score) {
-  const cx = 150, cy = 152, R = 118, W = 22;
-  const pt = (v, r) => { const a = Math.PI * (1 - (v + 100) / 200); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
-  const arc = (a, b, col, op) => { const [x1, y1] = pt(a, R), [x2, y2] = pt(b, R), [x3, y3] = pt(b, R - W), [x4, y4] = pt(a, R - W);
-    return `<path d="M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${R - W} ${R - W} 0 0 0 ${x4} ${y4}Z" fill="${col}" opacity="${op}"/>`; };
-  let s = arc(-100, -40, RED, .85) + arc(-40, -30, RED, .45) + arc(-30, 30, FLAT, .3) + arc(30, 40, GREEN, .45) + arc(40, 100, GREEN, .85);
-  for (const v of [-100, -40, -30, 0, 30, 40, 100]) {
-    const [a1, b1] = pt(v, R + 1), [a2, b2] = pt(v, R + 6), far = Math.abs(v) === 40 ? 24 : 15, [x, y] = pt(v, R + far);
-    s += `<line x1="${a1}" y1="${b1}" x2="${a2}" y2="${b2}" stroke="var(--muted)" stroke-width="1"/><text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:var(--muted);font-size:10px">${v > 0 ? "+" + v : v}</text>`;
+// 가로 스케일: 실제 점수는 대부분 ±60 안이라 −60~+60만 보여줌 (넘으면 끝에 붙이고 표시)
+const SMAX = 60;
+const pos = v => (Math.max(-SMAX, Math.min(SMAX, v)) + SMAX) / (2 * SMAX) * 100;
+const mix = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+function drawScale(score, trail, chg) {
+  const el = $("scale"); if (score == null) { el.innerHTML = ""; return; }
+  const zones = [[-60, -40, mix(RED, 80)], [-40, -30, mix(RED, 40)], [-30, 30, "var(--line)"], [30, 40, mix(GREEN, 40)], [40, 60, mix(GREEN, 80)]];
+  let h = `<div class="track">${zones.map(([a, b, c]) => `<i style="width:${(b - a) / (2 * SMAX) * 100}%;background:${c}"></i>`).join("")}</div>`;
+  for (const v of [-60, -40, -30, 0, 30, 40, 60]) h += `<div class="tk${v === 0 ? " z" : ""}" style="left:${pos(v)}%">${v > 0 ? "+" + v : v === 0 ? "0" : "−" + Math.abs(v)}</div>`;
+  for (const [v, t] of [[-50, "강한 하락"], [-35, "하락"], [0, "중립 / 횡보"], [35, "상승"], [50, "강한 상승"]]) h += `<div class="zl" style="left:${pos(v)}%">${t}</div>`;
+  // 진행 방향 꼬리: 최근 4주 동안 주간 점수가 지나온 길 → 지금 위치
+  const [, mc, md] = momOf(chg), col = md > 0 ? GREEN : md < 0 ? RED : "var(--muted)";
+  const tr = (trail || []).filter(p => p.score != null);
+  if (tr.length > 1) {
+    const x0 = pos(tr[0].score), x1 = pos(score), L = Math.min(x0, x1), W = Math.abs(x1 - x0);
+    h += `<div class="trail" style="left:${L}%;width:${W}%;background:linear-gradient(${x1 >= x0 ? "90deg" : "270deg"},${mix(col === "var(--muted)" ? "var(--muted)" : col, 15)},${col})"></div>`;
+    tr.slice(0, -1).forEach((p, i) => h += `<div class="past" style="left:${pos(p.score)}%;border-color:${col};opacity:${0.35 + 0.5 * i / Math.max(1, tr.length - 2)}" title="${dLab(p.T)} ${sgn(p.score)}"></div>`);
   }
-  if (score != null) {
-    const [nx, ny] = pt(clamp(score), R - W / 2), col = levelOf(score)[1];
-    s += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--text)" stroke-width="2.5" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="6" fill="var(--text)"/><circle cx="${nx}" cy="${ny}" r="7" fill="${col}" stroke="var(--text)" stroke-width="2"/>`;
-  }
-  $("gauge").innerHTML = s;
+  const lc = levelOf(score)[1] === "var(--text)" ? "var(--accent)" : levelOf(score)[1];
+  h += `<div class="knob" style="left:${pos(score)}%;border-color:${lc}"></div>`;
+  h += `<div class="pill" style="left:${Math.max(6, Math.min(94, pos(score)))}%;background:${lc};border-top-color:${lc}">${sgn(score)}</div>`;
+  if (score > SMAX) h += `<div class="over" style="right:-4px;color:${GREEN}">▶</div>`;
+  if (score < -SMAX) h += `<div class="over" style="left:-4px;color:${RED}">◀</div>`;
+  el.innerHTML = h;
+  $("scap").textContent = tr.length > 1 ? `흐린 점은 최근 ${tr.length - 1}주 동안의 주간 점수, 선은 지금까지 움직여 온 길이에요` : "";
 }
-function showTop(agg, nCoins, chg) {
-  drawGauge(agg.score);
+function showTop(agg, nCoins, chg, trail) {
+  drawScale(agg.score, trail, chg);
   const [word, col] = levelOf(agg.score);
   $("vScore").textContent = agg.score == null ? "-" : sgn(agg.score); $("vScore").style.color = col;
   $("vWord").textContent = word; $("vWord").style.color = col;
   $("vSub").textContent = `공식 판정 ${verdictOf(agg.score)[0]} (±30 기준) · ${nCoins}개 코인 평균 · 최근 30일`;
-  const [ml, mc] = momOf(chg);
-  $("mNum").textContent = chg == null ? "-" : sgn(chg); $("mNum").style.color = mc;
-  $("mLab").textContent = ml; $("mLab").style.color = mc;
+  const [ml, mc, , ma] = momOf(chg);
+  $("dArrow").textContent = ma; $("dArrow").style.color = mc;
+  $("dLab").textContent = ml; $("dLab").style.color = mc;
+  $("dSub").textContent = chg == null ? "4주 전 점수가 없어요" : `최근 4주 점수 변화 ${sgn(chg)}`;
   $("interp").textContent = interpret(agg.score, chg);
   $("compCard").hidden = false;
   $("tiles").innerHTML = HELP.map(([name, tip, fmt], j) => { const v = agg.sAvg[j], [dl, dc] = compDir(v), pos = v == null ? 50 : (clamp(v) + 100) / 2;
@@ -259,17 +291,17 @@ function drawLine() {
   const { pts, btc } = lineData, el = $("line");
   const W = Math.max(280, el.clientWidth), H = 260, ml = 34, mr = 54, mt = 12, mb = 26, pw = W - ml - mr, ph = H - mt - mb;
   const t0 = pts[0].T, t1 = pts[pts.length - 1].T, X = t => ml + (t1 === t0 ? pw / 2 : (t - t0) / (t1 - t0) * pw);
-  const Y = v => mt + (100 - v) / 200 * ph;
+  const Y = v => mt + (SMAX - Math.max(-SMAX, Math.min(SMAX, v))) / (2 * SMAX) * ph;   // 세로축 −60~+60 (넘으면 끝에 붙임)
   const bs = btc.filter(c => c.t >= t0 && c.t <= t1);
   const lo = Math.min(...bs.map(c => c.c)), hi = Math.max(...bs.map(c => c.c)), pad = (hi - lo) * 0.08 || 1;
   const YB = v => mt + (1 - (v - (lo - pad)) / (hi - lo + 2 * pad)) * ph;
   let s = `<svg class="ch" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
   // 영역 배경 (옅게): 매우 강한 상승 / 상승 / 중립 / 하락 / 매우 강한 하락
-  for (const [a, b, col, op] of [[100, 40, GREEN, .10], [40, 30, GREEN, .05], [-30, -40, RED, .05], [-40, -100, RED, .10]])
+  for (const [a, b, col, op] of [[60, 40, GREEN, .10], [40, 30, GREEN, .05], [-30, -40, RED, .05], [-40, -60, RED, .10]])
     s += `<rect x="${ml}" width="${pw}" y="${Y(a)}" height="${Y(b) - Y(a)}" fill="${col}" opacity="${op}"/>`;
-  for (const v of [100, 40, 30, 0, -30, -40, -100]) {
-    const key = v === 0 || Math.abs(v) === 30;
-    s += `<line x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v === 0 ? 'stroke-width="1.5"' : key ? 'stroke-dasharray="4 3"' : 'stroke-dasharray="1 3"'}/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`;
+  for (const v of [60, 40, 30, 0, -30, -40, -60]) {
+    const key = v === 0 || Math.abs(v) === 30, edge = Math.abs(v) === SMAX;
+    s += `<line x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v === 0 ? 'stroke-width="1.5"' : key ? 'stroke-dasharray="4 3"' : edge ? 'opacity="0"' : 'stroke-dasharray="1 3"'}/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end">${v > 0 ? "+" + v : v}</text>`;
   }
   for (let i = 0; i <= 4; i++) { const v = lo - pad + (hi - lo + 2 * pad) * i / 4; s += `<text x="${W - mr + 5}" y="${YB(v) + 3}" fill="var(--btc)" style="fill:var(--btc)">${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(0)}</text>`; }
   s += `<polyline fill="none" stroke="var(--btc)" stroke-width="1.5" opacity=".9" points="${bs.filter((_, i) => i % 4 === 0).map(c => X(c.t).toFixed(1) + "," + YB(c.c).toFixed(1)).join(" ")}"/>`;
@@ -288,7 +320,7 @@ function drawLine() {
   const show = i => {
     const p = pts[i]; if (!p || p.score == null) { tip.hidden = true; return; }
     const bi = upTo(btc, p.T), bp = bi >= 0 ? btc[bi].c : null, [lv, lc] = levelOf(p.score), [mlab, mc] = momOf(p.chg);
-    tip.innerHTML = `<div>${new Date(p.T + 9 * HOUR).toISOString().slice(0, 10)}</div><div>Market Score <b style="color:${lc}">${sgn(p.score)}</b></div><div>시장 상태 <b style="color:${lc}">${lv}</b></div><div>4주 변화 <b style="color:${mc}">${p.chg == null ? "-" : sgn(p.chg) + " " + mlab}</b></div><div>BTC <b>${fmtUsd(bp)}</b></div>`;
+    tip.innerHTML = `<div>${new Date(p.T + 9 * HOUR).toISOString().slice(0, 10)}</div><div>Market Score <b style="color:${lc}">${sgn(p.score)}</b></div><div>시장 상태 <b style="color:${lc}">${lv}</b></div><div>진행 방향 <b style="color:${mc}">${p.chg == null ? "-" : mlab + " (4주 " + sgn(p.chg) + ")"}</b></div><div>BTC <b>${fmtUsd(bp)}</b></div>`;
     tip.hidden = false;
     const x = X(p.T), tw = tip.offsetWidth, ww = wrap.clientWidth;
     tip.style.left = Math.max(0, Math.min(ww - tw, x - tw / 2)) + "px";
@@ -361,7 +393,7 @@ async function run() {
     if (!per.length) throw new Error("점수를 계산할 데이터가 부족해요");
     // 4주 변화 = 각 주 점수 − 정확히 4주 전 점수 (화면 표시용, 점수 계산과 무관)
     pts.forEach((p, i) => { const q = pts[i - 4]; p.chg = q && p.score != null && q.score != null && p.T - q.T === 4 * WEEK ? p.score - q.score : null; });
-    showTop(aggregate(per), per.length, pts[pts.length - 1].chg);
+    showTop(aggregate(per), per.length, pts[pts.length - 1].chg, pts.slice(-5));
     barData = per.slice().sort((a, b) => b.score - a.score);
     $("barCard").hidden = false; drawBars();
     lineData = { pts, btc }; $("lineCard").hidden = false; drawLine();
