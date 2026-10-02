@@ -10,7 +10,7 @@
   const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const KST = 9 * 3600;   // 차트 시간을 한국 시간으로 보이게 9시간 더함
 
-  let chart = null, series = null, lines = [];
+  let chart = null, series = null, lines = [], mustShow = [];   // mustShow: 세로 범위에 꼭 넣을 가격들
   let lastEl = null, lastOpts = null, tvArgs = null;   // 모드가 바뀔 때 다시 그리려고 기억해 둠
   const isDark = () => (window.Theme ? Theme.get() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
   let drawnR = null, drawnKey = null, lastN = 0, lastFirstT = 0;   // 지금 그려진 분석 결과 / 코인+봉 단위 / 캔들 수 / 첫 캔들 시각
@@ -52,6 +52,15 @@
       series = chart.addCandlestickSeries({
         upColor: cssVar("--up"), downColor: cssVar("--down"),
         wickUpColor: cssVar("--up"), wickDownColor: cssVar("--down"), borderVisible: false,
+        // 세로 범위에 진입가·예상가가 항상 들어오게 (캔들 범위 밖이어도 자동 맞춤에 포함)
+        autoscaleInfoProvider: original => {
+          const res = original();
+          if (res && res.priceRange && mustShow.length) {
+            res.priceRange.minValue = Math.min(res.priceRange.minValue, ...mustShow);
+            res.priceRange.maxValue = Math.max(res.priceRange.maxValue, ...mustShow);
+          }
+          return res;
+        },
       });
     }
 
@@ -71,10 +80,12 @@
       lines.push(series.createPriceLine({ price, color, title, lineStyle: style, lineWidth: width, axisLabelVisible: true }));
     };
     if (cur && cur.H) add(cur.H, cssVar("--up"), "H", 2, 1);
+    mustShow = [];
     if (cur && cur.level) {
       add(cur.L, cssVar("--down"), "L", 2, 1);
-      add(cur.level, cssVar("--accent"), "진입", 0, 2);
+      add(cur.level, cssVar("--accent"), "진입 " + cur.level.toFixed(p), 0, 2);
       add(cur.expected, cssVar("--accent"), short ? "예상 하락" : "예상 반등", 1, 1);
+      mustShow = [cur.level, cur.expected].filter(v => v != null && isFinite(v));
     }
 
     series.setMarkers(buildMarkers(r));
