@@ -6,6 +6,7 @@
 (function () {
   const TABS = [
     ["index.html", "TEST 참고용"],
+    ["paper.html", "모의투자"],
     ["market.html", "시장 방향"],
     ["liquidation.html", "청산히트맵"],
     ["oi.html", "OI"],
@@ -13,12 +14,13 @@
     ["movers.html", "24시간변동률"],
     ["kimp.html", "김치프리미엄"],
     ["news.html", "주요뉴스"],
-    ["paper.html", "모의투자"],
   ];
   const style = document.createElement("style");
   style.textContent = `
     .navwrap{display:flex;align-items:stretch;margin:0 0 16px}
-    .navtabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
+    /* overflow-y:hidden — 가로 스크롤 칸이 손가락 따라 위아래로 흔들리지 않게 (아이폰) */
+    .navtabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+             border-bottom:1px solid var(--line);scrollbar-width:none}
     /* 다크/라이트 전환 버튼: 탭 오른쪽 끝에 고정 (탭이 옆으로 밀려도 안 가려짐) */
     .navwrap button.themebtn{flex:none;width:44px;padding:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;
                              color:var(--text);font-size:17px;line-height:1;cursor:pointer}
