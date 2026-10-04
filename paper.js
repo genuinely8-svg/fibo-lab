@@ -9,7 +9,7 @@
   "use strict";
   const E = PaperEngine;
   const KST = 9 * 3600;
-  const K = { token: "paper-token-v1", nick: "paper-nick-v1", sym: "paper-sym-v1", collapsed: "paper-chart-collapsed-v1", ctab: "paper-ctab-v1",
+  const K = { token: "paper-token-v1", nick: "paper-nick-v1", sym: "paper-sym-v1", collapsed: "paper-chart-collapsed-v1", collapsedM: "paper-chart-collapsed-m-v1", ctab: "paper-ctab-v1",
               mode: "paper-mode-v1", lev: "paper-lev-v1", sound: "paper-sound-v1", notes: "paper-notes-v1:", dep: "paper-dep-v1:" };
   const STABLES = new Set(["USDC", "FDUSD", "TUSD", "USDE", "BUSD", "DAI", "USDP", "USDS", "USD1"]);
   const IVS = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -297,7 +297,7 @@
 
   function setSym(sym) {
     $("picker").hidden = true;
-    S.sym = sym; ls.set(K.sym, sym);
+    S.sym = sym; ls.set(K.sym, sym); lastMid = 0; midDir = "";
     S.book = null; S.trades = []; renderBook(); renderTrades();
     $("oprice").value = ""; $("qty").value = ""; $("pct").value = 0;
     renderHd(); subscribe(); loadTicker(); renderTV(); loadChart(); renderOrderInfo();
@@ -327,18 +327,22 @@
   }
 
   // ── 호가·체결 ────────────────────────────────────────────────
+  const isMob = () => matchMedia("(max-width:900px)").matches;
+  let lastMid = 0, midDir = "";
   function renderBook() {
     const el = $("book");
     if (!S.book) { el.innerHTML = '<div class="muted small" style="padding:10px">불러오는 중…</div>'; return; }
-    const N = matchMedia("(max-width:900px)").matches ? 7 : 10;
+    const N = isMob() ? 8 : 10;
     const asks = S.book.a.slice(0, N).map(x => [+x[0], +x[1]]), bids = S.book.b.slice(0, N).map(x => [+x[0], +x[1]]);
     const cum = arr => { let s = 0; return arr.map(x => (s += x[1])); };
     const ca = cum(asks), cb = cum(bids), mx = Math.max(ca[ca.length - 1] || 1, cb[cb.length - 1] || 1);
     const row = (cls, x, c) => `<div class="brow ${cls}" data-p="${x[0]}"><i style="width:${(c / mx * 100).toFixed(0)}%"></i><span>${fp(x[0])}</span><span>${fq(x[1])}</span></div>`;
     const p = S.px[S.sym], mk = S.mark[S.sym];
+    if (p && lastMid && p !== lastMid) midDir = p > lastMid ? "up" : "dn";
+    if (p) lastMid = p;
     el.innerHTML = `<div class="bhead"><span>가격(USDT)</span><span>수량(${esc(base(S.sym))})</span></div>`
       + asks.map((x, i) => row("a", x, ca[i])).reverse().join("")
-      + `<div class="mid">${fp(p)}<small>마크 ${mk ? fp(mk.p) : "-"}</small></div>`
+      + `<div class="mid ${midDir}">${fp(p)}<small>마크 ${mk ? fp(mk.p) : "-"}</small></div>`
       + bids.map((x, i) => row("b", x, cb[i])).join("");
   }
   $("book").onclick = e => { const r = e.target.closest("[data-p]"); if (r) { setType("limit"); $("oprice").value = r.dataset.p; renderOrderInfo(); } };
@@ -450,7 +454,7 @@
   }
   $("ctabs").onclick = e => { const b = e.target.closest("button"); if (b) setCtab(b.dataset.c); };
   function setCollapsed(c) {
-    $("chartbox").classList.toggle("collapsed", c); $("ctoggle").textContent = c ? "차트 펼치기" : "차트 접기"; ls.set(K.collapsed, c ? "1" : "0");
+    $("chartbox").classList.toggle("collapsed", c); $("ctoggle").textContent = c ? "차트 펼치기" : "차트 접기"; ls.set(isMob() ? K.collapsedM : K.collapsed, c ? "1" : "0");
     if (!c) { if (S.ctab === "tv") renderTV(); else loadChart(); }
   }
   $("ctoggle").onclick = () => setCollapsed(!$("chartbox").classList.contains("collapsed"));
@@ -736,7 +740,7 @@
     loadNotes();
     setMode(S.mode); setLev(ls.get(K.lev) || 10); setType("limit");
     setCtab(S.ctab);
-    setCollapsed(ls.get(K.collapsed) === "1");
+    setCollapsed(isMob() ? ls.get(K.collapsedM) !== "0" : ls.get(K.collapsed) === "1");   // 모바일은 기본 접힘
     renderHd(); renderBook(); renderTrades(); renderDot();
     mkt.open(); pub.open(); loadTicker(); loadCoins();
     refresh();

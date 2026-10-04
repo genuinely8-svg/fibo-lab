@@ -178,27 +178,75 @@
     table.pt .acts .pp button{padding:5px 8px}
     .tr-dep{grid-template-columns:1fr!important}
   }
-  /* 모바일: 위에서부터 가격 → 차트(접기/펼치기) → 호가|주문 좌우 → 포지션 */
+  /* 모바일 (선물 거래 앱 배치): 가격 → 차트(기본 접힘, 얇은 줄) → [주문 | 호가] 좌우 → 포지션 */
   @media (max-width:900px){
-    .term{grid-template-columns:minmax(0,44fr) minmax(0,56fr);grid-template-areas:"hd hd" "chart chart" "book order" "lower lower"}
-    .chartbody{min-height:360px}
-    #hd{padding:8px 10px;gap:6px 14px}
-    #price{font-size:21px}
+    .term{gap:8px;grid-template-columns:minmax(0,57fr) minmax(0,43fr);grid-template-areas:"hd hd" "chart chart" "order book" "lower lower"}
+    .wrap{padding:10px 8px 50px}
+    .wrap>h1{display:none}
+    .topbar{margin:0 0 8px;font-size:12px}
+    .topbar .long{display:none}
+    .box{border-radius:10px}
+
+    /* 상단: 1줄 = 코인 + 가격 + 변동률, 2줄 = 마크가·펀딩비 */
+    #hd{padding:8px 10px;gap:2px 12px}
+    .coinbtn{font-size:15px;padding:2px 6px;border:0}
+    #price{font-size:22px;order:2}
+    #hd .pickwrap{order:1}
+    #hd .st.chg{order:3;flex-direction:row;align-items:baseline;gap:4px}
+    #hd .st.chg span{display:none}
+    #hd .st.chg b{font-size:14px}
+    #hd .wsline{order:4;margin-left:auto}
+    #hd .st{order:5}
+    #hd .brk{order:4;flex-basis:100%;height:0}
+    #hd .st b{font-size:12px}
+
+    /* 차트: 접혀 있을 땐 얇은 한 줄 */
+    .chartbody{min-height:340px}
+    .chartbar{padding:6px 8px}
+    .chartbox.collapsed .chartbar .tabs2,.chartbox.collapsed .chartbar .iv{display:none}
+    .chartbox.collapsed .chartbar::before{content:"📈 차트";font-size:13px;color:var(--muted)}
+
+    /* 주문 패널 (왼쪽) */
+    .orderbox{padding:8px}
+    .orderbox label{margin-bottom:7px}
+    .orderbox label>.lt{font-size:11.5px}
+    .orderbox input{padding:6px;font-size:13px}
+    .orderbox .seg{margin-bottom:7px}
+    .orderbox .seg button{padding:6px 2px;font-size:12.5px}
+    .levrow{margin-bottom:2px}
+    .levrow input[type=number]{width:52px;padding:4px 6px}
+    .quick{display:none}
+    #lev{margin-bottom:8px}
+    .pcts{gap:4px;margin:-2px 0 8px}
+    .pcts button{font-size:11px;padding:4px 0}
+    .tpsl{gap:6px}
+    .info{line-height:1.7;font-size:11px;margin:2px 0 8px}
+    .info div{gap:4px}
+    .info b{font-size:11px}
+    #liqnote{display:none!important}
+    .obtns{grid-template-columns:1fr;gap:6px}
+    .obtns button{padding:11px 4px;font-size:15px;border-radius:8px}
+
+    /* 호가 (오른쪽) */
     .mobonly{display:inline-flex}
     .bookbox{padding:6px 4px}
-    .brow,.bhead,.trow{font-size:11px;padding:1.5px 2px}
-    .orderbox{padding:8px}
-    .orderbox input{padding:6px 6px;font-size:13px}
-    .obtns{grid-template-columns:1fr}
-    .obtns button{padding:10px 4px}
-    .levrow input[type=number]{width:56px}
-    .quick button{font-size:11px;padding:4px 0}
-    .wrap{padding:12px 8px 50px}
-    table.pt tbody{grid-template-columns:1fr}
-    .adm input{width:80px}
+    .bookbox .seg button{padding:4px 10px;font-size:12px}
+    .brow,.bhead,.trow{font-size:11px;padding:2px 2px}
+    .brow span:last-child{color:var(--muted)}
+    .mid{font-size:16px;padding:7px 2px;flex-direction:column;gap:0;line-height:1.2}
+    .mid.up{color:var(--buy)} .mid.dn{color:var(--sell)}
     #trades,#book{display:none}
     .bookbox.showbook #book{display:block}
     .bookbox.showtr #trades{display:block;margin-top:0;border-top:0;padding-top:0;max-height:none}
+
+    /* 아래 */
+    .lower{padding:10px}
+    .tiles{gap:6px;margin-bottom:8px}
+    .tile{padding:8px 10px}
+    .tile .v{font-size:14px}
+    .foot2{font-size:11px;line-height:1.6}
+    table.pt tbody{grid-template-columns:1fr}
+    .adm input{width:80px}
   }
   @media (max-width:520px){ .st.hidem{display:none} .tiles{grid-template-columns:1fr 1fr} }
 </style>
@@ -222,7 +270,7 @@
 
   <div id="app" hidden>
     <div class="topbar">
-      <span><b id="who"></b> 님 · 가상 돈으로 하는 연습용이에요 (실제 돈 아님)</span>
+      <span><b id="who"></b> 님<span class="long"> · 가상 돈으로 하는 연습용이에요 (실제 돈 아님)</span></span>
       <span class="rt">
         <button class="ghost" id="bell" title="알림">🔔<i id="bellN" hidden>0</i></button>
         <button class="ghost mini" id="logout">로그아웃</button>
@@ -241,7 +289,8 @@
         </div>
         <div id="price">-</div>
         <span class="wsline" title="실시간 연결 상태"><i class="wsdot off" id="wsdot"></i><span id="wstxt">연결 중</span></span>
-        <div class="st"><span>24h 변동</span><b id="chg">-</b></div>
+        <div class="st chg"><span>24h 변동</span><b id="chg">-</b></div>
+        <i class="brk"></i>
         <div class="st"><span>마크가</span><b id="mark">-</b></div>
         <div class="st hidem"><span>24h 고가</span><b id="hi">-</b></div>
         <div class="st hidem"><span>24h 저가</span><b id="lo">-</b></div>
