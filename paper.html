@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261005001300"></script>
+<script src="theme.js?v=20261005001600"></script>
 <title>Paper Trading · ath TEST</title>
-<link rel="stylesheet" href="common.css?v=20261005001300">
+<link rel="stylesheet" href="common.css?v=20261005001600">
 <style>
   html,body{overflow-x:hidden}
   .wrap{max-width:1500px}
@@ -109,6 +109,9 @@
   .quick button.on{border-color:var(--accent);color:var(--accent)}
   .pcts{display:flex;gap:6px;margin:-4px 0 10px}
   .pcts button{flex:1;padding:4px 0;font-size:12px;min-width:0}
+  .tpchk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;font-size:13px;color:var(--text)}
+  .tpchk input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
+  .tpsl[hidden]{display:none}
   .tpsl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
   .tpsl input{width:100%}
   .info{font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 12px}
@@ -354,7 +357,8 @@
         <label><span class="lt">Size (<span id="qunit">BTC</span>)</span><input id="qty" inputmode="decimal" placeholder="0"></label>
         <input id="pct" type="range" min="0" max="100" step="1" value="0">
         <div class="pcts"><button class="ghost" data-p="25">25%</button><button class="ghost" data-p="50">50%</button><button class="ghost" data-p="75">75%</button><button class="ghost" data-p="100">100%</button></div>
-        <div class="tpsl">
+        <label class="tpchk"><input type="checkbox" id="tpon"><span>TP/SL</span></label>
+        <div class="tpsl" id="tpbox" hidden>
           <label><span class="lt">Take profit</span><input id="tp" inputmode="decimal" placeholder="Optional"></label>
           <label><span class="lt">Stop loss</span><input id="sl" inputmode="decimal" placeholder="Optional"></label>
         </div>
@@ -389,10 +393,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261005001300"></script>
-<script src="common.js?v=20261005001300"></script>
-<script src="meta.js?v=20261005001300"></script>
-<script src="paper-engine.js?v=20261005001300"></script>
-<script src="paper.js?v=20261005001300"></script>
+<script src="nav.js?v=20261005001600"></script>
+<script src="common.js?v=20261005001600"></script>
+<script src="meta.js?v=20261005001600"></script>
+<script src="paper-engine.js?v=20261005001600"></script>
+<script src="paper.js?v=20261005001600"></script>
 </body>
 </html>

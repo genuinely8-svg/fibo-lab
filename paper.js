@@ -546,11 +546,12 @@
     ordering = true; $("bLong").disabled = $("bShort").disabled = true;
     try {
       await sendAction({ action: "order", sym: S.sym, side, mode: S.mode, lev: lev(), qty: q, type: S.otype, price: S.otype === "limit" ? num($("oprice").value) : undefined,
-                         tp: $("tp").value.trim() || undefined, sl: $("sl").value.trim() || undefined });
+                         tp: $("tpon").checked ? $("tp").value.trim() || undefined : undefined, sl: $("tpon").checked ? $("sl").value.trim() || undefined : undefined });
       $("qty").value = ""; $("pct").value = 0; renderOrderInfo();
     } catch (e) {}
     ordering = false; $("bLong").disabled = $("bShort").disabled = false;
   }
+  $("tpon").onchange = () => { $("tpbox").hidden = !$("tpon").checked; };
   $("bLong").onclick = () => submit("long");
   $("bShort").onclick = () => submit("short");
 
