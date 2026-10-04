@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261005003921"></script>
+<script src="theme.js?v=20261005004237"></script>
 <title>시장 방향</title>
-<link rel="stylesheet" href="common.css?v=20261005003921">
+<link rel="stylesheet" href="common.css?v=20261005004237">
 <style>
   :root{ --btc:#f59e0b }
   /* 상단 핵심 카드 */
@@ -77,7 +77,7 @@
 
   <div class="card" id="topCard">
     <div class="head1"><span class="eyebrow">MARKET SCORE <button class="help" id="hScore" type="button" title="설명">?</button></span><button id="run" type="button">다시 분석</button></div>
-    <div class="helptxt" id="hScoreTxt" hidden>코인마다 위쪽·아래쪽 피보나치 확장 레벨 반응을 모두 분석해 세 요소를 −100~+100으로 맞추고 평균낸 값이에요. 공식 판정은 +30 이상 상승장, −30 이하 하락장, 그 사이는 횡보예요. 실제로는 대부분 −60~+60 사이에서 움직여서, 아래 스케일도 그 범위로 보여줘요.</div>
+    <div class="helptxt" id="hScoreTxt" hidden>코인마다 위쪽·아래쪽 진입 레벨 반응을 모두 분석해 세 요소를 −100~+100으로 맞추고 평균낸 값이에요. 공식 판정은 +30 이상 상승장, −30 이하 하락장, 그 사이는 횡보예요. 실제로는 대부분 −60~+60 사이에서 움직여서, 아래 스케일도 그 범위로 보여줘요.</div>
     <div class="hero">
       <div>
         <div class="bigscore" id="vScore">-</div>
@@ -117,7 +117,7 @@
 
   <div class="card">
     <details class="about"><summary>Market Score란?</summary>
-      <p>Market Score는 여러 암호화폐의 Fibonacci 반응 데이터를 종합해 현재 시장 내부의 상승·하락 구조 강도를 −100부터 +100까지 나타낸 지표입니다.</p>
+      <p>Market Score는 여러 암호화폐의 진입 레벨 반응 데이터를 종합해 현재 시장 내부의 상승·하락 구조 강도를 −100부터 +100까지 나타낸 지표입니다.</p>
       <p>이 점수는 미래 가격을 예측하거나 매수·매도 시점을 제시하기 위한 신호가 아니라, 현재 시장 상태를 한눈에 파악하기 위한 정보입니다.</p>
       <p>4주 변화는 현재 Market Score와 4주 전 Market Score의 차이입니다. 최근 시장 내부 상태가 개선되고 있는지 악화되고 있는지를 보여줍니다.</p>
     </details>
@@ -126,10 +126,10 @@
   <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식(FibCore)으로 위쪽·아래쪽 양방향을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
 </div>
 
-<script src="common.js?v=20261005003921"></script>
-<script src="nav.js?v=20261005003921"></script>
-<script src="meta.js?v=20261005003921"></script>
-<script src="fib-core.js?v=20261005003921"></script>
+<script src="common.js?v=20261005004237"></script>
+<script src="nav.js?v=20261005004237"></script>
+<script src="meta.js?v=20261005004237"></script>
+<script src="fib-core.js?v=20261005004237"></script>
 <script>
 "use strict";
 const FUT = "https://fapi.binance.com/fapi/v1";
@@ -227,9 +227,9 @@ function interpret(score, chg) {
   return `${a} ${but}최근 4주 동안 시장 내부 상태는 ${verb}.`;
 }
 const HELP = [
-  ["터치 비율", "시장 전체에서 위쪽 Fibonacci 레벨과 아래쪽 Fibonacci 레벨 중 어느 방향의 반응이 더 많이 나타나는지 봅니다. 위쪽 확장 레벨 터치 ÷ (위쪽 + 아래쪽 터치). 가격이 위쪽 레벨에 닿은 횟수가 아래쪽보다 많을수록 높아요. 50%가 중립이에요.", v => v == null ? "-" : v.toFixed(1) + "%"],
+  ["터치 비율", "시장 전체에서 위쪽 진입 레벨과 아래쪽 진입 레벨 중 어느 방향의 반응이 더 많이 나타나는지 봅니다. 위쪽 확장 레벨 터치 ÷ (위쪽 + 아래쪽 터치). 가격이 위쪽 레벨에 닿은 횟수가 아래쪽보다 많을수록 높아요. 50%가 중립이에요.", v => v == null ? "-" : v.toFixed(1) + "%"],
   ["반등/하락 우위", "아래쪽 레벨의 반등과 위쪽 레벨의 하락 중 어느 반응이 더 강했는지 비교합니다. 아래쪽 레벨에서 반등이 우세했던 비율 − 위쪽 레벨에서 하락이 우세했던 비율 (%p). 아래쪽 반응이 더 강했으면 +, 위쪽 반응이 더 강했으면 −예요.", v => sgn(v) + "%p"],
-  ["기대값 우위", "각 Fibonacci 반응 이후 실제 가격 움직임의 평균적인 우위를 비교합니다. 아래쪽 레벨 반응의 기대값 − 위쪽 레벨 반응의 기대값 (%p, 수수료 포함). ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
+  ["기대값 우위", "각 진입 레벨 반응 이후 실제 가격 움직임의 평균적인 우위를 비교합니다. 아래쪽 레벨 반응의 기대값 − 위쪽 레벨 반응의 기대값 (%p, 수수료 포함). ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
 ];
 const compDir = v => v == null ? ["-", FLAT] : v >= 30 ? ["상승 우위", GREEN] : v <= -30 ? ["하락 우위", RED] : ["중립", "var(--text)"];
 // 가로 스케일: 실제 점수는 대부분 ±60 안이라 −60~+60만 보여줌 (넘으면 끝에 붙이고 표시)
