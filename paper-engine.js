@@ -81,13 +81,13 @@
     tp = num(tp); sl = num(sl);
     const out = { tp: null, sl: null };
     if (!isNaN(tp)) {
-      if (!(tp > 0)) throw new Error("익절가가 올바르지 않아요");
-      if (side === "long" ? tp <= ref : tp >= ref) throw new Error(`익절가는 ${side === "long" ? "현재가(기준가)보다 높아야" : "현재가(기준가)보다 낮아야"} 해요`);
+      if (!(tp > 0)) throw new Error("Invalid take-profit price");
+      if (side === "long" ? tp <= ref : tp >= ref) throw new Error(`Take-profit must be ${side === "long" ? "above" : "below"} the current (reference) price`);
       out.tp = tp;
     }
     if (!isNaN(sl)) {
-      if (!(sl > 0)) throw new Error("손절가가 올바르지 않아요");
-      if (side === "long" ? sl >= ref : sl <= ref) throw new Error(`손절가는 ${side === "long" ? "현재가(기준가)보다 낮아야" : "현재가(기준가)보다 높아야"} 해요`);
+      if (!(sl > 0)) throw new Error("Invalid stop-loss price");
+      if (side === "long" ? sl >= ref : sl <= ref) throw new Error(`Stop-loss must be ${side === "long" ? "below" : "above"} the current (reference) price`);
       out.sl = sl;
     }
     return out;
@@ -104,25 +104,25 @@
     return p;
   }
 
-  // 포지션 닫기(전부 또는 일부). reason: "TP" | "SL" | "청산" | "수동" | "지정가 청산". qtyClose 없으면 전부
+  // 포지션 닫기(전부 또는 일부). reason: "TP" | "SL" | "Liquidation" | "Manual" | "Limit close". qtyClose 없으면 전부
   function closePosition(st, p, price, reason, t, qtyClose) {
     const full = !(qtyClose > 0) || qtyClose >= p.qty * (1 - 1e-9);
     const q = full ? p.qty : r8(qtyClose), f = q / p.qty;
     const mg = p.margin * f, openFee = p.fee * f, cross = modeOf(p) === "cross";
     let gross, closeFee, back;
-    if (reason === "청산") {
+    if (reason === "Liquidation") {
       if (cross) { gross = pnlOf(p.side, p.entry, price, q); closeFee = mmOf(q, price); back = mg + gross - closeFee; }   // 교차: 계정 전체가 같이 정산 (바닥은 0)
       else { gross = -mg; closeFee = 0; back = 0; }
     } else {
       gross = pnlOf(p.side, p.entry, price, q);
-      closeFee = q * price * (reason === "TP" || reason === "지정가 청산" ? FEE_MAKER : FEE_TAKER);
+      closeFee = q * price * (reason === "TP" || reason === "Limit close" ? FEE_MAKER : FEE_TAKER);
       back = Math.max(0, mg + gross - closeFee);
     }
     st.bal += back;
     const net = gross - closeFee - openFee;
     st.st.rp += net; st.st.fee += closeFee;
     const lev = p.lev, tr = { id: p.id, t, ot: p.t, sym: p.sym, side: p.side, mode: modeOf(p), lev, qty: q, entry: p.entry, exit: price,
-                 pnl: net, fee: openFee + closeFee, roe: net / mg * 100, reason: full ? reason : `${reason} (부분 ${Math.round(f * 100)}%)` };
+                 pnl: net, fee: openFee + closeFee, roe: net / mg * 100, reason: full ? reason : `${reason} (partial ${Math.round(f * 100)}%)` };
     if (full) {
       st.st.n++; if (p.rp + net > 0) st.st.w++;     // 승패는 포지션이 완전히 닫힐 때 전체 손익으로 한 번만
       st.pos = st.pos.filter(x => x.id !== p.id);
@@ -135,64 +135,64 @@
   // 주문 접수 검증 + 체결/대기 처리. cur = 지금 가격
   function placeOrder(st, req, cur, now) {
     const sym = String(req.sym || "").toUpperCase();
-    if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) throw new Error("코인 정보가 올바르지 않아요");
+    if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) throw new Error("Invalid symbol");
     const side = req.side === "short" ? "short" : req.side === "long" ? "long" : null;
-    if (!side) throw new Error("방향이 올바르지 않아요");
+    if (!side) throw new Error("Invalid side");
     const lev = Math.floor(num(req.lev));
-    if (!(lev >= 1 && lev <= MAX_LEV)) throw new Error(`레버리지는 1~${MAX_LEV}배예요`);
+    if (!(lev >= 1 && lev <= MAX_LEV)) throw new Error(`Leverage must be 1–${MAX_LEV}x`);
     const mode = modeOf(req);
     const qty = r8(num(req.qty));
-    if (!(qty > 0) || !isFinite(qty)) throw new Error("수량을 입력하세요");
+    if (!(qty > 0) || !isFinite(qty)) throw new Error("Enter a quantity");
     const limit = req.type === "limit";
     let price = cur;
     if (limit) {
       price = num(req.price);
-      if (!(price > 0)) throw new Error("지정가 가격을 입력하세요");
+      if (!(price > 0)) throw new Error("Enter a limit price");
     }
-    if (qty * price < MIN_NOTIONAL) throw new Error(`주문 금액이 너무 작아요 (최소 ${MIN_NOTIONAL} USDT)`);
+    if (qty * price < MIN_NOTIONAL) throw new Error(`Order value too small (min ${MIN_NOTIONAL} USDT)`);
     // 바로 체결되는 지정가(현재가보다 유리하지 않은 방향)는 시장가처럼 현재가로 체결
     const immediate = !limit || (side === "long" ? price >= cur : price <= cur);
     const fillPrice = immediate ? cur : price;
     const { tp, sl } = checkTpSl(side, fillPrice, req.tp, req.sl);
     const rate = immediate ? FEE_TAKER : FEE_MAKER;
-    if (needOf(qty, fillPrice, lev, rate) > available(st) + 1e-9) throw new Error("사용 가능한 잔고가 부족해요");
+    if (needOf(qty, fillPrice, lev, rate) > available(st) + 1e-9) throw new Error("Insufficient available balance");
     const o = { sym, side, mode, lev, qty, price: fillPrice, tp, sl };
     if (immediate) {
-      if (st.pos.length >= MAX_POS) throw new Error(`포지션은 최대 ${MAX_POS}개까지예요`);
-      const p = openPosition(st, o, now, rate, limit ? "지정가(즉시)" : "시장가");
-      logOrder(st, { id: p.id, t: now, sym, side, mode, lev, qty, price: fillPrice, kind: limit ? "지정가" : "시장가", status: "체결" });
+      if (st.pos.length >= MAX_POS) throw new Error(`Max ${MAX_POS} open positions`);
+      const p = openPosition(st, o, now, rate, limit ? "Limit (instant)" : "Market");
+      logOrder(st, { id: p.id, t: now, sym, side, mode, lev, qty, price: fillPrice, kind: limit ? "Limit" : "Market", status: "Filled" });
       return { filled: true, pos: p };
     }
-    if (st.ord.length >= MAX_ORD) throw new Error(`미체결 주문은 최대 ${MAX_ORD}개까지예요`);
+    if (st.ord.length >= MAX_ORD) throw new Error(`Max ${MAX_ORD} open orders`);
     o.id = st.seq++; o.t = now;
     st.ord.push(o);
-    logOrder(st, { id: o.id, t: now, sym, side, mode, lev, qty, price, kind: "지정가", status: "접수" });
+    logOrder(st, { id: o.id, t: now, sym, side, mode, lev, qty, price, kind: "Limit", status: "Open" });
     return { filled: false, ord: o };
   }
 
   // 지정가 청산: 포지션의 pct% 를 정한 가격에 닫는 주문 (롱은 위에서 팔고, 숏은 아래에서 삼). 이미 유리한 가격이면 바로 체결
   function placeCloseLimit(st, id, pct, price, cur, now) {
     const p = st.pos.find(x => x.id === id);
-    if (!p) throw new Error("이미 닫혔거나 없는 포지션이에요");
+    if (!p) throw new Error("Position already closed or not found");
     pct = Math.floor(num(pct));
-    if (!(pct >= 1 && pct <= 100)) throw new Error("청산 비율은 1~100% 예요");
+    if (!(pct >= 1 && pct <= 100)) throw new Error("Close ratio must be 1–100%");
     price = num(price);
-    if (!(price > 0)) throw new Error("지정가 가격을 입력하세요");
+    if (!(price > 0)) throw new Error("Enter a limit price");
     const qty = pct >= 100 ? p.qty : r8(p.qty * pct / 100);
     const immediate = p.side === "long" ? price <= cur : price >= cur;
-    if (immediate) { const tr = closePosition(st, p, cur, "수동", now, qty); return { filled: true, tr }; }
-    if (st.ord.length >= MAX_ORD) throw new Error(`미체결 주문은 최대 ${MAX_ORD}개까지예요`);
+    if (immediate) { const tr = closePosition(st, p, cur, "Manual", now, qty); return { filled: true, tr }; }
+    if (st.ord.length >= MAX_ORD) throw new Error(`Max ${MAX_ORD} open orders`);
     const o = { id: st.seq++, ro: p.id, sym: p.sym, side: p.side, mode: modeOf(p), lev: p.lev, qty, pct, price, t: now };
     st.ord.push(o);
-    logOrder(st, { id: o.id, t: now, sym: p.sym, side: p.side, mode: modeOf(p), lev: p.lev, qty, price, kind: "지정가 청산", status: "접수" });
+    logOrder(st, { id: o.id, t: now, sym: p.sym, side: p.side, mode: modeOf(p), lev: p.lev, qty, price, kind: "Limit close", status: "Open" });
     return { filled: false, ord: o };
   }
 
   function cancelOrder(st, id, now) {
     const o = st.ord.find(x => x.id === id);
-    if (!o) throw new Error("이미 체결됐거나 없는 주문이에요");
+    if (!o) throw new Error("Order already filled or not found");
     st.ord = st.ord.filter(x => x.id !== id);
-    logOrder(st, { id: o.id, t: now, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: o.qty, price: o.price, kind: o.ro ? "지정가 청산" : "지정가", status: "취소" });
+    logOrder(st, { id: o.id, t: now, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: o.qty, price: o.price, kind: o.ro ? "Limit close" : "Limit", status: "Cancelled" });
   }
 
   // 1분봉 소급 처리. candles: [{t, sym, o, h, l, c}] (t = 봉 시작 ms). 반환: 일어난 일 목록
@@ -210,9 +210,9 @@
         if (o.ro || o.sym !== k.sym || t < ceilMin(o.t)) continue;
         if (!(o.side === "long" ? k.l <= o.price : k.h >= o.price)) continue;
         st.ord = st.ord.filter(x => x.id !== o.id);
-        const p = openPosition(st, o, t, FEE_MAKER, "지정가", t);
+        const p = openPosition(st, o, t, FEE_MAKER, "Limit", t);
         p.id = o.id;                                             // 주문 번호 그대로 포지션 번호로
-        logOrder(st, { id: o.id, t, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: o.qty, price: o.price, kind: "지정가", status: "체결" });
+        logOrder(st, { id: o.id, t, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: o.qty, price: o.price, kind: "Limit", status: "Filled" });
         ev.push({ t, type: "fill", sym: o.sym, side: o.side, mode: modeOf(o), price: o.price, qty: o.qty });
       }
       // 2) 손절 (격리는 청산과 함께, 교차는 손절만)
@@ -223,7 +223,7 @@
         const slHit = p.sl != null && (long ? k.l <= p.sl : k.h >= p.sl);
         if (!liqHit && !slHit) continue;
         const slFirst = slHit && (!liqHit || (long ? p.sl >= p.liq : p.sl <= p.liq));
-        const tr = slFirst ? closePosition(st, p, p.sl, "SL", t + MIN) : closePosition(st, p, p.liq, "청산", t + MIN);
+        const tr = slFirst ? closePosition(st, p, p.sl, "SL", t + MIN) : closePosition(st, p, p.liq, "Liquidation", t + MIN);
         push(slFirst ? "sl" : "liq", p, tr);
       }
       // 3) 교차 청산: 교차 포지션이 전부 가장 불리한 가격에 있다고 보고 계정 단위로 확인
@@ -235,7 +235,7 @@
         let eq = W, mm = 0;
         for (const p of cp) { const x = adv(p); eq += pnlOf(p.side, p.entry, x, p.qty); mm += mmOf(p.qty, x); }
         if (eq <= mm) {
-          for (const p of cp) { const tr = closePosition(st, p, adv(p), "청산", t + MIN); push("liq", p, tr); }
+          for (const p of cp) { const tr = closePosition(st, p, adv(p), "Liquidation", t + MIN); push("liq", p, tr); }
           if (st.bal < 0) st.bal = 0;
         }
       }
@@ -252,8 +252,8 @@
         if (!(o.side === "long" ? k.h >= o.price : k.l <= o.price)) continue;
         st.ord = st.ord.filter(x => x.id !== o.id);
         const q = o.pct >= 100 ? p.qty : Math.min(p.qty, r8(p.qty * o.pct / 100));
-        logOrder(st, { id: o.id, t, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: q, price: o.price, kind: "지정가 청산", status: "체결" });
-        push("rclose", p, closePosition(st, p, o.price, "지정가 청산", t + MIN, q));
+        logOrder(st, { id: o.id, t, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: q, price: o.price, kind: "Limit close", status: "Filled" });
+        push("rclose", p, closePosition(st, p, o.price, "Limit close", t + MIN, q));
       }
       for (const k of ks) lastC[k.sym] = k.c;
     }
