@@ -145,7 +145,7 @@
     if (!i) return;
     if (i.kind === "order") {
       const t = `${base(i.sym)} ${modeTxt(i.mode)} ${sideTxt(i.side)} ${i.lev}x · ${fq(i.qty)} @ ${fp(i.price)}`;
-      if (i.filled) notify("ok", "Position opened", t); else notify("ok", "Order placed", "Limit · " + t);
+      if (i.filled) notify("ok", i.merged ? "Added to position" : "Position opened", t); else notify("ok", "Order placed", "Limit · " + t);
     } else if (i.kind === "cancel") notify("ok", "Order cancelled", "Open order cancelled");
     else if (i.kind === "close") notify(i.pnl >= 0 ? "ok" : "warn", i.pct >= 100 ? "Position closed" : `Partial close ${i.pct}%`, `${base(i.sym)} ${sideTxt(i.side)} @ ${fp(i.price)} · PnL ${sg(i.pnl)} USDT`);
     else if (i.kind === "closeLimit") notify("ok", "Limit close order placed", `${base(i.sym)} ${i.pct}% @ ${fp(i.price)}`);

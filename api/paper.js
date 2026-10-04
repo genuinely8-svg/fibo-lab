@@ -25,6 +25,7 @@ module.exports = async (req, res) => {
       sy = { events: [], dirty: false, behind: true, error: true };      // 상태 조회는 옛 상태라도 보여줌
     }
     dirty = sy.dirty;
+    if (E.mergeAll(st)) dirty = true;                   // 예전에 따로 잡힌 같은 포지션은 하나로
     if (b.action !== "state" && sy.behind) {
       if (dirty) await db.setJSON(key, user);
       throw A.fail(409, "Processing older history. Please try again in a few seconds");
@@ -40,7 +41,7 @@ module.exports = async (req, res) => {
         const cur = await B.price(sym);
         const r = E.placeOrder(st, b, cur, now);
         const x = r.filled ? r.pos : r.ord;
-        info = { kind: "order", filled: r.filled, sym, side: x.side, mode: x.mode, lev: x.lev, qty: x.qty, price: r.filled ? r.pos.entry : r.ord.price, limit: b.type === "limit" };
+        info = { kind: "order", filled: r.filled, sym, side: x.side, mode: x.mode, lev: x.lev, qty: r.filled ? Number(b.qty) : x.qty, price: r.filled ? r.fill : r.ord.price, limit: b.type === "limit", merged: !!r.merged };
         dirty = true; break;
       }
       case "cancel": E.cancelOrder(st, id, now); info = { kind: "cancel" }; dirty = true; break;

@@ -93,7 +93,50 @@
     return out;
   }
 
+  // 같은 코인·같은 방향·같은 마진 모드의 열린 포지션 (있으면 거기에 합침 = 물타기/불타기)
+  const sameOf = (st, o) => st.pos.find(p => p.sym === o.sym && p.side === o.side && modeOf(p) === modeOf(o));
+  // 합쳤을 때 추가로 필요한 돈 (레버리지를 새 주문 값으로 맞추면서 기존 증거금도 다시 계산)
+  function mergeNeed(p, o, price, rate) {
+    const q = r8(p.qty + o.qty), entry = (p.entry * p.qty + price * o.qty) / q;
+    return q * entry / o.lev - p.margin + o.qty * price * rate;
+  }
+  // 예전에 따로 잡힌 같은 포지션들을 하나로 합침 (증거금은 그대로 더해서 잔고 변화 없음)
+  function mergeAll(st) {
+    let changed = false;
+    for (let i = 0; i < st.pos.length; i++) {
+      const a = st.pos[i];
+      for (let j = st.pos.length - 1; j > i; j--) {
+        const b = st.pos[j];
+        if (b.sym !== a.sym || b.side !== a.side || modeOf(b) !== modeOf(a)) continue;
+        const q = r8(a.qty + b.qty);
+        a.entry = (a.entry * a.qty + b.entry * b.qty) / q; a.qty = q;
+        a.margin += b.margin; a.fee += b.fee; a.rp += b.rp;
+        a.lev = Math.max(1, Math.min(MAX_LEV, Math.round(a.qty * a.entry / a.margin)));
+        if (modeOf(a) === "isolated") a.liq = liqPrice(a.side, a.entry, a.qty * a.entry / a.margin);
+        a.tp = a.tp || b.tp; a.sl = a.sl || b.sl; a.t = Math.min(a.t, b.t);
+        for (const o of st.ord) if (o.ro === b.id) o.ro = a.id;
+        st.pos.splice(j, 1); changed = true;
+      }
+    }
+    return changed;
+  }
+
   function openPosition(st, o, t, rate, via, fillT) {
+    const ex = sameOf(st, o);
+    if (ex) {                                               // 물타기/불타기: 평균 진입가로 합침
+      const fee = o.qty * o.price * rate, q = r8(ex.qty + o.qty), entry = (ex.entry * ex.qty + o.price * o.qty) / q;
+      let margin = q * entry / o.lev, lev = o.lev;
+      if (margin - ex.margin + fee > st.bal + 1e-9) {        // (소급 체결 중) 다시 맞출 돈이 모자라면: 증거금만 더하고 레버리지는 실제 비율로
+        margin = ex.margin + o.qty * o.price / o.lev; lev = Math.max(1, Math.min(MAX_LEV, Math.round(q * entry / margin)));
+      }
+      st.bal -= margin - ex.margin + fee;
+      ex.qty = q; ex.entry = entry; ex.margin = margin; ex.lev = lev; ex.fee += fee;
+      if (modeOf(ex) === "isolated") ex.liq = liqPrice(ex.side, entry, q * entry / margin);
+      if (o.tp) ex.tp = o.tp;
+      if (o.sl) ex.sl = o.sl;
+      st.st.fee += fee;
+      return Object.defineProperty(ex, "_merged", { value: true, configurable: true, enumerable: false });
+    }
     const mode = modeOf(o), margin = o.qty * o.price / o.lev, fee = o.qty * o.price * rate;
     st.bal -= margin + fee;
     const p = { id: st.seq++, sym: o.sym, side: o.side, mode, lev: o.lev, qty: o.qty, entry: o.price, margin, fee, rp: 0,
@@ -155,13 +198,15 @@
     const fillPrice = immediate ? cur : price;
     const { tp, sl } = checkTpSl(side, fillPrice, req.tp, req.sl);
     const rate = immediate ? FEE_TAKER : FEE_MAKER;
-    if (needOf(qty, fillPrice, lev, rate) > available(st) + 1e-9) throw new Error("Insufficient available balance");
     const o = { sym, side, mode, lev, qty, price: fillPrice, tp, sl };
+    const ex = immediate ? sameOf(st, o) : null;
+    const need = ex ? mergeNeed(ex, o, fillPrice, rate) : needOf(qty, fillPrice, lev, rate);
+    if (need > available(st) + 1e-9) throw new Error("Insufficient available balance");
     if (immediate) {
-      if (st.pos.length >= MAX_POS) throw new Error(`Max ${MAX_POS} open positions`);
+      if (!ex && st.pos.length >= MAX_POS) throw new Error(`Max ${MAX_POS} open positions`);
       const p = openPosition(st, o, now, rate, limit ? "Limit (instant)" : "Market");
       logOrder(st, { id: p.id, t: now, sym, side, mode, lev, qty, price: fillPrice, kind: limit ? "Limit" : "Market", status: "Filled" });
-      return { filled: true, pos: p };
+      return { filled: true, pos: p, fill: fillPrice, merged: !!ex };
     }
     if (st.ord.length >= MAX_ORD) throw new Error(`Max ${MAX_ORD} open orders`);
     o.id = st.seq++; o.t = now;
@@ -211,7 +256,7 @@
         if (!(o.side === "long" ? k.l <= o.price : k.h >= o.price)) continue;
         st.ord = st.ord.filter(x => x.id !== o.id);
         const p = openPosition(st, o, t, FEE_MAKER, "Limit", t);
-        p.id = o.id;                                             // 주문 번호 그대로 포지션 번호로
+        if (!p._merged) p.id = o.id;                             // 새 포지션이면 주문 번호 그대로 포지션 번호로
         logOrder(st, { id: o.id, t, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: o.qty, price: o.price, kind: "Limit", status: "Filled" });
         ev.push({ t, type: "fill", sym: o.sym, side: o.side, mode: modeOf(o), price: o.price, qty: o.qty });
       }
@@ -265,7 +310,7 @@
     return { equity, ret: (equity - st.dep) / st.dep * 100 };
   }
 
-  return { START, FEE_TAKER, FEE_MAKER, MMR, MAX_LEV, MAX_POS, MAX_ORD, MIN_NOTIONAL,
+  return { mergeAll, START, FEE_TAKER, FEE_MAKER, MMR, MAX_LEV, MAX_POS, MAX_ORD, MIN_NOTIONAL,
            liqPrice, pnlOf, needOf, mmOf, modeOf, crossWallet, crossLiqPrice, crossAccount, liqOf, ratioOf,
            newState, reserved, available, sumMargin, checkTpSl,
            placeOrder, placeCloseLimit, cancelOrder, closePosition, replay, summary, logTrade };
