@@ -78,22 +78,35 @@
   // 새 버전으로 열 때 붙였던 ?v= 는 주소창에서 지워서 깔끔하게
   const q = new URLSearchParams(location.search);
   if (q.has("v")) { q.delete("v"); history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash); }
-  let busy = false;
-  async function check() {
-    if (busy || document.hidden) return;
+  let busy = false, newV = null, bar = null;
+  const go = v => { const u = new URLSearchParams(location.search); u.set("v", v); location.replace(location.pathname + "?" + u + location.hash); };   // 새 주소로 열면 브라우저가 예전 것을 못 씀
+  // 보고 있는 도중에는 화면을 갑자기 새로고침하지 않고, 아래에 작은 안내만 띄움 (누르면 새로고침)
+  function showBar() {
+    if (bar) return;
+    bar = document.createElement("button");
+    bar.type = "button";
+    bar.textContent = "새 버전이 있어요 · 눌러서 새로고침";
+    bar.style.cssText = "position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;padding:9px 16px;border-radius:999px;" +
+      "border:1px solid var(--line);background:var(--card);color:var(--text);font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35);cursor:pointer";
+    bar.onclick = () => go(newV);
+    document.body.appendChild(bar);
+  }
+  async function check(fromHidden) {
+    if (busy) return;
+    if (newV) { if (fromHidden) go(newV); return; }
     busy = true;
     try {
       const html = await (await fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" })).text();
       const m = html.match(/nav\.js\?v=([^"'&]+)/);
       if (m && m[1] !== cur) {
-        const u = new URLSearchParams(location.search); u.set("v", m[1]);
-        location.replace(location.pathname + "?" + u + location.hash);   // 새 주소로 열면 브라우저가 예전 것을 못 씀
-        return;
+        newV = m[1];
+        if (fromHidden) { go(newV); return; }     // 다른 앱 갔다 돌아온 순간이면 바로 최신으로 (눈에 안 띔)
+        showBar();
       }
     } catch (e) {}
     busy = false;
   }
-  setTimeout(check, 2000);                       // 열자마자 한 번
-  setInterval(check, 3 * 60 * 1000);             // 켜두면 3분마다
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });   // 다른 앱 갔다 돌아오면
+  setTimeout(() => check(true), 1500);            // 열자마자 한 번 (막 연 참이라 바로 최신으로)
+  setInterval(() => { if (!document.hidden) check(false); }, 3 * 60 * 1000);   // 켜두면 3분마다 확인 → 안내만
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) check(true); });   // 다른 앱 갔다 돌아오면
 })();
