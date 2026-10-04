@@ -333,11 +333,22 @@
 
   // ── 호가·체결 ────────────────────────────────────────────────
   const isMob = () => matchMedia("(max-width:900px)").matches;
-  let lastMid = 0, midDir = "";
+  let lastMid = 0, midDir = "", bookN = 8;
+  // 폰: 왼쪽 주문 패널 높이에 맞춰 호가 줄 수를 정함 (실제 줄 높이를 재서, 6~20줄)
+  function fitBook() {
+    if (!isMob() || !S.book) return;
+    const box = $("bookbox"), ob = document.querySelector(".orderbox"), row = $("book").querySelector(".brow");
+    if (!row || $("book").offsetParent === null) return;
+    const rh = row.offsetHeight, rows = $("book").querySelectorAll(".brow").length;
+    const book = $("book"), used = (book.offsetTop - box.offsetTop) + book.offsetHeight - rows * rh + 8;   // 줄을 뺀 나머지 (탭·제목·가운데 가격·여백)
+    const n = Math.max(6, Math.min(20, Math.floor((ob.offsetHeight - used - 4) / rh / 2)));
+    if (n !== bookN) { bookN = n; renderBook(); }
+  }
+  addEventListener("resize", () => setTimeout(fitBook, 50));
   function renderBook() {
     const el = $("book");
     if (!S.book) { el.innerHTML = '<div class="muted small" style="padding:10px">Loading…</div>'; return; }
-    const N = isMob() ? 8 : 10;
+    const N = isMob() ? bookN : 10;
     const asks = S.book.a.slice(0, N).map(x => [+x[0], +x[1]]), bids = S.book.b.slice(0, N).map(x => [+x[0], +x[1]]);
     const cum = arr => { let s = 0; return arr.map(x => (s += x[1])); };
     const ca = cum(asks), cb = cum(bids), mx = Math.max(ca[ca.length - 1] || 1, cb[cb.length - 1] || 1);
@@ -349,7 +360,9 @@
       + asks.map((x, i) => row("a", x, ca[i])).reverse().join("")
       + `<div class="mid ${midDir}">${fp(p)}<small>Mark ${mk ? fp(mk.p) : "-"}</small></div>`
       + bids.map((x, i) => row("b", x, cb[i])).join("");
+    if (isMob() && !fitting) { fitting = true; requestAnimationFrame(() => { fitting = false; fitBook(); }); }
   }
+  let fitting = false;
   $("book").onclick = e => { const r = e.target.closest("[data-p]"); if (r) { setType("limit"); $("oprice").value = r.dataset.p; renderOrderInfo(); } };
   function renderTrades() {
     $("trades").innerHTML = `<div class="bhead"><span>Time</span><span>Price</span><span>Size</span></div>` + S.trades.map(t =>
@@ -533,16 +546,15 @@
       return v === undefined ? "Enter size" : v === null ? "None" : fp(v);
     };
     $("liqL").textContent = show("long"); $("liqS").textContent = show("short");
-    // TP/SL 예상 손익: 가격이 진입가보다 위/아래인지로 롱·숏을 판단해서 (수수료 포함) 계산
+    // TP/SL 예상 손익: 롱으로 열 때 / 숏으로 열 때 둘 다 (수수료 포함) — 입력칸 위 말풍선
     const est = (id, kind) => {
       const v = num($(id).value), el = $(id + "Est");
       if (!(v > 0) || !ref) { el.innerHTML = ""; return; }
-      if (!(q > 0)) { el.innerHTML = '<span class="m">Enter size to see est. PnL</span>'; return; }
-      const side = kind === "tp" ? (v > ref ? "long" : "short") : (v < ref ? "long" : "short");
-      const fee = q * ref * rateNow() + q * v * (kind === "tp" ? E.FEE_MAKER : E.FEE_TAKER);
-      const pnl = E.pnlOf(side, ref, v, q) - fee, roe = pnl / (q * ref / lev()) * 100;
-      const mv = (v - ref) / ref * 100;
-      el.innerHTML = `<span class="m">${kind === "tp" ? "TP" : "SL"} (${sideTxt(side)}) ${sg(mv)}% →</span> <b class="${pc(pnl)}">${sg(pnl)} USDT</b> <span class="${pc(roe)}">(${sg(roe)}%)</span>`;
+      if (!(q > 0)) { el.innerHTML = "Enter size to see est. PnL"; return; }
+      const fee = q * ref * rateNow() + q * v * (kind === "tp" ? E.FEE_MAKER : E.FEE_TAKER), mg = q * ref / lev();
+      const row = (side, lbl) => { const pnl = E.pnlOf(side, ref, v, q) - fee, roe = pnl / mg * 100;
+        return `<div><span class="${side === "long" ? "bl" : "sh"}">${lbl}</span> ≈ <span class="${pnl >= 0 ? "up" : "dn"}">${sg(pnl)} USDT (${sg(roe)}%)</span></div>`; };
+      el.innerHTML = row("long", "Long") + row("short", "Short");
     };
     est("tp", "tp"); est("sl", "sl");
     $("liqnote").textContent = S.mode === "cross"
@@ -563,7 +575,7 @@
     } catch (e) {}
     ordering = false; $("bLong").disabled = $("bShort").disabled = false;
   }
-  $("tpon").onchange = () => { $("tpbox").hidden = !$("tpon").checked; };
+  $("tpon").onchange = () => { $("tpbox").hidden = !$("tpon").checked; renderBook(); };
   $("bLong").onclick = () => submit("long");
   $("bShort").onclick = () => submit("short");
 

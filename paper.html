@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script src="theme.js?v=20261005002100"></script>
+<script src="theme.js?v=20261005002600"></script>
 <title>Paper Trading · ath TEST</title>
-<link rel="stylesheet" href="common.css?v=20261005002100">
+<link rel="stylesheet" href="common.css?v=20261005002600">
 <style>
   html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
   /* 아이폰: 입력칸 글자가 16px 보다 작으면 누를 때 화면이 확대돼서, 터치 기기에서는 입력칸을 16px 로 */
@@ -114,9 +114,15 @@
   .tpchk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;font-size:13px;color:var(--text)}
   .tpchk input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
   .tpsl[hidden]{display:none}
-  .tpsl .est{font-size:11.5px;line-height:1.45;margin-top:-4px;margin-bottom:6px;font-variant-numeric:tabular-nums}
-  .tpsl .est:empty{display:none}
-  .tpsl .est .m{color:var(--muted)}
+  /* TP/SL 예상 손익 말풍선 (입력칸을 누르고 있을 때 위에 뜸) */
+  .bw{position:relative}
+  .bub{display:none;position:absolute;left:0;bottom:calc(100% - 14px);z-index:20;background:#f4f5f7;color:#111;border-radius:6px;padding:5px 8px;
+       font-size:11.5px;line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums;box-shadow:0 4px 14px rgba(0,0,0,.35);pointer-events:none}
+  .bub.r2{left:auto;right:0}
+  .bub:after{content:"";position:absolute;left:16px;top:100%;border:6px solid transparent;border-top-color:#f4f5f7}
+  .bub.r2:after{left:auto;right:16px}
+  .bw:focus-within .bub:not(:empty){display:block}
+  .bub .bl{color:#0a8f8f} .bub .sh{color:#d6336c} .bub .up{color:#0a8f5a} .bub .dn{color:#d63a4c}
   .tpsl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
   .tpsl input{width:100%}
   .info{font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 12px}
@@ -364,9 +370,8 @@
         <div class="pcts"><button class="ghost" data-p="25">25%</button><button class="ghost" data-p="50">50%</button><button class="ghost" data-p="75">75%</button><button class="ghost" data-p="100">100%</button></div>
         <label class="tpchk"><input type="checkbox" id="tpon"><span>TP/SL</span></label>
         <div class="tpsl" id="tpbox" hidden>
-          <label><span class="lt">Take profit</span><input id="tp" inputmode="decimal" placeholder="Optional"></label>
-          <label><span class="lt">Stop loss</span><input id="sl" inputmode="decimal" placeholder="Optional"></label>
-          <div class="est" id="tpEst"></div><div class="est" id="slEst"></div>
+          <label class="bw"><span class="lt">Take profit</span><input id="tp" inputmode="decimal" placeholder="Optional"><div class="bub" id="tpEst"></div></label>
+          <label class="bw"><span class="lt">Stop loss</span><input id="sl" inputmode="decimal" placeholder="Optional"><div class="bub r2" id="slEst"></div></label>
         </div>
         <div class="info">
           <div><span>Available</span><b id="avail">-</b></div>
@@ -399,10 +404,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261005002100"></script>
-<script src="common.js?v=20261005002100"></script>
-<script src="meta.js?v=20261005002100"></script>
-<script src="paper-engine.js?v=20261005002100"></script>
-<script src="paper.js?v=20261005002100"></script>
+<script src="nav.js?v=20261005002600"></script>
+<script src="common.js?v=20261005002600"></script>
+<script src="meta.js?v=20261005002600"></script>
+<script src="paper-engine.js?v=20261005002600"></script>
+<script src="paper.js?v=20261005002600"></script>
 </body>
 </html>
