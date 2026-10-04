@@ -6,6 +6,8 @@ const B = require("./_lib/binance");
 const { sync } = require("./_lib/sync");
 const E = require("../paper-engine");
 
+const LA_EVERY = 10 * 60e3;
+
 module.exports = async (req, res) => {
   try {
     if (req.method !== "POST") throw A.fail(405, "POST 만 돼요");
@@ -57,6 +59,7 @@ module.exports = async (req, res) => {
       default: throw A.fail(400, "알 수 없는 요청이에요");
     }
 
+    if (now - (user.la || 0) > LA_EVERY) { user.la = now; dirty = true; }     // 마지막 접속은 10분에 한 번만 기록 (명령 절약)
     if (dirty) await db.setJSON(key, user);
     res.status(200).json({
       nick: user.nick, admin: A.isAdminKey(key), st: user.st, now, events: sy.events, msg,

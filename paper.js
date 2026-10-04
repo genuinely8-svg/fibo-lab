@@ -41,7 +41,7 @@
   async function post(url, body) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...(S.token ? { Authorization: "Bearer " + S.token } : {}) }, body: JSON.stringify(body) });
     const j = await res.json().catch(() => ({}));
-    if (res.status === 401 && S.token && url !== "/api/auth") { logout(true); throw new Error(j.error || "다시 로그인해주세요"); }
+    if ((res.status === 401 || (res.status === 403 && /차단/.test(j.error || ""))) && S.token && url !== "/api/auth") { logout(true, j.error); throw new Error(j.error || "다시 로그인해주세요"); }
     if (!res.ok) throw new Error(j.error || "서버 오류 " + res.status);
     return j;
   }
@@ -63,12 +63,12 @@
     } catch (e) { $("lerr").textContent = e.message; }
     finally { $("lbtn").disabled = false; }
   });
-  function logout(silent) {
+  function logout(silent, msg) {
     ls.del(TOKEN_KEY); S.token = null; S.st = null; S.admin = false;
     try { ws && ws.close(); } catch (e) {}
     ws = null; started = false;
     $("app").hidden = true; $("login").hidden = false;
-    if (silent) $("lerr").textContent = "다시 로그인해주세요";
+    if (silent) $("lerr").textContent = msg || "다시 로그인해주세요";
   }
   $("logout").onclick = () => { logout(); location.reload(); };
 
@@ -392,7 +392,7 @@
     else if (S.tab === "adm") { if (!adminRows) loadAdmin(); else renderAdmin(); }
   }
   function renderAll() { if (!S.st) return; renderHd(); renderTiles(); if (S.tab !== "adm") renderTab(); renderOrderInfo(); }
-  $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) { S.tab = b.dataset.t; adminRows = S.tab === "adm" ? null : adminRows; renderTab(); } };
+  $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) { S.tab = b.dataset.t; adminRows = null; adminView = null; renderTab(); } };
 
   // 포지션 카드 버튼
   $("tabbody").onclick = async e => {
@@ -420,32 +420,60 @@
   $("reset").onclick = () => { if (confirm("잔고와 포지션, 모든 기록이 지워지고 10,000 USDT 로 다시 시작해요. 계속할까요?")) sendAction({ action: "reset" }).catch(() => {}); };
 
   // ── 관리자 ───────────────────────────────────────────────────
-  let adminRows = null;
+  let adminRows = null, adminLog = [], adminView = null;     // adminView: 상세 보기 중인 사용자 정보
+  const dt = t => t ? mdhm(t) : "-";
   async function loadAdmin() {
     $("tabbody").innerHTML = '<div class="empty">불러오는 중…</div>';
-    try { adminRows = (await post("/api/admin", { action: "list" })).users; renderAdmin(); }
+    try { const r = await post("/api/admin", { action: "list" }); adminRows = r.users; adminLog = r.log; renderAdmin(); }
     catch (e) { $("tabbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
   }
   function renderAdmin() {
-    $("tabbody").innerHTML = adminRows.map(u => `<div class="adm"><div class="nm"><b>${esc(u.nick)}</b><br><span class="muted small">잔고 ${fu(u.bal)} · 총 ${fu(u.equity)} · 원금 ${fu(u.dep)} · 거래 ${u.n}회</span></div>
+    if (adminView) return renderAdminDetail();
+    const rows = adminRows.map(u => `<div class="adm"><div class="nm"><b class="lnk" data-adm="detail" data-n="${esc(u.nick)}">${esc(u.nick)}</b>
+        ${u.bl ? '<span class="tag short">차단</span>' : ""}${u.admin ? '<span class="tag long">관리자</span>' : ""}<br>
+        <span class="muted small">가입 ${dt(u.c)} · 마지막 접속 ${dt(u.la)}<br>잔고 ${fu(u.bal)} · 거래 ${u.n}회 · 포지션 ${u.pos}개</span></div>
       <b class="${pc(u.ret)}">${sg(u.ret)}%</b>
       <input inputmode="decimal" placeholder="충전 USDT" data-n="${esc(u.nick)}"><button class="mini" data-adm="charge" data-n="${esc(u.nick)}">충전</button>
-      <button class="ghost mini" data-adm="reset" data-n="${esc(u.nick)}">잔고 초기화</button></div>`).join("") || '<div class="empty">사용자가 없어요</div>';
+      <button class="ghost mini" data-adm="reset" data-n="${esc(u.nick)}">잔고 초기화</button>
+      ${u.admin ? "" : `<button class="ghost mini" data-adm="${u.bl ? "unblock" : "block"}" data-n="${esc(u.nick)}">${u.bl ? "차단 해제" : "차단"}</button>
+      <button class="ghost mini r" data-adm="delete" data-n="${esc(u.nick)}">삭제</button>`}</div>`).join("") || '<div class="empty">사용자가 없어요</div>';
+    const log = adminLog.map(l => `<div class="lrow"><span><b>${esc(l.to)}</b> · ${esc(l.act)}</span><span class="m">${mdhm(l.t)} · ${esc(l.by)}</span></div>`).join("") || '<div class="empty">아직 기록이 없어요</div>';
+    $("tabbody").innerHTML = rows + '<h2 style="margin-top:18px">관리자 활동 기록 (최근 50개)</h2>' + log;
+  }
+  function renderAdminDetail() {
+    const d = adminView;
+    const ord = d.ol.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${o.kind}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${o.status}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">없어요</div>';
+    const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">관리자 충전 +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
+      : `<div class="lrow"><span><b>${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(t.reason)}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
+        <span class="m">${fq(t.qty)} · ${fp(t.entry)} → ${fp(t.exit)} · ${mdhm(t.t)}</span></div>`).join("") || '<div class="empty">없어요</div>';
+    $("tabbody").innerHTML = `<button class="ghost mini" data-adm="back">← 목록으로</button>
+      <h2 style="margin:10px 0 4px">${esc(d.nick)} ${d.bl ? '<span class="tag short">차단</span>' : ""}</h2>
+      <p class="sub">가입 ${dt(d.c)} · 마지막 접속 ${dt(d.la)} · 잔고 ${fu(d.bal)} · 원금 ${fu(d.dep)} · ${d.stats.w}승 ${d.stats.n - d.stats.w}패 · 보유 포지션 ${d.pos.length}개 · 미체결 ${d.ord.length}개</p>
+      <h2>최근 거래 기록</h2>${th}<h2 style="margin-top:16px">최근 주문 기록</h2>${ord}`;
   }
   $("tabbody").addEventListener("click", async e => {
     const b = e.target.closest("[data-adm]"); if (!b) return;
-    const nick = b.dataset.n;
+    const act = b.dataset.adm, nick = b.dataset.n;
     try {
-      if (b.dataset.adm === "charge") {
+      if (act === "back") { adminView = null; return renderAdmin(); }
+      if (act === "detail") { adminView = await post("/api/admin", { action: "detail", nick }); return renderAdmin(); }
+      if (act === "charge") {
         const amt = num(b.parentElement.querySelector("input").value);
         if (!(amt > 0)) return toast("충전 금액을 입력하세요");
         if (!confirm(`${nick} 님에게 ${fu(amt)} USDT 를 충전할까요?`)) return;
         toast((await post("/api/admin", { action: "charge", nick, amount: amt })).msg);
-      } else {
+      } else if (act === "reset") {
         if (!confirm(`${nick} 님의 잔고·포지션·기록을 전부 지우고 10,000 USDT 로 초기화할까요?`)) return;
         toast((await post("/api/admin", { action: "reset", nick })).msg);
-      }
-      loadAdmin();
+      } else if (act === "block" || act === "unblock") {
+        if (!confirm(`${nick} 님을 ${act === "block" ? "차단" : "차단 해제"}할까요?`)) return;
+        toast((await post("/api/admin", { action: act, nick })).msg);
+      } else if (act === "delete") {
+        if (!confirm(`${nick} 님의 계정을 삭제할까요? 잔고와 모든 기록이 사라지고 되돌릴 수 없어요.`)) return;
+        if (!confirm(`정말 '${nick}' 계정을 삭제할까요? (마지막 확인)`)) return;
+        toast((await post("/api/admin", { action: "delete", nick })).msg);
+      } else return;
+      adminView = null; loadAdmin();
       if (nick.toLowerCase() === (S.nick || "").toLowerCase()) refresh(true);
     } catch (err) { toast(err.message); }
   });

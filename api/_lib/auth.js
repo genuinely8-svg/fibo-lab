@@ -2,6 +2,7 @@
 const crypto = require("crypto");
 const db = require("./db");
 
+const BLOCKED = "차단된 계정입니다";
 const fail = (status, msg) => { const e = new Error(msg); e.status = status; return e; };
 
 const NICK_RE = /^[0-9A-Za-z_\-가-힣ㄱ-ㅎ]{2,16}$/u;
@@ -37,6 +38,7 @@ function makeToken(key, ph) {
 }
 
 const adminKey = () => (process.env.ADMIN_NICKNAME ? "u:" + normNick(process.env.ADMIN_NICKNAME) : null);
+const displayOf = key => key.slice(2);
 const isAdminKey = key => !!adminKey() && key === adminKey();
 
 // 요청의 토큰으로 사용자 불러오기 (Redis GET 1번)
@@ -49,9 +51,10 @@ async function authed(req) {
   if (!p || !p.k || !sig || p.e < Date.now()) throw fail(401, "다시 로그인해주세요");
   const user = await db.getJSON(p.k);
   if (!user) throw fail(401, "다시 로그인해주세요");
+  if (user.bl && !isAdminKey(p.k)) throw fail(403, BLOCKED);       // 이미 로그인된 기기도 다음 요청부터 막힘
   const want = sign(payload, user.ph);
   if (want.length !== sig.length || !crypto.timingSafeEqual(Buffer.from(want), Buffer.from(sig))) throw fail(401, "다시 로그인해주세요");
   return { key: p.k, user };
 }
 
-module.exports = { fail, checkNick, normNick, userKey, hashPin, verifyPin, makeToken, authed, isAdminKey };
+module.exports = { BLOCKED, displayOf, fail, checkNick, normNick, userKey, hashPin, verifyPin, makeToken, authed, isAdminKey };
