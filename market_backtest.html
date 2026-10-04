@@ -1,5 +1,5 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FIBO LAB · 시장 방향 백테스트</title>
-<link rel="stylesheet" href="common.css?v=20261005003921"><script src="theme.js?v=20261005003921"></script><style>:root{--bg:#0b0f14;--card:#111720;--line:#273142;--text:#e8edf5;--muted:#93a0b3;--accent:#4f7cff;--up:#27c281;--down:#ef5b67}html{background:var(--bg);color:var(--text)}body{background:var(--bg);color:var(--text)}</style>
+<link rel="stylesheet" href="common.css?v=20261005004237"><script src="theme.js?v=20261005004237"></script><style>:root{--bg:#0b0f14;--card:#111720;--line:#273142;--text:#e8edf5;--muted:#93a0b3;--accent:#4f7cff;--up:#27c281;--down:#ef5b67}html{background:var(--bg);color:var(--text)}body{background:var(--bg);color:var(--text)}</style>
 <style>
 body{max-width:1180px;margin:auto;padding:18px}.hero{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;flex-wrap:wrap}.muted{color:var(--muted)}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0}.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.controls label{display:grid;gap:5px;font-size:12px;color:var(--muted)}select,input,button{font:inherit;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);padding:9px 11px}button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:white;border-color:transparent}button:disabled{opacity:.5;cursor:not-allowed}
@@ -31,15 +31,15 @@ table.cards td::before{content:attr(data-label);color:var(--muted);text-align:le
 <div class="panel"><h2>4주 변화량 구간별 BTC 성과</h2><div class="note">4주 변화량 = 현재 시장점수 − 4주 전 시장점수. 강한 개선 ≥ +30 · 개선 +15 이상 +30 미만 · 중립 −15 초과 +15 미만 · 악화 −30 초과 −15 이하 · 강한 악화 ≤ −30<br>주의: 주간 표본은 이후 수익률 구간이 서로 겹쳐서(예: 30일 수익률은 다음 4주와 대부분 겹침) 실제로 독립적인 표본은 표본 수보다 적습니다. 결과는 참고용 데이터이며 매매 신호가 아닙니다.</div><div class="tablewrap"><table><thead><tr><th>모멘텀</th><th>표본</th><th>1일 평균 / 상승률</th><th>3일 평균 / 상승률</th><th>7일 평균 / 상승률</th><th>14일 평균 / 상승률</th><th>30일 평균 / 상승률</th></tr></thead><tbody id="moms"></tbody></table></div><div id="momNote" class="note"></div></div>
 <div class="panel"><h2>주간 점수 원자료</h2><button id="csv">CSV 저장</button><div class="tablewrap"><table><thead><tr><th>날짜</th><th>점수</th><th>판정</th><th>4주 변화</th><th>모멘텀</th><th>코인수</th><th>BTC</th></tr></thead><tbody id="raw"></tbody></table></div></div>
 <div class="panel rg"><h2>시장 국면 일치도 검증</h2>
-<div class="note">FIBO 시장 방향 점수가 미래 가격이 아니라 <b>그 시점의 BTC 시장 상태</b>와 얼마나 비슷한지 보는 표입니다. BTC 가격은 점수 계산에 쓰지 않고 비교 기준으로만 씁니다(단, 점수 산출 코인 목록에는 기존대로 BTC의 피보 터치 통계가 한 코인으로 포함돼 있습니다).<br>
+<div class="note">ATH 시장 방향 점수가 미래 가격이 아니라 <b>그 시점의 BTC 시장 상태</b>와 얼마나 비슷한지 보는 표입니다. BTC 가격은 점수 계산에 쓰지 않고 비교 기준으로만 씁니다(단, 점수 산출 코인 목록에는 기존대로 BTC의 피보 터치 통계가 한 코인으로 포함돼 있습니다).<br>
 BTC 국면 = 30일 수익률(+5% 초과 +1 / −5% 미만 −1 / 그 외 0) + 현재가 vs 30일 이동평균(위 +1 / 아래 −1) + 30일 이동평균의 7일 전 대비 기울기(상승 +1 / 하락 −1). 합계 +2 이상 상승 추세, −2 이하 하락 추세, 그 외 중립. 각 주의 계산은 그 주 시점까지의 BTC 데이터만 씁니다.</div>
 <h3>1. 전체 일치율</h3><div class="grid g2" id="rgAll"></div>
 <h3>2. 방향성 일치율</h3><div class="grid" id="rgDir"></div>
-<h3>3. FIBO vs BTC Confusion Matrix</h3><div class="tablewrap"><table class="cm"><thead><tr><th></th><th>BTC 상승</th><th>BTC 중립</th><th>BTC 하락</th><th>합계</th></tr></thead><tbody id="rgCm"></tbody></table></div><div id="rgCmNote" class="note"></div>
-<h3>4. FIBO 판정별 BTC 시장상태</h3><div class="tablewrap"><table class="cards"><thead><tr><th>FIBO 판정</th><th>표본</th><th>BTC 상승 추세</th><th>BTC 중립</th><th>BTC 하락 추세</th></tr></thead><tbody id="rgByFibo"></tbody></table></div>
+<h3>3. ATH vs BTC Confusion Matrix</h3><div class="tablewrap"><table class="cm"><thead><tr><th></th><th>BTC 상승</th><th>BTC 중립</th><th>BTC 하락</th><th>합계</th></tr></thead><tbody id="rgCm"></tbody></table></div><div id="rgCmNote" class="note"></div>
+<h3>4. ATH 판정별 BTC 시장상태</h3><div class="tablewrap"><table class="cards"><thead><tr><th>ATH 판정</th><th>표본</th><th>BTC 상승 추세</th><th>BTC 중립</th><th>BTC 하락 추세</th></tr></thead><tbody id="rgByFibo"></tbody></table></div>
 <h3>5. Market Score 구간별 BTC 시장상태</h3><div class="tablewrap"><table class="cards"><thead><tr><th>점수 구간</th><th>표본</th><th>평균 BTC 30일 수익률</th><th>BTC 상승 추세</th><th>BTC 중립</th><th>BTC 하락 추세</th></tr></thead><tbody id="rgBins"></tbody></table></div>
 <h3>6. 상관관계</h3><div class="tablewrap"><table class="cards"><thead><tr><th>항목</th><th>Pearson r</th></tr></thead><tbody id="rgCorr"></tbody></table></div>
-<h3>7. 주간 원자료</h3><div class="tablewrap"><table class="cards"><thead><tr><th>날짜</th><th>marketScore</th><th>FIBO 판정</th><th>BTC</th><th>BTC 30일</th><th>MA30</th><th>MA30 기울기</th><th>BTC 점수</th><th>BTC 국면</th></tr></thead><tbody id="rgRaw"></tbody></table></div>
+<h3>7. 주간 원자료</h3><div class="tablewrap"><table class="cards"><thead><tr><th>날짜</th><th>marketScore</th><th>ATH 판정</th><th>BTC</th><th>BTC 30일</th><th>MA30</th><th>MA30 기울기</th><th>BTC 점수</th><th>BTC 국면</th></tr></thead><tbody id="rgRaw"></tbody></table></div>
 </div>
 </div>
 <script>
@@ -492,7 +492,7 @@ function verdict(s){return s>=30?'상승장':s<=-30?'하락장':'횡보'}
 // BTC 가격은 점수 계산에 쓰지 않고, 점수와 비교하는 독립 기준(benchmark)으로만 씀
 // 각 주의 BTC 상태는 점수와 같은 시점(그 주 시각 T에 열린 봉까지)의 데이터만 사용 → 미래 데이터 없음
 function fiboRegime(s){return s>=30?'bull':s<=-30?'bear':'neutral'}
-const FIBO_KO={bull:'FIBO 상승장',neutral:'FIBO 횡보',bear:'FIBO 하락장'}, BTC_KO={bull:'BTC 상승 추세',neutral:'BTC 중립',bear:'BTC 하락 추세'}, REGS=['bull','neutral','bear'];
+const FIBO_KO={bull:'ATH 상승장',neutral:'ATH 횡보',bear:'ATH 하락장'}, BTC_KO={bull:'BTC 상승 추세',neutral:'BTC 중립',bear:'BTC 하락 추세'}, REGS=['bull','neutral','bear'];
 const BTC_RET_TH=5;                                                   // 30일 수익률 ±5% 기준
 function lastIdxAtOrBefore(cs,T){let lo=0,hi=cs.length-1,ans=-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t<=T){ans=m;lo=m+1}else hi=m-1}return ans}
 function closeAtTime(cs,t){let lo=0,hi=cs.length-1;while(lo<=hi){const m=(lo+hi)>>1;if(cs[m].t===t)return cs[m].c;if(cs[m].t<t)lo=m+1;else hi=m-1}return null}
@@ -527,9 +527,9 @@ function renderRegime(rows){
   let tot=0;const cell=(f,b)=>V.filter(r=>r.fiboRegime===f&&r.btcRegime===b).length;
   $('rgCm').innerHTML=REGS.map(f=>{const cs=REGS.map(b=>cell(f,b));tot+=cs.reduce((a,b)=>a+b,0);return `<tr><td>${FIBO_KO[f]}</td>${cs.map((c,j)=>`<td class="${f===REGS[j]?'hit':''}">${c}</td>`).join('')}<td class="muted">${cs.reduce((a,b)=>a+b,0)}</td></tr>`}).join('')
     +`<tr><td class="muted">합계</td>${REGS.map(b=>`<td class="muted">${V.filter(r=>r.btcRegime===b).length}</td>`).join('')}<td><b>${tot}</b></td></tr>`;
-  $('rgCmNote').textContent=`행 = FIBO 판정, 열 = BTC 국면. 표 합계 ${tot}주 = 유효 표본 ${N}주.`;
-  // FIBO 판정별 BTC 상태
-  $('rgByFibo').innerHTML=REGS.map(f=>{const s=shares(V.filter(r=>r.fiboRegime===f));return `<tr>${td('FIBO 판정',FIBO_KO[f])}${td('표본',s.n)}${td('BTC 상승 추세',f1(s.bull))}${td('BTC 중립',f1(s.neutral))}${td('BTC 하락 추세',f1(s.bear))}</tr>`}).join('');
+  $('rgCmNote').textContent=`행 = ATH 판정, 열 = BTC 국면. 표 합계 ${tot}주 = 유효 표본 ${N}주.`;
+  // ATH 판정별 BTC 상태
+  $('rgByFibo').innerHTML=REGS.map(f=>{const s=shares(V.filter(r=>r.fiboRegime===f));return `<tr>${td('ATH 판정',FIBO_KO[f])}${td('표본',s.n)}${td('BTC 상승 추세',f1(s.bull))}${td('BTC 중립',f1(s.neutral))}${td('BTC 하락 추세',f1(s.bear))}</tr>`}).join('');
   // 점수 구간별
   $('rgBins').innerHTML=SCORE_BINS.map(([lab,fn])=>{const L=V.filter(r=>fn(r.score)),s=shares(L),a=avg(L.map(r=>r.btc30dReturn));return `<tr>${td('점수 구간',lab)}${td('표본',s.n)}${td('평균 BTC 30일 수익률',sg(a),cls(a))}${td('BTC 상승 추세',f1(s.bull))}${td('BTC 중립',f1(s.neutral))}${td('BTC 하락 추세',f1(s.bear))}</tr>`}).join('');
   // 상관관계
@@ -537,7 +537,7 @@ function renderRegime(rows){
   $('rgCorr').innerHTML=[['marketScore vs BTC 지난 30일 수익률',cr(rows.map(r=>r.score),rows.map(r=>r.btc30dReturn))],['marketScore vs btcRegimeScore',cr(rows.map(r=>r.score),rows.map(r=>r.btcRegimeScore))],['change4w vs BTC 지난 4주 수익률',cr(rows.map(r=>r.change4w),rows.map(r=>r.btc4wReturn))]]
     .map(([k,v])=>`<tr>${td('항목',k)}${td('Pearson r',v)}</tr>`).join('');
   // 주간 원자료
-  $('rgRaw').innerHTML=rows.map(r=>`<tr>${td('날짜',new Date(r.T).toLocaleDateString('ko-KR'))}${td('marketScore',r.score.toFixed(1),cls(r.score))}${td('FIBO 판정',FIBO_KO[r.fiboRegime].replace('FIBO ',''))}${td('BTC',r.btc!=null?r.btc.toFixed(0):'-')}${td('BTC 30일',sg(r.btc30dReturn),cls(r.btc30dReturn))}${td('MA30',r.btcMA30!=null?r.btcMA30.toFixed(0):'-')}${td('MA30 기울기',sg(r.btcMA30Slope),cls(r.btcMA30Slope))}${td('BTC 점수',r.btcRegimeScore??'-')}${td('BTC 국면',r.btcRegime?BTC_KO[r.btcRegime].replace('BTC ',''):'-')}</tr>`).join('');
+  $('rgRaw').innerHTML=rows.map(r=>`<tr>${td('날짜',new Date(r.T).toLocaleDateString('ko-KR'))}${td('marketScore',r.score.toFixed(1),cls(r.score))}${td('ATH 판정',FIBO_KO[r.fiboRegime].replace('FIBO ',''))}${td('BTC',r.btc!=null?r.btc.toFixed(0):'-')}${td('BTC 30일',sg(r.btc30dReturn),cls(r.btc30dReturn))}${td('MA30',r.btcMA30!=null?r.btcMA30.toFixed(0):'-')}${td('MA30 기울기',sg(r.btcMA30Slope),cls(r.btcMA30Slope))}${td('BTC 점수',r.btcRegimeScore??'-')}${td('BTC 국면',r.btcRegime?BTC_KO[r.btcRegime].replace('BTC ',''):'-')}</tr>`).join('');
 }
 function cross(prev,cur){const e=[];if(prev<30&&cur>=30)e.push('+30 진입');if(prev>=30&&cur<30)e.push('+30 이탈');if(prev<=0&&cur>0)e.push('0 상향돌파');if(prev>=0&&cur<0)e.push('0 하향돌파');if(prev>-30&&cur<=-30)e.push('-30 진입');if(prev<=-30&&cur>-30)e.push('-30 이탈');return e}
 function corr(a,b){const pairs=a.map((x,i)=>[x,b[i]]).filter(p=>p.every(Number.isFinite));if(pairs.length<3)return null;const ax=avg(pairs.map(p=>p[0])),bx=avg(pairs.map(p=>p[1]));let n=0,da=0,db=0;for(const [x,y] of pairs){n+=(x-ax)*(y-bx);da+=(x-ax)**2;db+=(y-bx)**2}return da&&db?n/Math.sqrt(da*db):null}
