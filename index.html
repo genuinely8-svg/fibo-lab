@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261005002544"></script>
+<script src="theme.js?v=20261005003921"></script>
 <title>ath TEST (참고용)</title>
 <style>
   :root{
@@ -240,6 +240,13 @@
       <label>터치 후 관찰 봉 수
         <input id="k" type="number" min="3" max="100" value="20">
       </label>
+      <label>진입 깊이
+        <select id="ratio">
+          <option value="0.5">A · 얕게 (신호 많음)</option>
+          <option value="0.618">B · 중간</option>
+          <option value="1" selected>C · 깊게 (기본)</option>
+        </select>
+      </label>
       <label>분석할 캔들 수
         <select id="count">
           <option value="600">600개</option>
@@ -344,10 +351,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261005002544"></script>
-<script src="chart.js?v=20261005002544"></script>
-<script src="nav.js?v=20261005002544"></script>
-<script src="meta.js?v=20261005002544"></script>
+<script src="fib-core.js?v=20261005003921"></script>
+<script src="chart.js?v=20261005003921"></script>
+<script src="nav.js?v=20261005003921"></script>
+<script src="meta.js?v=20261005003921"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -470,7 +477,7 @@ let dir = "long";                  // "long" | "short"
 const hashDir = () => { const h = location.hash.slice(1).toLowerCase(); return h === "long" || h === "short" ? h : null; };
 let watch = DEFAULT_WATCH.slice();
 let shared = null;                 // 링크로 공유받은 목록 (저장 전)
-const SETTINGS = ["ex", "unit", "n", "k", "count", "auto", "topN", "mcap", "fee", "sort"];
+const SETTINGS = ["ex", "unit", "n", "k", "ratio", "count", "auto", "topN", "mcap", "fee", "sort"];
 function saveSettings() {
   const o = { mode, dir, autoV: 2 }; for (const id of SETTINGS) o[id] = $(id).value;
   try { localStorage.setItem("main-settings-v1", JSON.stringify(o)); } catch (e) {}
@@ -548,7 +555,7 @@ async function runOnce() {
   await Promise.all([worker(), worker(), worker(), worker()]);
   await logosReady;            // 로고가 준비될 때까지 (보통 즉시)
   // 계산은 캔들을 다 받은 뒤 "지금 모드"로 (받는 도중에 LONG/SHORT 를 바꿔도 맞게)
-  for (let i = 0; i < out.length; i++) if (out[i] && !out[i].error) out[i] = { ...out[i], ...FibCore.analyze(out[i].candles, { n, k, direction: dir }) };
+  for (let i = 0; i < out.length; i++) if (out[i] && !out[i].error) out[i] = { ...out[i], ...FibCore.analyze(out[i].candles, { n, k, ratio: +$("ratio").value || 1, direction: dir }) };
   // 자동 스캔에서는 데이터가 부족한 코인은 조용히 빼고 개수만 알려줌
   lastSkipped = mode === "scan" ? out.filter(r => r.error).length : 0;
   results = mode === "scan" ? out.filter(r => !r.error) : out;
@@ -672,7 +679,7 @@ function renderTable() {
   let rank = 0;
   $("tbody").innerHTML = rows.map(r => {
     // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
-    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
     const logo = logoHtml(r.market);
     const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
       + `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a></div>`;
@@ -696,7 +703,7 @@ mq.addEventListener("change", () => { chartPanel.style.width = ""; renderTable()
 // 카드 한 장 안의 숫자 부분 (카드를 새로 그릴 때와 숫자만 바꿀 때 같이 씀)
 function cardParts(r) {
   const s = r.stats, c = r.current;
-  const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+  const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
   const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
   const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
   return {
@@ -714,7 +721,7 @@ function cardParts(r) {
 function renderCards(rows) {
   let rank = 0;
   $("cards").innerHTML = rows.filter(r => !r.error || mode === "watch").map(r => {
-    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}`;
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
     const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
     if (r.error) return `<div class="ccard"><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
       <div class="c3">${r.error}${more}</div></div>`;
@@ -861,7 +868,7 @@ $("saveShared").onclick = () => {
 // ── 휴대폰: 설정 한 줄 요약 (누르면 펼치기/접기) ─────────────────────────
 function updateSetSum() {
   const t = id => $(id).selectedOptions[0].text;
-  $("setSum").textContent = `${dir.toUpperCase()} · ${t("ex")} · ${t("unit")}봉 · 캔들 ${t("count")}` + (mode === "scan" ? ` · 시총 ${t("mcap")} · 거래량 상위 ${t("topN")}` : " · 관심목록");
+  $("setSum").textContent = `${dir.toUpperCase()} · ${t("ex")} · ${t("unit")}봉 · 깊이 ${t("ratio").slice(0, 1)} · 캔들 ${t("count")}` + (mode === "scan" ? ` · 시총 ${t("mcap")} · 거래량 상위 ${t("topN")}` : " · 관심목록");
 }
 $("setBar").onclick = () => $("setCard").classList.toggle("collapsed");
 
@@ -885,7 +892,7 @@ function setDir(d) {
   dir = d; applyDirUI(); saveSettings(); updateSetSum();
   if (!results.length) return;
   const n = +$("n").value, k = +$("k").value;
-  results = results.map(r => r.error ? r : { market: r.market, candles: r.candles, ...FibCore.analyze(r.candles, { n, k, direction: dir }) });
+  results = results.map(r => r.error ? r : { market: r.market, candles: r.candles, ...FibCore.analyze(r.candles, { n, k, ratio: +$("ratio").value || 1, direction: dir }) });
   Live.applyLatest();
   if (!(openCoin && refreshInPlace())) renderTable();
   if (openCoin && view === "lw") drawChart();
@@ -937,7 +944,7 @@ function tickCountdown() {
 }
 setInterval(tickCountdown, 1000); tickCountdown();
 $("auto").onchange = () => { setAuto(); saveSettings(); };
-for (const id of ["ex", "unit", "n", "k", "count", "topN", "mcap"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); if (id === "unit") setAuto(); run(); });
+for (const id of ["ex", "unit", "n", "k", "ratio", "count", "topN", "mcap"]) $(id).addEventListener("change", () => { saveSettings(); updateSetSum(); if (id === "unit") setAuto(); run(); });
 // 수수료·정렬은 다시 받을 필요 없이 표만 다시 그림
 $("fee").addEventListener("input", () => { saveSettings(); if (results.length && !(openCoin && refreshInPlace())) renderTable(); });
 $("sort").addEventListener("change", () => { saveSettings(); if (results.length) renderTable(); });
