@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script src="theme.js?v=20261005002544"></script>
+<script src="theme.js?v=20261005003043"></script>
 <title>Paper Trading · ath TEST</title>
-<link rel="stylesheet" href="common.css?v=20261005002544">
+<link rel="stylesheet" href="common.css?v=20261005003043">
 <style>
   html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
   /* 아이폰: 입력칸 글자가 16px 보다 작으면 누를 때 화면이 확대돼서, 터치 기기에서는 입력칸을 16px 로 */
   @media (pointer:coarse){ input,select,textarea{font-size:16px!important} }
   .wrap{max-width:1500px}
-  .term{--buy:#22b573;--sell:#ef4b5f;--warn2:#f59e0b}
+  body,.term{--buy:#22b573;--sell:#ef4b5f;--warn2:#f59e0b}
   .g{color:var(--buy)} .r{color:var(--sell)} .o{color:var(--warn2)}
   button.buy{background:var(--buy)} button.sell{background:var(--sell)}
   button.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
@@ -173,6 +173,31 @@
   #modal .card{width:380px;max-width:100%;margin:0;max-height:86vh;overflow-y:auto}
   #modal .btns{display:flex;gap:8px;margin-top:12px} #modal .btns button{flex:1}
   #modal label{margin-bottom:8px}
+  /* 아래에서 올라오는 시트 (포지션 닫기) */
+  #modal.sheet{align-items:end;padding:0}
+  #modal.sheet .card{width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));max-height:92vh;animation:sup .18s ease-out}
+  @keyframes sup{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+  @media (min-width:901px){ #modal.sheet{align-items:center;padding:16px} #modal.sheet .card{border-radius:14px} }
+  .sheet .shh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .sheet .shh h2{margin:0;font-size:22px}
+  .sheet .x{width:36px;height:36px;padding:0;font-size:18px;border:0}
+  .sheet .h2l{display:flex;align-items:center;gap:6px;margin:6px 0 10px}
+  .sheet .h2l b{font-size:17px;margin-right:2px}
+  .sheet .kv{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:3px 0;font-variant-numeric:tabular-nums}
+  .sheet .kv span{color:var(--muted)} .sheet .kv b{font-weight:600}
+  .sheet .prow{display:flex;gap:8px;margin:12px 0 10px}
+  .sheet .pin{flex:1;position:relative;display:flex}
+  .sheet .pin input{flex:1;width:100%;padding-right:52px}
+  .sheet .pin small{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px}
+  .sheet #cmkt{flex:none;padding:0 14px;white-space:nowrap}
+  .sheet #cmkt.on{border-color:var(--text)}
+  .sheet .qbox{display:block;margin:0 0 6px}
+  .sheet .qbox input{width:100%}
+  .sheet .dots{position:relative;margin:10px 8px 14px;height:22px}
+  .sheet .dots input{position:absolute;inset:0;width:100%;margin:0;z-index:2;background:transparent}
+  .sheet .dots i{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--card);border:2px solid var(--muted);z-index:1;pointer-events:none}
+  .sheet .dots i:nth-of-type(1){left:0} .sheet .dots i:nth-of-type(2){left:25%} .sheet .dots i:nth-of-type(3){left:50%} .sheet .dots i:nth-of-type(4){left:75%} .sheet .dots i:nth-of-type(5){left:100%}
+  .sheet .confirm{width:100%;margin-top:14px;padding:14px;font-size:16px;border-radius:10px;background:var(--text);color:var(--bg)}
 
   .mobonly{display:none}
 
@@ -404,10 +429,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261005002544"></script>
-<script src="common.js?v=20261005002544"></script>
-<script src="meta.js?v=20261005002544"></script>
-<script src="paper-engine.js?v=20261005002544"></script>
-<script src="paper.js?v=20261005002544"></script>
+<script src="nav.js?v=20261005003043"></script>
+<script src="common.js?v=20261005003043"></script>
+<script src="meta.js?v=20261005003043"></script>
+<script src="paper-engine.js?v=20261005003043"></script>
+<script src="paper.js?v=20261005003043"></script>
 </body>
 </html>
