@@ -57,16 +57,36 @@
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === "suspended") actx.resume();
-      const seq = kind === "ok" ? [[880, 0, .09]] : kind === "warn" ? [[660, 0, .1], [660, .16, .1]] : [[330, 0, .16], [247, .2, .22]];
-      for (const [f, at, d] of seq) {
-        const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + at;
-        o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.12, t0 + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + d);
-        o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + d + .02);
+      // 체결음: "띵-동" 두 음 차임 (종소리처럼 배음을 섞고 길게 울리며 사라짐)
+      //   ding: 체결·포지션 오픈/종료 (높은 음 → 낮은 음), warn: 경고 (같은 음 두 번), bad: 청산·실패 (낮은 두 음)
+      const seq = kind === "ding" ? [[1318.5, 0, .55, .16], [1046.5, .16, .9, .16]]
+        : kind === "ok" ? [[1174.7, 0, .35, .1]]
+        : kind === "warn" ? [[880, 0, .25, .12], [880, .2, .3, .12]]
+        : [[392, 0, .35, .15], [311.1, .22, .5, .15]];
+      for (const [f, at, d, vol] of seq) {
+        const t0 = actx.currentTime + at, out = actx.createGain();
+        out.gain.setValueAtTime(.0001, t0); out.gain.exponentialRampToValueAtTime(vol, t0 + .006); out.gain.exponentialRampToValueAtTime(.0001, t0 + d);
+        out.connect(actx.destination);
+        for (const [mul, amp] of [[1, 1], [2, .28], [3, .08]]) {            // 기본음 + 배음 → 종소리 느낌
+          const o = actx.createOscillator(), g = actx.createGain();
+          o.type = "sine"; o.frequency.value = f * mul; g.gain.value = amp;
+          o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + d + .05);
+        }
       }
     } catch (e) {}
   }
+  // 아이폰은 화면을 한 번 눌러야 소리를 낼 수 있어서, 첫 터치 때 소리 장치를 미리 깨워둠
+  const unlockAudio = () => {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      const b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0);
+    } catch (e) {}
+    removeEventListener("pointerdown", unlockAudio); removeEventListener("keydown", unlockAudio);
+  };
+  addEventListener("pointerdown", unlockAudio); addEventListener("keydown", unlockAudio);
   // kind: ok(초록) | warn(주황) | bad(빨강, 청산·실패)
-  function notify(kind, title, text, quiet) {
+  function notify(kind, title, text, quiet, snd) {
     S.notes.unshift({ t: Date.now(), k: kind, title, text: text || "" });
     if (S.notes.length > 50) S.notes.length = 50;
     S.unread++; saveNotes(); renderBell();
@@ -77,7 +97,7 @@
     $("toasts").prepend(el);
     while ($("toasts").children.length > 4) $("toasts").lastChild.remove();
     setTimeout(() => el.remove(), kind === "ok" ? 4000 : 6000);
-    beep(kind);
+    beep(snd || kind);
   }
   const fail = e => notify("bad", "Failed", e.message || String(e));
   function saveNotes() { ls.set(K.notes + (S.nick || ""), JSON.stringify(S.notes)); }
@@ -89,7 +109,7 @@
   }
   $("bell").onclick = e => { e.stopPropagation(); const p = $("bellpanel"); p.hidden = !p.hidden; if (!p.hidden) { S.unread = 0; } renderBell(); };
   $("bellpanel").onclick = e => e.stopPropagation();
-  $("snd").onclick = () => { S.sound = !S.sound; ls.set(K.sound, S.sound ? "1" : "0"); renderBell(); if (S.sound) beep("ok"); };
+  $("snd").onclick = () => { S.sound = !S.sound; ls.set(K.sound, S.sound ? "1" : "0"); renderBell(); if (S.sound) beep("ding"); };
   $("bclear").onclick = () => { S.notes = []; S.unread = 0; saveNotes(); renderBell(); };
   document.addEventListener("click", () => { $("bellpanel").hidden = true; });
 
@@ -139,15 +159,15 @@
         + events.map(e => `<div class="lrow"><span class="${EV_TITLE[e.type][0] === "bad" ? "r" : EV_TITLE[e.type][0] === "warn" ? "o" : "g"}"><b>${EV_TITLE[e.type][1]}</b></span><span>${esc(evText(e))}</span><span class="m">${mdhm(e.t)}</span></div>`).join(""), null, "확인");
       return;
     }
-    for (const e of events) notify(EV_TITLE[e.type][0], EV_TITLE[e.type][1], evText(e));
+    for (const e of events) notify(EV_TITLE[e.type][0], EV_TITLE[e.type][1], evText(e), false, ["fill", "tp", "rclose"].includes(e.type) ? "ding" : undefined);
   }
   function handleInfo(i) {
     if (!i) return;
     if (i.kind === "order") {
       const t = `${base(i.sym)} ${modeTxt(i.mode)} ${sideTxt(i.side)} ${i.lev}x · ${fq(i.qty)} @ ${fp(i.price)}`;
-      if (i.filled) notify("ok", i.merged ? "Added to position" : "Position opened", t); else notify("ok", "Order placed", "Limit · " + t);
+      if (i.filled) notify("ok", i.merged ? "Added to position" : "Position opened", t, false, "ding"); else notify("ok", "Order placed", "Limit · " + t);
     } else if (i.kind === "cancel") notify("ok", "Order cancelled", "Open order cancelled");
-    else if (i.kind === "close") notify(i.pnl >= 0 ? "ok" : "warn", i.pct >= 100 ? "Position closed" : `Partial close ${i.pct}%`, `${base(i.sym)} ${sideTxt(i.side)} @ ${fp(i.price)} · PnL ${sg(i.pnl)} USDT`);
+    else if (i.kind === "close") notify(i.pnl >= 0 ? "ok" : "warn", i.pct >= 100 ? "Position closed" : `Partial close ${i.pct}%`, `${base(i.sym)} ${sideTxt(i.side)} @ ${fp(i.price)} · PnL ${sg(i.pnl)} USDT`, false, "ding");
     else if (i.kind === "closeLimit") notify("ok", "Limit close order placed", `${base(i.sym)} ${i.pct}% @ ${fp(i.price)}`);
     else if (i.kind === "edit") notify("ok", "TP/SL updated", base(i.sym));
     else if (i.kind === "reset") notify("ok", "Reset", "Starting again with 10,000 USDT");
