@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
     const { key, user } = await A.authed(req);
     const st = user.st;
     const now = Date.now();
-    let dirty = false, msg = null;
+    let dirty = false, info = null;
 
     // 1) 소급 처리
     let sy;
@@ -39,30 +39,40 @@ module.exports = async (req, res) => {
         if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) throw A.fail(400, "코인 정보가 올바르지 않아요");
         const cur = await B.price(sym);
         const r = E.placeOrder(st, b, cur, now);
-        msg = r.filled ? `체결: ${sym} ${r.pos.side === "long" ? "롱" : "숏"} @ ${r.pos.entry}` : "지정가 주문이 접수됐어요";
+        const x = r.filled ? r.pos : r.ord;
+        info = { kind: "order", filled: r.filled, sym, side: x.side, mode: x.mode, lev: x.lev, qty: x.qty, price: r.filled ? r.pos.entry : r.ord.price, limit: b.type === "limit" };
         dirty = true; break;
       }
-      case "cancel": E.cancelOrder(st, id, now); msg = "주문을 취소했어요"; dirty = true; break;
-      case "close": {
+      case "cancel": E.cancelOrder(st, id, now); info = { kind: "cancel" }; dirty = true; break;
+      case "close": {                                   // 시장가 청산 (pct: 25/50/75/100 등)
         const p = st.pos.find(x => x.id === id);
         if (!p) throw A.fail(404, "이미 닫혔거나 없는 포지션이에요");
-        const tr = E.closePosition(st, p, await B.price(p.sym), "수동", now);
-        msg = `청산 완료 (${tr.pnl >= 0 ? "+" : ""}${tr.pnl.toFixed(2)} USDT)`; dirty = true; break;
+        const pct = Math.floor(Number(b.pct) || 100);
+        if (!(pct >= 1 && pct <= 100)) throw A.fail(400, "청산 비율은 1~100% 예요");
+        const tr = E.closePosition(st, p, await B.price(p.sym), "수동", now, pct >= 100 ? 0 : p.qty * pct / 100);
+        info = { kind: "close", sym: p.sym, side: p.side, pnl: tr.pnl, price: tr.exit, pct }; dirty = true; break;
+      }
+      case "closeLimit": {                              // 지정가 청산 주문
+        const p = st.pos.find(x => x.id === id);
+        if (!p) throw A.fail(404, "이미 닫혔거나 없는 포지션이에요");
+        const r = E.placeCloseLimit(st, id, b.pct, b.price, await B.price(p.sym), now);
+        info = r.filled ? { kind: "close", sym: p.sym, side: p.side, pnl: r.tr.pnl, price: r.tr.exit, pct: Number(b.pct) } : { kind: "closeLimit", sym: p.sym, price: r.ord.price, pct: r.ord.pct };
+        dirty = true; break;
       }
       case "edit": {
         const p = st.pos.find(x => x.id === id);
         if (!p) throw A.fail(404, "이미 닫혔거나 없는 포지션이에요");
         const t = E.checkTpSl(p.side, await B.price(p.sym), b.tp, b.sl);
-        p.tp = t.tp; p.sl = t.sl; msg = "TP/SL을 바꿨어요"; dirty = true; break;
+        p.tp = t.tp; p.sl = t.sl; info = { kind: "edit", sym: p.sym }; dirty = true; break;
       }
-      case "reset": user.st = E.newState(now); msg = "초기화했어요 (10,000 USDT)"; dirty = true; break;
+      case "reset": user.st = E.newState(now); info = { kind: "reset" }; dirty = true; break;
       default: throw A.fail(400, "알 수 없는 요청이에요");
     }
 
     if (now - (user.la || 0) > LA_EVERY) { user.la = now; dirty = true; }     // 마지막 접속은 10분에 한 번만 기록 (명령 절약)
     if (dirty) await db.setJSON(key, user);
     res.status(200).json({
-      nick: user.nick, admin: A.isAdminKey(key), st: user.st, now, events: sy.events, msg,
+      nick: user.nick, admin: A.isAdminKey(key), st: user.st, now, events: sy.events, info,
       behind: !!sy.behind, syncError: !!sy.error,
     });
   } catch (e) {
