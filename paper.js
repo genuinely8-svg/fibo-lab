@@ -533,6 +533,18 @@
       return v === undefined ? "Enter size" : v === null ? "None" : fp(v);
     };
     $("liqL").textContent = show("long"); $("liqS").textContent = show("short");
+    // TP/SL 예상 손익: 가격이 진입가보다 위/아래인지로 롱·숏을 판단해서 (수수료 포함) 계산
+    const est = (id, kind) => {
+      const v = num($(id).value), el = $(id + "Est");
+      if (!(v > 0) || !ref) { el.innerHTML = ""; return; }
+      if (!(q > 0)) { el.innerHTML = '<span class="m">Enter size to see est. PnL</span>'; return; }
+      const side = kind === "tp" ? (v > ref ? "long" : "short") : (v < ref ? "long" : "short");
+      const fee = q * ref * rateNow() + q * v * (kind === "tp" ? E.FEE_MAKER : E.FEE_TAKER);
+      const pnl = E.pnlOf(side, ref, v, q) - fee, roe = pnl / (q * ref / lev()) * 100;
+      const mv = (v - ref) / ref * 100;
+      el.innerHTML = `<span class="m">${kind === "tp" ? "TP" : "SL"} (${sideTxt(side)}) ${sg(mv)}% →</span> <b class="${pc(pnl)}">${sg(pnl)} USDT</b> <span class="${pc(roe)}">(${sg(roe)}%)</span>`;
+    };
+    est("tp", "tp"); est("sl", "sl");
     $("liqnote").textContent = S.mode === "cross"
       ? `Cross: liq. price based on whole account${q > 0 ? "" : " (uses full available balance if no size)"}`
       : `Isolated: at ${lev()}x, liquidated after ~${(100 / lev() - E.MMR * 100).toFixed(2)}% adverse move`;
