@@ -13,6 +13,7 @@
     ["movers.html", "24시간변동률"],
     ["kimp.html", "김치프리미엄"],
     ["news.html", "주요뉴스"],
+    ["paper.html", "모의투자"],
   ];
   const style = document.createElement("style");
   style.textContent = `
