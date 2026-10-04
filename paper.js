@@ -701,13 +701,8 @@
     if (act === "close") {
       const pct = +b.dataset.pct;
       if (p && confirm(`Market close ${pct}% of ${base(p.sym)} position?`)) sendAction({ action: "close", id, pct }).catch(() => {});
-    } else if (act === "closesheet" && p) {
-      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} · Market close</h2>
-        <p class="small muted">Size ${fq(p.qty)} · Last ${fp(S.px[p.sym])}</p>
-        <div class="pctgrid" id="mpg">${[25, 50, 75, 100].map(x => `<button class="ghost${x === 100 ? " on" : ""}" data-p="${x}">${x}%</button>`).join("")}</div>`,
-        () => sendAction({ action: "close", id, pct: +($("mpg").querySelector(".on") || {}).dataset.p || 100 }), "Close");
-      $("mpg").onclick = e => { const x = e.target.closest("button"); if (x) [...$("mpg").children].forEach(y => y.classList.toggle("on", y === x)); };
-    } else if (act === "cancel") sendAction({ action: "cancel", id }).catch(() => {});
+    } else if (act === "closesheet" && p) closeSheet(p);
+    else if (act === "cancel") sendAction({ action: "cancel", id }).catch(() => {});
     else if (act === "limitclose" && p) {
       modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} · Limit close</h2>
         <label><span class="lt">Close price (USDT)</span><input id="mpx" inputmode="decimal" value="${S.px[p.sym] ? S.px[p.sym].toFixed(pdec(S.px[p.sym])) : ""}"></label>
@@ -722,8 +717,60 @@
         sendAction({ action: "edit", id, tp: $("mtp").value.trim() || undefined, sl: $("msl").value.trim() || undefined }));
     }
   };
+  // ── 포지션 닫기 시트 (거래소 앱 스타일: 가격 비우면 시장가, 넣으면 지정가 / 수량 바) ──
+  function closeSheet(p) {
+    const m = $("modal"), id = p.id, b = esc(base(p.sym)), cl = E.modeOf(p) === "cross" ? "Cross" : "Isolated";
+    const pending = S.st.ord.filter(o => o.ro === id).reduce((s, o) => s + o.qty, 0);
+    const maxQ = Math.max(0, p.qty - pending), dec = Math.max(stepOf(p.entry).dec, (String(p.qty).split(".")[1] || "").length);
+    m.className = "sheet";
+    m.innerHTML = `<div class="card">
+      <div class="shh"><h2>Close</h2><button class="ghost x" id="cx" aria-label="Close">✕</button></div>
+      <div class="h2l"><b>${b}USDT</b><span class="chip ${p.side}">${sideTxt(p.side)}</span><span class="chip ${p.side}">${p.lev}x</span><span class="chip">${cl}</span></div>
+      <div class="kv"><span>Current price</span><b id="cpx">-</b></div>
+      <div class="kv"><span>Entry price</span><b>${fp(p.entry)} USDT</b></div>
+      <div class="prow"><span class="pin"><input id="cprice" inputmode="decimal" placeholder="Fill at market price"><small>USDT</small></span><button class="ghost" id="cmkt">Market price</button></div>
+      <label class="qbox"><span class="lt">Quantity (${b})</span><input id="cqty" inputmode="decimal" value="${String(+maxQ.toFixed(dec))}"></label>
+      <div class="dots"><input id="cpct" type="range" min="0" max="100" step="1" value="100"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="kv"><span>Size</span><b>${fq(p.qty)} ${b}</b></div>
+      <div class="kv"><span>Open orders</span><b>${fq(pending)} ${b}</b></div>
+      <div class="kv"><span>Max close</span><b>${fq(maxQ)} ${b}</b></div>
+      <div class="kv"><span>Est. closing profit</span><b id="cpnl">-</b></div>
+      <div class="kv"><span>Est. closing fee</span><b id="cfee">-</b></div>
+      <button id="cok" class="confirm">Confirm</button></div>`;
+    m.hidden = false;
+    const upd = () => {
+      const lp = num($("cprice").value), mkt = !(lp > 0), px = mkt ? (S.px[p.sym] || p.entry) : lp, q = Math.min(maxQ, num($("cqty").value) || 0);
+      $("cpx").textContent = fp(S.px[p.sym]) + " USDT";
+      $("cmkt").classList.toggle("on", mkt);
+      if (!(q > 0)) { $("cpnl").textContent = $("cfee").textContent = "-"; return; }
+      const g = E.pnlOf(p.side, p.entry, px, q), roe = g / (p.margin * q / p.qty) * 100, fee = q * px * (mkt ? E.FEE_TAKER : E.FEE_MAKER);
+      $("cpnl").innerHTML = `<span class="${pc(g)}">${sg(g)} USDT (${sg(roe)}%)</span>`;
+      $("cfee").textContent = fu(fee, 4) + " USDT";
+    };
+    const setPct = v => { $("cpct").value = v; $("cpct").style.setProperty("--v", v + "%"); $("cqty").value = v >= 100 ? String(maxQ) : String(+(maxQ * v / 100).toFixed(dec)); upd(); };
+    $("cpct").oninput = () => setPct(+$("cpct").value);
+    $("cqty").oninput = () => { const v = maxQ > 0 ? Math.min(100, Math.round((num($("cqty").value) || 0) / maxQ * 100)) : 0; $("cpct").value = v; $("cpct").style.setProperty("--v", v + "%"); upd(); };
+    $("cprice").oninput = upd;
+    $("cmkt").onclick = () => { $("cprice").value = ""; upd(); };
+    $("cx").onclick = () => { m.hidden = true; };
+    $("cpct").style.setProperty("--v", "100%");
+    upd(); const tick = setInterval(() => { if (m.hidden || !document.body.contains($("cpx"))) clearInterval(tick); else upd(); }, 1000);
+    $("cok").onclick = async () => {
+      const q = num($("cqty").value), lp = num($("cprice").value);
+      if (!(q > 0)) return notify("warn", "Close", "Enter a quantity");
+      if (q > maxQ * (1 + 1e-9)) return notify("warn", "Close", `Max close is ${fq(maxQ)} ${base(p.sym)}`);
+      const pct = Math.min(100, q / p.qty * 100);
+      if (pct < 1) return notify("warn", "Close", "Minimum is 1% of the position");
+      $("cok").disabled = true;
+      try {
+        if (lp > 0) await sendAction({ action: "closeLimit", id, price: lp, pct });
+        else await sendAction({ action: "close", id, pct: q >= p.qty * (1 - 1e-9) ? 100 : pct });
+        m.hidden = true;
+      } catch (e) {} finally { const b2 = $("cok"); if (b2) b2.disabled = false; }
+    };
+  }
   function modal(html, onOk, okText) {
-    const m = $("modal");
+    const m = $("modal"); m.className = "";
     m.innerHTML = `<div class="card">${html}<div class="btns">${onOk ? '<button class="ghost" id="mno">Cancel</button>' : ""}<button id="myes">${okText || "Confirm"}</button></div></div>`;
     m.hidden = false;
     if (onOk) $("mno").onclick = () => { m.hidden = true; };
