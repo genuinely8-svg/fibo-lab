@@ -9,7 +9,7 @@
   "use strict";
   const E = PaperEngine;
   const KST = 9 * 3600;
-  const K = { token: "paper-token-v1", nick: "paper-nick-v1", sym: "paper-sym-v1", collapsed: "paper-chart-collapsed-v1", ctab: "paper-ctab-v1",
+  const K = { token: "paper-token-v1", nick: "paper-nick-v1", sym: "paper-sym-v1", collapsed: "paper-chart-collapsed-v1", collapsedM: "paper-chart-collapsed-m-v1", ctab: "paper-ctab-v1",
               mode: "paper-mode-v1", lev: "paper-lev-v1", sound: "paper-sound-v1", notes: "paper-notes-v1:", dep: "paper-dep-v1:" };
   const STABLES = new Set(["USDC", "FDUSD", "TUSD", "USDE", "BUSD", "DAI", "USDP", "USDS", "USD1"]);
   const IVS = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -41,8 +41,13 @@
   const mdhm = t => { const d = new Date(t + 9 * 3600e3).toISOString(); return d.slice(5, 10) + " " + d.slice(11, 16); };
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = v => { const n = parseFloat(String(v).replace(/,/g, "")); return isFinite(n) ? n : NaN; };
-  const sideTxt = s => s === "long" ? "롱" : "숏";
-  const modeTxt = m => m === "cross" ? "교차" : "격리";
+  const sideTxt = s => s === "long" ? "Long" : "Short";
+  const modeTxt = m => m === "cross" ? "Cross" : "Isolated";
+  // 예전(한글) 기록 값 → 영어 표시
+  const LEG = { "지정가": "Limit", "시장가": "Market", "지정가(즉시)": "Limit (instant)", "지정가 청산": "Limit close", "체결": "Filled", "접수": "Open", "취소": "Cancelled",
+                "청산": "Liquidation", "수동": "Manual", "부분": "partial" };
+  const LA = s => String(s ?? "").replace(/잔고 초기화/g, "Balance reset").replace(/차단 해제/g, "Unblocked").replace(/계정 삭제/g, "Account deleted").replace(/차단/g, "Blocked").replace(/충전/g, "Deposit");
+  const L = s => String(s ?? "").replace(/지정가\(즉시\)|지정가 청산|지정가|시장가|체결|접수|취소|청산|수동|부분/g, m => LEG[m] || m);
   const tagSide = (side, mode, lev) => `<span class="tag ${side}">${sideTxt(side)}</span> <span class="tag gray">${modeTxt(mode)} ${lev}x</span>`;
 
   // ── 알림: 위쪽 토스트 + 종 아이콘 기록 + 소리 ───────────────────
@@ -74,13 +79,13 @@
     setTimeout(() => el.remove(), kind === "ok" ? 4000 : 6000);
     beep(kind);
   }
-  const fail = e => notify("bad", "실패", e.message || String(e));
+  const fail = e => notify("bad", "Failed", e.message || String(e));
   function saveNotes() { ls.set(K.notes + (S.nick || ""), JSON.stringify(S.notes)); }
   function loadNotes() { try { S.notes = JSON.parse(ls.get(K.notes + (S.nick || "")) || "[]"); } catch (e) { S.notes = []; } S.unread = 0; renderBell(); }
   function renderBell() {
     $("bellN").hidden = !S.unread; $("bellN").textContent = S.unread > 9 ? "9+" : S.unread;
-    $("snd").textContent = S.sound ? "소리 끄기" : "소리 켜기";
-    if (!$("bellpanel").hidden) $("blist").innerHTML = S.notes.map(n => `<div class="${n.k}"><span><b>${esc(n.title)}</b> ${esc(n.text)}<small>${mdhm(n.t)}</small></span></div>`).join("") || '<div class="muted" style="--c:transparent">알림이 없어요</div>';
+    $("snd").textContent = S.sound ? "Sound off" : "Sound on";
+    if (!$("bellpanel").hidden) $("blist").innerHTML = S.notes.map(n => `<div class="${n.k}"><span><b>${esc(n.title)}</b> ${esc(n.text)}<small>${mdhm(n.t)}</small></span></div>`).join("") || '<div class="muted" style="--c:transparent">No notifications</div>';
   }
   $("bell").onclick = e => { e.stopPropagation(); const p = $("bellpanel"); p.hidden = !p.hidden; if (!p.hidden) { S.unread = 0; } renderBell(); };
   $("bellpanel").onclick = e => e.stopPropagation();
@@ -92,8 +97,8 @@
   async function post(url, body) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...(S.token ? { Authorization: "Bearer " + S.token } : {}) }, body: JSON.stringify(body) });
     const j = await res.json().catch(() => ({}));
-    if ((res.status === 401 || (res.status === 403 && /차단/.test(j.error || ""))) && S.token && url !== "/api/auth") { logout(true, j.error); throw new Error(j.error || "다시 로그인해주세요"); }
-    if (!res.ok) throw new Error(j.error || "서버 오류 " + res.status);
+    if ((res.status === 401 || (res.status === 403 && /차단|blocked/i.test(j.error || ""))) && S.token && url !== "/api/auth") { logout(true, j.error); throw new Error(j.error || "Please log in again"); }
+    if (!res.ok) throw new Error(j.error || "Server error " + res.status);
     return j;
   }
 
@@ -105,7 +110,7 @@
     try {
       let r = await post("/api/auth", { nick, pin });
       if (r.needCreate) {
-        if (!confirm(`'${nick}' 은(는) 처음 보는 닉네임이에요.\n이 닉네임과 입력한 PIN 으로 새 계정을 만들까요?`)) return;
+        if (!confirm(`'${nick}' is a new nickname.\nCreate a new account with this nickname and PIN?`)) return;
         r = await post("/api/auth", { nick, pin, create: true });
       }
       S.token = r.token; S.nick = r.nick; ls.set(K.token, r.token); ls.set(K.nick, r.nick);
@@ -118,19 +123,19 @@
     ls.del(K.token); S.token = null; S.st = null; S.admin = false;
     closeSocks(); started = false; S.first = true;
     $("app").hidden = true; $("login").hidden = false;
-    if (silent) $("lerr").textContent = msg || "다시 로그인해주세요";
+    if (silent) $("lerr").textContent = msg || "Please log in again";
   }
   $("logout").onclick = () => { logout(); location.reload(); };
 
   // ── 서버 상태 ────────────────────────────────────────────────
-  const EV_TITLE = { fill: ["ok", "지정가 체결 · 포지션 오픈"], tp: ["ok", "익절(TP) 발동"], sl: ["warn", "손절(SL) 발동"], liq: ["bad", "강제 청산"], rclose: ["ok", "지정가 청산 체결"] };
-  const evText = e => `${base(e.sym)} ${sideTxt(e.side)} @ ${fp(e.price)}${e.pnl != null ? ` · 손익 ${sg(e.pnl)} USDT` : ""}`;
+  const EV_TITLE = { fill: ["ok", "Limit filled · Position opened"], tp: ["ok", "Take-profit triggered"], sl: ["warn", "Stop-loss triggered"], liq: ["bad", "Liquidated"], rclose: ["ok", "Limit close filled"] };
+  const evText = e => `${base(e.sym)} ${sideTxt(e.side)} @ ${fp(e.price)}${e.pnl != null ? ` · PnL ${sg(e.pnl)} USDT` : ""}`;
   function handleEvents(events) {
     if (!events || !events.length) return;
     if (S.first) {                                       // 접속하지 않은 동안 처리된 것들: 한 번에 묶어서 알려줌
       for (const e of events) notify(EV_TITLE[e.type][0], EV_TITLE[e.type][1], evText(e), true);
-      notify("warn", `부재 중 체결 내역 ${events.length}건`, "접속하지 않은 동안 처리된 내역이에요");
-      modal(`<h2>부재 중 체결 내역 ${events.length}건</h2><p class="sub">접속하지 않은 동안 1분봉으로 소급 처리된 내역이에요</p>`
+      notify("warn", `${events.length} event(s) while you were away`, "Processed while you were offline");
+      modal(`<h2>${events.length} event(s) while you were away</h2><p class="sub">Processed from 1-minute candles while you were offline</p>`
         + events.map(e => `<div class="lrow"><span class="${EV_TITLE[e.type][0] === "bad" ? "r" : EV_TITLE[e.type][0] === "warn" ? "o" : "g"}"><b>${EV_TITLE[e.type][1]}</b></span><span>${esc(evText(e))}</span><span class="m">${mdhm(e.t)}</span></div>`).join(""), null, "확인");
       return;
     }
@@ -140,17 +145,17 @@
     if (!i) return;
     if (i.kind === "order") {
       const t = `${base(i.sym)} ${modeTxt(i.mode)} ${sideTxt(i.side)} ${i.lev}x · ${fq(i.qty)} @ ${fp(i.price)}`;
-      if (i.filled) notify("ok", "포지션 오픈", t); else notify("ok", "주문 등록", "지정가 · " + t);
-    } else if (i.kind === "cancel") notify("ok", "주문 취소", "미체결 주문을 취소했어요");
-    else if (i.kind === "close") notify(i.pnl >= 0 ? "ok" : "warn", i.pct >= 100 ? "포지션 종료" : `부분 청산 ${i.pct}%`, `${base(i.sym)} ${sideTxt(i.side)} @ ${fp(i.price)} · 손익 ${sg(i.pnl)} USDT`);
-    else if (i.kind === "closeLimit") notify("ok", "지정가 청산 주문 등록", `${base(i.sym)} ${i.pct}% @ ${fp(i.price)}`);
-    else if (i.kind === "edit") notify("ok", "TP/SL 변경", base(i.sym));
-    else if (i.kind === "reset") notify("ok", "초기화", "10,000 USDT 로 다시 시작해요");
+      if (i.filled) notify("ok", i.merged ? "Added to position" : "Position opened", t); else notify("ok", "Order placed", "Limit · " + t);
+    } else if (i.kind === "cancel") notify("ok", "Order cancelled", "Open order cancelled");
+    else if (i.kind === "close") notify(i.pnl >= 0 ? "ok" : "warn", i.pct >= 100 ? "Position closed" : `Partial close ${i.pct}%`, `${base(i.sym)} ${sideTxt(i.side)} @ ${fp(i.price)} · PnL ${sg(i.pnl)} USDT`);
+    else if (i.kind === "closeLimit") notify("ok", "Limit close order placed", `${base(i.sym)} ${i.pct}% @ ${fp(i.price)}`);
+    else if (i.kind === "edit") notify("ok", "TP/SL updated", base(i.sym));
+    else if (i.kind === "reset") notify("ok", "Reset", "Starting again with 10,000 USDT");
   }
   function checkDeposits() {
     const deps = S.st.th.filter(t => t.kind === "deposit"), key = K.dep + S.nick, saved = ls.get(key);
     const last = saved == null ? -1 : +saved, max = deps.reduce((m, t) => Math.max(m, t.id), last < 0 ? 0 : last);
-    for (const d of deps.slice().reverse()) if (d.id > last && (saved != null || Date.now() - d.t < 86400e3)) notify("ok", "관리자 충전 받음", `+${fu(d.amount)} USDT`);
+    for (const d of deps.slice().reverse()) if (d.id > last && (saved != null || Date.now() - d.t < 86400e3)) notify("ok", "Deposit received", `+${fu(d.amount)} USDT`);
     if (String(max) !== saved) ls.set(key, String(max));
   }
   async function sendAction(body, quiet) {
@@ -164,7 +169,7 @@
       handleEvents(r.events);
       S.first = false;
       if (!quiet) handleInfo(r.info);
-      if (r.syncError && !quiet) notify("warn", "바이낸스 기록 지연", "기록을 못 받아서 옛 상태를 보여줘요");
+      if (r.syncError && !quiet) notify("warn", "Binance data delayed", "Showing last known state");
       checkDeposits();
       afterState();
       if (r.behind && !r.syncError) setTimeout(() => sendAction({ action: "state" }, true), 1500);   // 오래 비웠으면 이어서 처리
@@ -222,8 +227,8 @@
   function renderDot() {
     const m = mkt.alive(), p = pub.alive(), el = $("wsdot");
     el.className = "wsdot " + (m && p ? "on" : "off");
-    el.title = m && p ? "실시간 연결됨" : `연결 끊김 — 다시 연결하는 중 (가격 ${m ? "정상" : "끊김"} · 호가 ${p ? "정상" : "끊김"})`;
-    $("wstxt").textContent = m && p ? "실시간" : "재연결 중";
+    el.title = m && p ? "Live" : `Disconnected — reconnecting (price ${m ? "ok" : "down"} · book ${p ? "ok" : "down"})`;
+    $("wstxt").textContent = m && p ? "Live" : "Reconnecting";
   }
 
   let dirtyHd = false, dirtyBook = false, dirtyTr = false;
@@ -280,14 +285,14 @@
       S.coins = list;
       for (const c of list) if (!S.px[c.sym]) S.px[c.sym] = c.last;      // 처음 한 번만 채움 (실시간 값을 덮어쓰지 않음)
       renderPicker();
-    } catch (e) { $("plist").innerHTML = '<div class="muted">코인 목록을 못 받았어요</div>'; }
+    } catch (e) { $("plist").innerHTML = '<div class="muted">Could not load coin list</div>'; }
   }
   const logoImg = b => CoinMeta.logo(b) ? `<img src="${esc(CoinMeta.logo(b))}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="ph"></span>`;
   function renderPicker() {
     const q = $("psearch").value.trim().toUpperCase();
     const rows = S.coins.filter(c => !q || c.b.includes(q) || (CoinMeta.ko(c.b) || "").includes(q)).map(c =>
       `<div data-s="${c.sym}">${logoImg(c.b)}<span class="s">${esc(c.b)} <span class="n">${esc(CoinMeta.ko(c.b) || "")}</span></span><span>${fp(c.last)}</span><span class="${pc(c.chg)}">${sg(c.chg)}%</span></div>`);
-    $("plist").innerHTML = rows.join("") || '<div class="muted">없어요</div>';
+    $("plist").innerHTML = rows.join("") || '<div class="muted">No results</div>';
   }
   $("coinbtn").onclick = e => { e.stopPropagation(); const p = $("picker"); p.hidden = !p.hidden; if (!p.hidden) { $("psearch").value = ""; renderPicker(); loadCoins(); $("psearch").focus(); } };
   $("psearch").oninput = renderPicker;
@@ -297,7 +302,7 @@
 
   function setSym(sym) {
     $("picker").hidden = true;
-    S.sym = sym; ls.set(K.sym, sym);
+    S.sym = sym; ls.set(K.sym, sym); lastMid = 0; midDir = "";
     S.book = null; S.trades = []; renderBook(); renderTrades();
     $("oprice").value = ""; $("qty").value = ""; $("pct").value = 0;
     renderHd(); subscribe(); loadTicker(); renderTV(); loadChart(); renderOrderInfo();
@@ -307,7 +312,7 @@
   let lastPx = 0;
   function renderHd() {
     const b = base(S.sym), p = S.px[S.sym], t = S.t24[S.sym], m = S.mark[S.sym];
-    if ($("coinbtn").dataset.k !== S.sym) { $("coinbtn").innerHTML = `${logoImg(b)}<span>${esc(b)}<small> USDT 무기한</small></span> ▾`; $("coinbtn").dataset.k = S.sym; }
+    if ($("coinbtn").dataset.k !== S.sym) { $("coinbtn").innerHTML = `${logoImg(b)}<span>${esc(b)}<small> USDT Perp</small></span> ▾`; $("coinbtn").dataset.k = S.sym; }
     $("qunit").textContent = b;
     const el = $("price");
     el.textContent = fp(p);
@@ -327,23 +332,27 @@
   }
 
   // ── 호가·체결 ────────────────────────────────────────────────
+  const isMob = () => matchMedia("(max-width:900px)").matches;
+  let lastMid = 0, midDir = "";
   function renderBook() {
     const el = $("book");
-    if (!S.book) { el.innerHTML = '<div class="muted small" style="padding:10px">불러오는 중…</div>'; return; }
-    const N = matchMedia("(max-width:900px)").matches ? 7 : 10;
+    if (!S.book) { el.innerHTML = '<div class="muted small" style="padding:10px">Loading…</div>'; return; }
+    const N = isMob() ? 8 : 10;
     const asks = S.book.a.slice(0, N).map(x => [+x[0], +x[1]]), bids = S.book.b.slice(0, N).map(x => [+x[0], +x[1]]);
     const cum = arr => { let s = 0; return arr.map(x => (s += x[1])); };
     const ca = cum(asks), cb = cum(bids), mx = Math.max(ca[ca.length - 1] || 1, cb[cb.length - 1] || 1);
     const row = (cls, x, c) => `<div class="brow ${cls}" data-p="${x[0]}"><i style="width:${(c / mx * 100).toFixed(0)}%"></i><span>${fp(x[0])}</span><span>${fq(x[1])}</span></div>`;
     const p = S.px[S.sym], mk = S.mark[S.sym];
-    el.innerHTML = `<div class="bhead"><span>가격(USDT)</span><span>수량(${esc(base(S.sym))})</span></div>`
+    if (p && lastMid && p !== lastMid) midDir = p > lastMid ? "up" : "dn";
+    if (p) lastMid = p;
+    el.innerHTML = `<div class="bhead"><span>Price(USDT)</span><span>Size(${esc(base(S.sym))})</span></div>`
       + asks.map((x, i) => row("a", x, ca[i])).reverse().join("")
-      + `<div class="mid">${fp(p)}<small>마크 ${mk ? fp(mk.p) : "-"}</small></div>`
+      + `<div class="mid ${midDir}">${fp(p)}<small>Mark ${mk ? fp(mk.p) : "-"}</small></div>`
       + bids.map((x, i) => row("b", x, cb[i])).join("");
   }
   $("book").onclick = e => { const r = e.target.closest("[data-p]"); if (r) { setType("limit"); $("oprice").value = r.dataset.p; renderOrderInfo(); } };
   function renderTrades() {
-    $("trades").innerHTML = `<div class="bhead"><span>시간</span><span>가격</span><span>수량</span></div>` + S.trades.map(t =>
+    $("trades").innerHTML = `<div class="bhead"><span>Time</span><span>Price</span><span>Size</span></div>` + S.trades.map(t =>
       `<div class="trow"><span class="muted">${hms(t.T)}</span><span class="${t.m ? "r" : "g"}">${fp(t.p)}</span><span>${fq(t.q)}</span></div>`).join("");
   }
   $("bseg").onclick = e => {
@@ -360,7 +369,7 @@
     if (!tvLoading) tvLoading = new Promise((ok, no) => {
       const s = document.createElement("script");
       s.src = "https://s3.tradingview.com/tv.js";
-      s.onload = ok; s.onerror = () => { tvLoading = null; no(new Error("트레이딩뷰를 불러오지 못했어요")); };
+      s.onload = ok; s.onerror = () => { tvLoading = null; no(new Error("Could not load TradingView")); };
       document.head.appendChild(s);
     });
     return tvLoading;
@@ -372,7 +381,7 @@
     if (!force && key === tvKey && $("tv").querySelector("#tv-widget")) return;
     tvKey = key;
     const el = $("tv");
-    el.innerHTML = '<p class="tvmsg">트레이딩뷰 불러오는 중…</p>';
+    el.innerHTML = '<p class="tvmsg">Loading TradingView…</p>';
     try { await loadTV(); } catch (e) { el.innerHTML = `<p class="tvmsg">${esc(e.message)}</p>`; tvKey = ""; return; }
     if (key !== S.sym + "|" + (isDark() ? "d" : "l")) return;
     el.innerHTML = '<div id="tv-widget" style="height:100%"></div>';
@@ -385,7 +394,7 @@
 
   let chart = null, series = null, lines = [], loadId = 0;
   function initChart() {
-    if (chart || !window.LightweightCharts) { if (!window.LightweightCharts) $("chart").innerHTML = '<p class="tvmsg">차트 라이브러리를 불러오지 못했어요</p>'; return; }
+    if (chart || !window.LightweightCharts) { if (!window.LightweightCharts) $("chart").innerHTML = '<p class="tvmsg">Could not load chart library</p>'; return; }
     chart = LightweightCharts.createChart($("chart"), {
       autoSize: true,
       layout: { background: { color: css("--card") }, textColor: css("--muted"), fontFamily: "system-ui,'Malgun Gothic',sans-serif" },
@@ -417,7 +426,7 @@
       series.applyOptions({ priceFormat: { type: "price", precision: pdec(last), minMove: Math.pow(10, -pdec(last)) } });
       chart.timeScale().scrollToRealTime();
       drawLines();
-    } catch (e) { if (id === loadId) notify("warn", "차트 오류", "캔들을 못 받았어요"); }
+    } catch (e) { if (id === loadId) notify("warn", "Chart error", "Could not load candles"); }
   }
   // 진입가·청산가·TP/SL·미체결 주문 가격선 (내 포지션 탭에서만 보임)
   function drawLines() {
@@ -429,10 +438,10 @@
     for (const p of S.st.pos) {
       if (p.sym !== S.sym) continue;
       const k = sideTxt(p.side);
-      add(p.entry, css("--muted"), `${k} 진입`, 0); add(E.liqOf(S.st, p, pxOf), "#f59e0b", `${k} 청산`, 2);
+      add(p.entry, css("--muted"), `${k} Entry`, 0); add(E.liqOf(S.st, p, pxOf), "#f59e0b", `${k} Liq.`, 2);
       add(p.tp, "#22b573", "TP", 2); add(p.sl, "#ef4b5f", "SL", 2);
     }
-    for (const o of S.st.ord) if (o.sym === S.sym) add(o.price, "#5b93f0", `${o.ro ? "청산" : sideTxt(o.side)} 주문`, 1);
+    for (const o of S.st.ord) if (o.sym === S.sym) add(o.price, "#5b93f0", `${o.ro ? "Close" : sideTxt(o.side)} order`, 1);
   }
   IVS.forEach(v => { const b = document.createElement("button"); b.textContent = v; b.dataset.v = v; if (v === S.iv) b.className = "on"; $("iv").appendChild(b); });
   $("iv").onclick = e => {
@@ -450,7 +459,7 @@
   }
   $("ctabs").onclick = e => { const b = e.target.closest("button"); if (b) setCtab(b.dataset.c); };
   function setCollapsed(c) {
-    $("chartbox").classList.toggle("collapsed", c); $("ctoggle").textContent = c ? "차트 펼치기" : "차트 접기"; ls.set(K.collapsed, c ? "1" : "0");
+    $("chartbox").classList.toggle("collapsed", c); $("ctoggle").textContent = c ? "Show chart" : "Hide chart"; ls.set(isMob() ? K.collapsedM : K.collapsed, c ? "1" : "0");
     if (!c) { if (S.ctab === "tv") renderTV(); else loadChart(); }
   }
   $("ctoggle").onclick = () => setCollapsed(!$("chartbox").classList.contains("collapsed"));
@@ -477,7 +486,7 @@
     S.mode = m; ls.set(K.mode, m);
     [...$("mmode").children].forEach(b => b.classList.toggle("on", b.dataset.m === m));
     renderOrderInfo();
-    if (say) notify("ok", "마진 모드 변경", `${modeTxt(m)} 마진으로 주문해요 (이미 열린 포지션은 그대로)`);
+    if (say) notify("ok", "Margin mode", `${modeTxt(m)} margin for new orders (open positions unchanged)`);
   }
   $("mmode").onclick = e => { const b = e.target.closest("button"); if (b && b.dataset.m !== S.mode) setMode(b.dataset.m, true); };
   function setLev(v, say) {
@@ -486,7 +495,7 @@
     [...$("lquick").children].forEach(b => b.classList.toggle("on", +b.dataset.l === v));
     if ($("pct").value > 0) pctToQty(+$("pct").value);
     renderOrderInfo();
-    if (say) notify("ok", "레버리지 변경", `${v}x (이미 열린 포지션은 그대로)`);
+    if (say) notify("ok", "Leverage", `${v}x (open positions unchanged)`);
   }
   $("lev").oninput = () => setLev($("lev").value);            // 끄는 동안은 조용히 (청산가는 바로 갱신)
   $("lev").onchange = () => setLev($("lev").value, true);
@@ -521,19 +530,19 @@
     const show = side => {
       if (!ref) return "-";
       const v = previewLiq(side, ref, qq);
-      return v === undefined ? "수량 입력 시" : v === null ? "청산 없음" : fp(v);
+      return v === undefined ? "Enter size" : v === null ? "None" : fp(v);
     };
     $("liqL").textContent = show("long"); $("liqS").textContent = show("short");
     $("liqnote").textContent = S.mode === "cross"
-      ? `교차: 계정 전체 잔고 기준 청산가${q > 0 ? "" : " (수량을 안 넣으면 사용 가능 전액으로 계산)"}`
-      : `격리: ${lev()}x 일 때 진입가에서 약 ${(100 / lev() - E.MMR * 100).toFixed(2)}% 반대로 움직이면 청산`;
+      ? `Cross: liq. price based on whole account${q > 0 ? "" : " (uses full available balance if no size)"}`
+      : `Isolated: at ${lev()}x, liquidated after ~${(100 / lev() - E.MMR * 100).toFixed(2)}% adverse move`;
   }
   let ordering = false;
   async function submit(side) {
     if (ordering) return;
     const q = num($("qty").value);
-    if (!(q > 0)) return notify("warn", "주문 확인", "수량을 입력하세요");
-    if (S.otype === "limit" && !(num($("oprice").value) > 0)) return notify("warn", "주문 확인", "지정가 가격을 입력하세요");
+    if (!(q > 0)) return notify("warn", "Check order", "Enter a size");
+    if (S.otype === "limit" && !(num($("oprice").value) > 0)) return notify("warn", "Check order", "Enter a limit price");
     ordering = true; $("bLong").disabled = $("bShort").disabled = true;
     try {
       await sendAction({ action: "order", sym: S.sym, side, mode: S.mode, lev: lev(), qty: q, type: S.otype, price: S.otype === "limit" ? num($("oprice").value) : undefined,
@@ -555,12 +564,12 @@
   function renderTiles() {
     const st = S.st, c = calc(), s = st.st;
     const tile = (k, v, cls, sub) => `<div class="tile"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
-    $("tiles").innerHTML = tile("총 자산", um(c.equity), "", `원금 ${ut(st.dep)}`)
-      + tile("사용 가능", um(E.available(st)), "", `증거금 ${ut(c.marg)}`)
-      + tile("미실현 손익", sm(c.upnl), pc(c.upnl))
-      + tile("실현 손익 (누적)", sm(s.rp), pc(s.rp), `수수료 ${ut(s.fee)}`)
-      + tile("누적 수익률", sg(c.ret) + "%", pc(c.ret))
-      + tile("승률", s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "-", "", `${s.w}승 ${s.n - s.w}패 / ${s.n}회`);
+    $("tiles").innerHTML = tile("Total equity", um(c.equity), "", `Principal ${ut(st.dep)}`)
+      + tile("Available", um(E.available(st)), "", `Margin ${ut(c.marg)}`)
+      + tile("Unrealized PnL", sm(c.upnl), pc(c.upnl))
+      + tile("Realized PnL", sm(s.rp), pc(s.rp), `Fees ${ut(s.fee)}`)
+      + tile("Total return", sg(c.ret) + "%", pc(c.ret))
+      + tile("Win rate", s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "-", "", `${s.w}W ${s.n - s.w}L / ${s.n} trades`);
   }
 
   // ── 아래 표 (PC 표 → 좁은 화면 카드) ──────────────────────────
@@ -576,9 +585,11 @@
     const liq = E.liqOf(st, p, pxOf), ratio = E.ratioOf(st, p, pxOf);
     return {
       val: um(p.qty * px), mark: fp(mk ? mk.p : px),
-      liq: `<span class="o">${liq ? fp(liq) : (E.modeOf(p) === "cross" ? "청산 없음" : "-")}</span>`,
+      liq: `<span class="o">${liq ? fp(liq) : (E.modeOf(p) === "cross" ? "None" : "-")}</span>`,
       ratio: `<span class="${ratio >= 80 ? "r" : ratio >= 50 ? "o" : ""}">${ratio.toFixed(2)}%</span>`,
       pnl: `<b class="${pc(up)}">${sm(up)}</b><span class="two ${pc(roe)}">${sg(roe)}%</span>`,
+      cpnl: `<b class="${pc(up)}">${sg(up)}</b>`, croe: `<b class="${pc(roe)}">${sg(roe)}%</b>`,
+      mark2: fp(mk ? mk.p : px),
     };
   }
   function posRow(p) {
@@ -587,33 +598,57 @@
       `<b>${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}`,
       fq(p.qty), dyn("val:" + id, d.val), fp(p.entry), dyn("mark:" + id, d.mark), dyn("liq:" + id, d.liq),
       um(p.margin), dyn("ratio:" + id, d.ratio), dyn("pnl:" + id, d.pnl), `<span class="${pc(p.rp - p.fee)}">${sm(p.rp - p.fee)}</span>`,
-      `<span class="g">TP ${p.tp ? fp(p.tp) : "-"}</span><span class="two r">SL ${p.sl ? fp(p.sl) : "-"}</span><button class="ghost mini" data-act="edit" data-id="${id}">수정</button>`,
+      `<span class="g">TP ${p.tp ? fp(p.tp) : "-"}</span><span class="two r">SL ${p.sl ? fp(p.sl) : "-"}</span><button class="ghost mini" data-act="edit" data-id="${id}">Edit</button>`,
       mdhm(p.t),
-      `<div class="acts"><button class="ghost" data-act="close" data-pct="100" data-id="${id}">시장가 청산</button><button class="ghost" data-act="limitclose" data-id="${id}">지정가 청산</button>
+      `<div class="acts"><button class="ghost" data-act="close" data-pct="100" data-id="${id}">Market close</button><button class="ghost" data-act="limitclose" data-id="${id}">Limit close</button>
         <span class="pp">${[25, 50, 75, 100].map(x => `<button class="ghost" data-act="close" data-pct="${x}" data-id="${id}">${x}%</button>`).join("")}</span></div>`,
     ];
   }
-  const POS_HEADS = [{ h: "코인 / 방향", c: "l" }, { h: "수량" }, { h: "포지션 가치" }, { h: "진입가" }, { h: "마크가(현재가)" }, { h: "청산가" }, { h: "증거금" }, { h: "증거금률" },
-                     { h: "미실현 손익 (ROE)" }, { h: "실현 손익" }, { h: "TP / SL" }, { h: "진입 시각" }, { h: "청산", c: "full" }];
+  // 좁은 화면용 포지션 카드 (거래소 앱 스타일)
+  function posCard(p) {
+    const d = posDyn(p), id = p.id, b = esc(base(p.sym)), cl = E.modeOf(p) === "cross" ? "Cross" : "Isolated";
+    const rp = p.rp - p.fee;
+    return `<div class="pcd">
+      <div class="h"><b>${b}USDT</b><span class="chip ${p.side}">${sideTxt(p.side)}</span><span class="chip ${p.side}">${p.lev}x</span><span class="chip">${cl}</span><span class="chip">USDT</span></div>
+      <div class="pnl"><div><span class="k">Unrealized PnL (USDT)</span>${dyn("cpnl:" + id, d.cpnl)}</div>
+        <div class="rt"><span class="k">ROE</span>${dyn("croe:" + id, d.croe)}</div></div>
+      <div class="grid">
+        <div><span class="k">Size (${b})</span>${fq(p.qty)}</div>
+        <div><span class="k">Margin (USDT)</span>${fu(p.margin)}</div>
+        <div><span class="k">Margin ratio</span>${dyn("ratio2:" + id, d.ratio)}</div>
+        <div><span class="k">Entry price</span>${fp(p.entry)}</div>
+        <div><span class="k">Mark price</span>${dyn("mark2:" + id, d.mark)}</div>
+        <div><span class="k">Est. liq. price</span>${dyn("liq2:" + id, d.liq)}</div>
+      </div>
+      <div class="sub2">
+        <div><span>Realized PnL (USDT)</span><span class="${pc(rp)}">${sg(rp)}</span></div>
+        <div><span>TP/SL</span><span class="ed" data-act="edit" data-id="${id}"><span class="g">${p.tp ? fp(p.tp) : "--"}</span> / <span class="r">${p.sl ? fp(p.sl) : "--"}</span> ✎</span></div>
+        <div><span>Opened</span><span>${mdhm(p.t)}</span></div>
+      </div>
+      <div class="btn3"><button data-act="edit" data-id="${id}">TP/SL</button><button data-act="limitclose" data-id="${id}">Limit close</button><button data-act="closesheet" data-id="${id}">Close</button></div>
+    </div>`;
+  }
+  const POS_HEADS = [{ h: "Symbol", c: "l" }, { h: "Size" }, { h: "Value" }, { h: "Entry price" }, { h: "Mark price" }, { h: "Liq. price" }, { h: "Margin" }, { h: "Margin ratio" },
+                     { h: "Unrealized PnL (ROE)" }, { h: "Realized PnL" }, { h: "TP / SL" }, { h: "Opened" }, { h: "Close", c: "full" }];
   function ordRow(o) {
     const cur = S.px[o.sym], val = o.qty * o.price;
-    return [`<b>${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, o.ro ? `지정가 청산 (${o.pct}%)` : "지정가", fp(o.price), fq(o.qty), um(val),
+    return [`<b>${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, o.ro ? `Limit close (${o.pct}%)` : "Limit", fp(o.price), fq(o.qty), um(val),
       o.ro ? "-" : um(val / o.lev), dyn("cur:" + o.id, fp(cur)), o.ro ? "-" : `<span class="g">${o.tp ? fp(o.tp) : "-"}</span> / <span class="r">${o.sl ? fp(o.sl) : "-"}</span>`, mdhm(o.t),
-      `<button class="ghost mini" data-act="cancel" data-id="${o.id}">취소</button>`];
+      `<button class="ghost mini" data-act="cancel" data-id="${o.id}">Cancel</button>`];
   }
-  const ORD_HEADS = [{ h: "코인 / 방향", c: "l" }, { h: "유형" }, { h: "가격" }, { h: "수량" }, { h: "주문 가치" }, { h: "필요 증거금" }, { h: "현재가" }, { h: "TP / SL" }, { h: "주문 시각" }, { h: "", c: "full" }];
-  const OL_HEADS = [{ h: "코인 / 방향", c: "l" }, { h: "유형" }, { h: "가격" }, { h: "수량" }, { h: "주문 가치" }, { h: "상태" }, { h: "시각" }];
-  const TH_HEADS = [{ h: "코인 / 방향", c: "l" }, { h: "수량" }, { h: "진입가" }, { h: "종료가" }, { h: "종료 가치" }, { h: "손익 (ROE)" }, { h: "수수료" }, { h: "사유" }, { h: "진입 시각" }, { h: "종료 시각" }];
-  const depRow = t => ({ dep: `<b class="g">관리자 충전 +${fu(t.amount)} USDT</b> <span class="muted small">${mdhm(t.t)}</span>` });
+  const ORD_HEADS = [{ h: "Symbol", c: "l" }, { h: "Type" }, { h: "Price" }, { h: "Size" }, { h: "Value" }, { h: "Margin" }, { h: "Last price" }, { h: "TP / SL" }, { h: "Time" }, { h: "", c: "full" }];
+  const OL_HEADS = [{ h: "Symbol", c: "l" }, { h: "Type" }, { h: "Price" }, { h: "Size" }, { h: "Value" }, { h: "Status" }, { h: "Time" }];
+  const TH_HEADS = [{ h: "Symbol", c: "l" }, { h: "Size" }, { h: "Entry price" }, { h: "Exit price" }, { h: "Exit value" }, { h: "PnL (ROE)" }, { h: "Fee" }, { h: "Reason" }, { h: "Opened" }, { h: "Closed" }];
+  const depRow = t => ({ dep: `<b class="g">Admin deposit +${fu(t.amount)} USDT</b> <span class="muted small">${mdhm(t.t)}</span>` });
 
   let sig = "";
   function tabHtml() {
     const st = S.st;
-    if (S.tab === "pos") return st.pos.length ? tbl(POS_HEADS, st.pos.map(posRow)) : '<div class="empty">보유 중인 포지션이 없어요</div>';
-    if (S.tab === "ord") return st.ord.length ? tbl(ORD_HEADS, st.ord.map(ordRow)) : '<div class="empty">미체결 주문이 없어요</div>';
-    if (S.tab === "ol") return st.ol.length ? tbl(OL_HEADS, st.ol.map(o => [`<b>${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, esc(o.kind), fp(o.price), fq(o.qty), um(o.qty * o.price), `<b>${esc(o.status)}</b>`, mdhm(o.t)])) : '<div class="empty">주문 기록이 없어요</div>';
+    if (S.tab === "pos") return st.pos.length ? `<div class="ptable">${tbl(POS_HEADS, st.pos.map(posRow))}</div><div class="pcards">${st.pos.map(posCard).join("")}</div>` : '<div class="empty">No open positions</div>';
+    if (S.tab === "ord") return st.ord.length ? tbl(ORD_HEADS, st.ord.map(ordRow)) : '<div class="empty">No open orders</div>';
+    if (S.tab === "ol") return st.ol.length ? tbl(OL_HEADS, st.ol.map(o => [`<b>${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, esc(L(o.kind)), fp(o.price), fq(o.qty), um(o.qty * o.price), `<b>${esc(L(o.status))}</b>`, mdhm(o.t)])) : '<div class="empty">No order history</div>';
     if (S.tab === "th") return st.th.length ? tbl(TH_HEADS, st.th.map(t => t.kind === "deposit" ? depRow(t) : [`<b>${esc(base(t.sym))}</b> ${tagSide(t.side, E.modeOf(t), t.lev)}`, fq(t.qty), fp(t.entry), fp(t.exit), um(t.qty * t.exit),
-        `<b class="${pc(t.pnl)}">${sm(t.pnl)}</b><span class="two ${pc(t.roe)}">${sg(t.roe)}%</span>`, um(t.fee), esc(t.reason), t.ot ? mdhm(t.ot) : "-", mdhm(t.t)])) : '<div class="empty">거래 기록이 없어요</div>';
+        `<b class="${pc(t.pnl)}">${sm(t.pnl)}</b><span class="two ${pc(t.roe)}">${sg(t.roe)}%</span>`, um(t.fee), esc(L(t.reason)), t.ot ? mdhm(t.ot) : "-", mdhm(t.t)])) : '<div class="empty">No trade history</div>';
     return "";
   }
   function renderTab() {
@@ -628,7 +663,7 @@
   function updateDyn() {
     if (!S.st) return;
     const set = (k, html) => { const n = $("tabbody").querySelector(`[data-k="${k}"]`); if (n && n.innerHTML !== html) n.innerHTML = html; };
-    if (S.tab === "pos") for (const p of S.st.pos) { const d = posDyn(p); for (const k in d) set(k + ":" + p.id, d[k]); }
+    if (S.tab === "pos") for (const p of S.st.pos) { const d = posDyn(p); d.ratio2 = d.ratio; d.liq2 = d.liq; for (const k in d) set(k + ":" + p.id, d[k]); }
     else if (S.tab === "ord") for (const o of S.st.ord) set("cur:" + o.id, fp(S.px[o.sym]));
   }
   function renderAll() { if (!S.st) return; renderHd(); renderTiles(); renderTab(); renderOrderInfo(); }
@@ -640,63 +675,69 @@
     const id = +b.dataset.id, act = b.dataset.act, p = S.st.pos.find(x => x.id === id);
     if (act === "close") {
       const pct = +b.dataset.pct;
-      if (p && confirm(`${base(p.sym)} 포지션의 ${pct}% 를 시장가로 청산할까요?`)) sendAction({ action: "close", id, pct }).catch(() => {});
+      if (p && confirm(`Market close ${pct}% of ${base(p.sym)} position?`)) sendAction({ action: "close", id, pct }).catch(() => {});
+    } else if (act === "closesheet" && p) {
+      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} · Market close</h2>
+        <p class="small muted">Size ${fq(p.qty)} · Last ${fp(S.px[p.sym])}</p>
+        <div class="pctgrid" id="mpg">${[25, 50, 75, 100].map(x => `<button class="ghost${x === 100 ? " on" : ""}" data-p="${x}">${x}%</button>`).join("")}</div>`,
+        () => sendAction({ action: "close", id, pct: +($("mpg").querySelector(".on") || {}).dataset.p || 100 }), "Close");
+      $("mpg").onclick = e => { const x = e.target.closest("button"); if (x) [...$("mpg").children].forEach(y => y.classList.toggle("on", y === x)); };
     } else if (act === "cancel") sendAction({ action: "cancel", id }).catch(() => {});
     else if (act === "limitclose" && p) {
-      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} 지정가 청산</h2>
-        <label><span class="lt">청산 가격 (USDT)</span><input id="mpx" inputmode="decimal" value="${S.px[p.sym] ? S.px[p.sym].toFixed(pdec(S.px[p.sym])) : ""}"></label>
-        <label><span class="lt">청산 비율 (%)</span><input id="mpct" inputmode="numeric" value="100"></label>
-        <p class="small muted">현재가 ${fp(S.px[p.sym])} · ${p.side === "long" ? "롱은 현재가보다 높은 가격" : "숏은 현재가보다 낮은 가격"}에 걸어 두면 닿을 때 체결돼요 (수수료 0.02%). 이미 유리한 가격이면 바로 체결돼요.</p>`,
+      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} · Limit close</h2>
+        <label><span class="lt">Close price (USDT)</span><input id="mpx" inputmode="decimal" value="${S.px[p.sym] ? S.px[p.sym].toFixed(pdec(S.px[p.sym])) : ""}"></label>
+        <label><span class="lt">Close ratio (%)</span><input id="mpct" inputmode="numeric" value="100"></label>
+        <p class="small muted">Last ${fp(S.px[p.sym])} · Place ${p.side === "long" ? "above" : "below"} the last price; fills when touched (fee 0.02%). Fills immediately if the price is already better.</p>`,
         () => sendAction({ action: "closeLimit", id, price: num($("mpx").value), pct: num($("mpct").value) }));
     } else if (act === "edit" && p) {
-      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} TP/SL 수정</h2>
-        <label><span class="lt">익절가 (TP)</span><input id="mtp" inputmode="decimal" value="${p.tp ?? ""}" placeholder="비우면 삭제"></label>
-        <label><span class="lt">손절가 (SL)</span><input id="msl" inputmode="decimal" value="${p.sl ?? ""}" placeholder="비우면 삭제"></label>
-        <p class="small muted">현재가 ${fp(S.px[p.sym])} · 청산가 ${fp(E.liqOf(S.st, p, pxOf))}</p>`, () =>
+      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} · TP/SL</h2>
+        <label><span class="lt">Take profit (TP)</span><input id="mtp" inputmode="decimal" value="${p.tp ?? ""}" placeholder="Empty = remove"></label>
+        <label><span class="lt">Stop loss (SL)</span><input id="msl" inputmode="decimal" value="${p.sl ?? ""}" placeholder="Empty = remove"></label>
+        <p class="small muted">Last ${fp(S.px[p.sym])} · Liq. ${fp(E.liqOf(S.st, p, pxOf))}</p>`, () =>
         sendAction({ action: "edit", id, tp: $("mtp").value.trim() || undefined, sl: $("msl").value.trim() || undefined }));
     }
   };
   function modal(html, onOk, okText) {
     const m = $("modal");
-    m.innerHTML = `<div class="card">${html}<div class="btns">${onOk ? '<button class="ghost" id="mno">닫기</button>' : ""}<button id="myes">${okText || "저장"}</button></div></div>`;
+    m.innerHTML = `<div class="card">${html}<div class="btns">${onOk ? '<button class="ghost" id="mno">Cancel</button>' : ""}<button id="myes">${okText || "Confirm"}</button></div></div>`;
     m.hidden = false;
     if (onOk) $("mno").onclick = () => { m.hidden = true; };
     $("myes").onclick = async () => { if (!onOk) { m.hidden = true; return; } try { await onOk(); m.hidden = true; } catch (e) {} };
   }
   $("modal").onclick = e => { if (e.target === $("modal")) $("modal").hidden = true; };
-  $("reset").onclick = () => { if (confirm("잔고와 포지션, 모든 기록이 지워지고 10,000 USDT 로 다시 시작해요. 계속할까요?")) sendAction({ action: "reset" }).catch(() => {}); };
+  $("reset").onclick = () => { if (confirm("This clears your balance, positions and history and restarts with 10,000 USDT. Continue?")) sendAction({ action: "reset" }).catch(() => {}); };
 
   // ── 관리자 ───────────────────────────────────────────────────
   let adminRows = null, adminLog = [], adminView = null;     // adminView: 상세 보기 중인 사용자 정보
   const dt = t => t ? mdhm(t) : "-";
   async function loadAdmin() {
-    $("tabbody").innerHTML = '<div class="empty">불러오는 중…</div>';
+    $("tabbody").innerHTML = '<div class="empty">Loading…</div>';
     try { const r = await post("/api/admin", { action: "list" }); adminRows = r.users; adminLog = r.log; renderAdmin(); }
     catch (e) { $("tabbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
   }
   function renderAdmin() {
     if (adminView) return renderAdminDetail();
     const rows = adminRows.map(u => `<div class="adm"><div class="nm"><b class="lnk" data-adm="detail" data-n="${esc(u.nick)}">${esc(u.nick)}</b>
-        ${u.bl ? '<span class="tag short">차단</span>' : ""}${u.admin ? '<span class="tag long">관리자</span>' : ""}<br>
-        <span class="muted small">가입 ${dt(u.c)} · 마지막 접속 ${dt(u.la)}<br>잔고 ${ut(u.bal)} · 거래 ${u.n}회 · 포지션 ${u.pos}개</span></div>
+        ${u.bl ? '<span class="tag short">Blocked</span>' : ""}${u.admin ? '<span class="tag long">Admin</span>' : ""}<br>
+        <span class="muted small">Joined ${dt(u.c)} · Last seen ${dt(u.la)}<br>Balance ${ut(u.bal)} · ${u.n} trades · ${u.pos} positions</span></div>
       <b class="${pc(u.ret)}">${sg(u.ret)}%</b>
-      <input inputmode="decimal" placeholder="충전 USDT" data-n="${esc(u.nick)}"><button class="mini" data-adm="charge" data-n="${esc(u.nick)}">충전</button>
-      <button class="ghost mini" data-adm="reset" data-n="${esc(u.nick)}">잔고 초기화</button>
-      ${u.admin ? "" : `<button class="ghost mini" data-adm="${u.bl ? "unblock" : "block"}" data-n="${esc(u.nick)}">${u.bl ? "차단 해제" : "차단"}</button>
-      <button class="ghost mini r" data-adm="delete" data-n="${esc(u.nick)}">삭제</button>`}</div>`).join("") || '<div class="empty">사용자가 없어요</div>';
-    const log = adminLog.map(l => `<div class="lrow"><span><b>${esc(l.to)}</b> · ${esc(l.act)}</span><span class="m">${mdhm(l.t)} · ${esc(l.by)}</span></div>`).join("") || '<div class="empty">아직 기록이 없어요</div>';
-    $("tabbody").innerHTML = rows + '<h2 style="margin-top:18px">관리자 활동 기록 (최근 50개)</h2>' + log;
+      <input inputmode="decimal" placeholder="USDT" data-n="${esc(u.nick)}"><button class="mini" data-adm="charge" data-n="${esc(u.nick)}">Deposit</button>
+      <button class="ghost mini" data-adm="reset" data-n="${esc(u.nick)}">Reset</button>
+      ${u.admin ? "" : `<button class="ghost mini" data-adm="${u.bl ? "unblock" : "block"}" data-n="${esc(u.nick)}">${u.bl ? "Unblock" : "Block"}</button>
+      <button class="ghost mini r" data-adm="delete" data-n="${esc(u.nick)}">Delete</button>`}</div>`).join("") || '<div class="empty">No users</div>';
+    const log = adminLog.map(l => `<div class="lrow"><span><b>${esc(l.to)}</b> · ${esc(LA(l.act))}</span><span class="m">${mdhm(l.t)} · ${esc(l.by)}</span></div>`).join("") || '<div class="empty">No activity yet</div>';
+    $("tabbody").innerHTML = rows + '<h2 style="margin-top:18px">Admin activity (last 50)</h2>' + log;
   }
   function renderAdminDetail() {
     const d = adminView;
-    const ord = d.ol.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${esc(o.kind)}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${esc(o.status)}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">없어요</div>';
-    const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">관리자 충전 +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
-      : `<div class="lrow"><span><b>${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(t.reason)}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
-        <span class="m">${fq(t.qty)} · ${fp(t.entry)} → ${fp(t.exit)} · ${mdhm(t.t)}</span></div>`).join("") || '<div class="empty">없어요</div>';
-    $("tabbody").innerHTML = `<button class="ghost mini" data-adm="back">← 목록으로</button>
-      <h2 style="margin:10px 0 4px">${esc(d.nick)} ${d.bl ? '<span class="tag short">차단</span>' : ""}</h2>
-      <p class="sub">가입 ${dt(d.c)} · 마지막 접속 ${dt(d.la)} · 잔고 ${ut(d.bal)} · 원금 ${ut(d.dep)} · ${d.stats.w}승 ${d.stats.n - d.stats.w}패 · 보유 포지션 ${d.pos.length}개 · 미체결 ${d.ord.length}개</p>
-      <h2>최근 거래 기록</h2>${th}<h2 style="margin-top:16px">최근 주문 기록</h2>${ord}`;
+    const ord = d.ol.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${esc(L(o.kind))}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${esc(L(o.status))}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
+    const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">Admin deposit +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
+      : `<div class="lrow"><span><b>${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(L(t.reason))}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
+        <span class="m">${fq(t.qty)} · ${fp(t.entry)} → ${fp(t.exit)} · ${mdhm(t.t)}</span></div>`).join("") || '<div class="empty">None</div>';
+    $("tabbody").innerHTML = `<button class="ghost mini" data-adm="back">← Back</button>
+      <h2 style="margin:10px 0 4px">${esc(d.nick)} ${d.bl ? '<span class="tag short">Blocked</span>' : ""}</h2>
+      <p class="sub">Joined ${dt(d.c)} · Last seen ${dt(d.la)} · Balance ${ut(d.bal)} · Principal ${ut(d.dep)} · ${d.stats.w}W ${d.stats.n - d.stats.w}L · ${d.pos.length} positions · ${d.ord.length} open orders</p>
+      <h2>Recent trades</h2>${th}<h2 style="margin-top:16px">Recent orders</h2>${ord}`;
   }
   $("tabbody").addEventListener("click", async e => {
     const b = e.target.closest("[data-adm]"); if (!b) return;
@@ -707,21 +748,21 @@
       let r;
       if (act === "charge") {
         const amt = num(b.parentElement.querySelector("input").value);
-        if (!(amt > 0)) return notify("warn", "충전", "충전 금액을 입력하세요");
-        if (!confirm(`${nick} 님에게 ${fu(amt)} USDT 를 충전할까요?`)) return;
+        if (!(amt > 0)) return notify("warn", "Deposit", "Enter an amount");
+        if (!confirm(`Deposit ${fu(amt)} USDT to ${nick}?`)) return;
         r = await post("/api/admin", { action: "charge", nick, amount: amt });
       } else if (act === "reset") {
-        if (!confirm(`${nick} 님의 잔고·포지션·기록을 전부 지우고 10,000 USDT 로 초기화할까요?`)) return;
+        if (!confirm(`Clear all of ${nick}'s balance, positions and history and reset to 10,000 USDT?`)) return;
         r = await post("/api/admin", { action: "reset", nick });
       } else if (act === "block" || act === "unblock") {
-        if (!confirm(`${nick} 님을 ${act === "block" ? "차단" : "차단 해제"}할까요?`)) return;
+        if (!confirm(`${act === "block" ? "Block" : "Unblock"} ${nick}?`)) return;
         r = await post("/api/admin", { action: act, nick });
       } else if (act === "delete") {
-        if (!confirm(`${nick} 님의 계정을 삭제할까요? 잔고와 모든 기록이 사라지고 되돌릴 수 없어요.`)) return;
-        if (!confirm(`정말 '${nick}' 계정을 삭제할까요? (마지막 확인)`)) return;
+        if (!confirm(`Delete ${nick}'s account? All data will be lost and cannot be undone.`)) return;
+        if (!confirm(`Really delete '${nick}'? (final confirmation)`)) return;
         r = await post("/api/admin", { action: "delete", nick });
       } else return;
-      notify("ok", "관리자", r.msg);
+      notify("ok", "Admin", r.msg);
       adminView = null; loadAdmin();
       if (nick.toLowerCase() === (S.nick || "").toLowerCase()) refresh(true);
     } catch (err) { fail(err); }
@@ -736,7 +777,7 @@
     loadNotes();
     setMode(S.mode); setLev(ls.get(K.lev) || 10); setType("limit");
     setCtab(S.ctab);
-    setCollapsed(ls.get(K.collapsed) === "1");
+    setCollapsed(isMob() ? ls.get(K.collapsedM) !== "0" : ls.get(K.collapsed) === "1");   // 모바일은 기본 접힘
     renderHd(); renderBook(); renderTrades(); renderDot();
     mkt.open(); pub.open(); loadTicker(); loadCoins();
     refresh();
@@ -748,7 +789,7 @@
       const cross = E.modeOf(p) === "cross", key = cross ? "cross" : "p" + p.id;
       if (seen.has(key)) continue; seen.add(key);
       const r = E.ratioOf(st, p, pxOf);
-      if (r >= 80 && !S.warned[key]) { S.warned[key] = true; notify("warn", "청산 위험", `${cross ? "교차 계정" : base(p.sym) + " " + sideTxt(p.side)} 증거금률 ${r.toFixed(1)}% (100% 가 되면 청산)`); }
+      if (r >= 80 && !S.warned[key]) { S.warned[key] = true; notify("warn", "Liquidation risk", `${cross ? "Cross account" : base(p.sym) + " " + sideTxt(p.side)} margin ratio ${r.toFixed(1)}% (liquidated at 100%)`); }
       else if (r < 60) delete S.warned[key];
     }
     for (const k of Object.keys(S.warned)) if (!seen.has(k)) delete S.warned[k];

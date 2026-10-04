@@ -6,7 +6,7 @@ const pick = names => { for (const n of names) if (process.env[n]) return proces
 function conf() {
   const url = pick(URL_NAMES), token = pick(TOKEN_NAMES);
   if (!url || !token) {
-    const e = new Error("DB 접속 환경변수를 못 찾았어요 (" + URL_NAMES.concat(TOKEN_NAMES).join(", ") + ")");
+    const e = new Error("DB environment variables not found (" + URL_NAMES.concat(TOKEN_NAMES).join(", ") + ")");
     e.status = 500;
     throw e;
   }
@@ -21,7 +21,7 @@ async function call(path, body) {
     body: JSON.stringify(body),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) { const e = new Error("DB 오류: " + (j.error || res.status)); e.status = 502; throw e; }
+  if (!res.ok) { const e = new Error("DB error: " + (j.error || res.status)); e.status = 502; throw e; }
   return j;
 }
 

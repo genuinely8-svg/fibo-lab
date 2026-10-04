@@ -5,7 +5,7 @@ const MIN = 60000;
 async function jget(path) {
   const res = await fetch(BASE + path, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) {
-    const e = new Error(res.status === 400 ? "없는 코인이에요" : "바이낸스 응답 오류 " + res.status);
+    const e = new Error(res.status === 400 ? "Unknown symbol" : "Binance error " + res.status);
     e.status = res.status === 400 ? 400 : 502;
     throw e;
   }
@@ -14,7 +14,7 @@ async function jget(path) {
 
 async function price(sym) {
   const p = +(await jget("/fapi/v1/ticker/price?symbol=" + sym)).price;
-  if (!(p > 0)) { const e = new Error("가격을 못 받았어요"); e.status = 502; throw e; }
+  if (!(p > 0)) { const e = new Error("Could not get price"); e.status = 502; throw e; }
   return p;
 }
 

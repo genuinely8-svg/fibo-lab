@@ -9,10 +9,10 @@ const LOG_KEEP = 200;
 
 module.exports = async (req, res) => {
   try {
-    if (req.method !== "POST") throw A.fail(405, "POST 만 돼요");
+    if (req.method !== "POST") throw A.fail(405, "POST only");
     const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { key, user: me } = await A.authed(req);
-    if (!A.isAdminKey(key)) throw A.fail(403, "관리자만 쓸 수 있어요");
+    if (!A.isAdminKey(key)) throw A.fail(403, "Admin only");
     const now = Date.now();
 
     if (b.action === "list") {
@@ -32,7 +32,7 @@ module.exports = async (req, res) => {
     const tnick = A.checkNick(b.nick);
     const tkey = A.userKey(tnick);
     const target = await db.getJSON(tkey);
-    if (!target) throw A.fail(404, "그런 사용자가 없어요");
+    if (!target) throw A.fail(404, "User not found");
     const self = tkey === key;
     // 기록과 함께 한 번에 저장
     const logCmds = what => [["LPUSH", "adminlog", JSON.stringify({ t: now, by: me.nick, act: what, to: target.nick })], ["LTRIM", "adminlog", 0, LOG_KEEP - 1]];
@@ -43,30 +43,30 @@ module.exports = async (req, res) => {
     }
     if (b.action === "charge") {
       const amt = Math.round(Number(b.amount) * 100) / 100;
-      if (!(amt > 0 && amt <= 10000000)) throw A.fail(400, "충전 금액은 0보다 크고 천만 이하로 해주세요");
+      if (!(amt > 0 && amt <= 10000000)) throw A.fail(400, "Amount must be > 0 and ≤ 10,000,000");
       const s = target.st;
       s.bal += amt; s.dep += amt;                       // 충전금은 원금으로 → 수익률이 부풀려지지 않음
-      E.logTrade(s, { id: s.seq++, t: now, kind: "deposit", amount: amt, note: `관리자 충전 +${amt}` });
-      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds(`충전 +${amt} USDT`)]);
-      return res.status(200).json({ ok: true, msg: `${target.nick} 님에게 ${amt} USDT 충전했어요` });
+      E.logTrade(s, { id: s.seq++, t: now, kind: "deposit", amount: amt, note: `Admin deposit +${amt}` });
+      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds(`Deposit +${amt} USDT`)]);
+      return res.status(200).json({ ok: true, msg: `Deposited ${amt} USDT to ${target.nick}` });
     }
     if (b.action === "reset") {
       target.st = E.newState(now);
-      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds("잔고 초기화")]);
-      return res.status(200).json({ ok: true, msg: `${target.nick} 님을 초기화했어요` });
+      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds("Balance reset")]);
+      return res.status(200).json({ ok: true, msg: `Reset ${target.nick}` });
     }
     if (b.action === "block" || b.action === "unblock") {
-      if (self) throw A.fail(400, "관리자 자신은 차단할 수 없어요");
+      if (self) throw A.fail(400, "You cannot block yourself");
       target.bl = b.action === "block";
-      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds(target.bl ? "차단" : "차단 해제")]);
-      return res.status(200).json({ ok: true, msg: `${target.nick} 님을 ${target.bl ? "차단" : "차단 해제"}했어요` });
+      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds(target.bl ? "Blocked" : "Unblocked")]);
+      return res.status(200).json({ ok: true, msg: `${target.bl ? "Blocked" : "Unblocked"} ${target.nick}` });
     }
     if (b.action === "delete") {
-      if (self) throw A.fail(400, "관리자 자신은 삭제할 수 없어요");
-      await db.pipeline([["DEL", tkey], ["SREM", "users", tkey], ...logCmds("계정 삭제")]);
-      return res.status(200).json({ ok: true, msg: `${target.nick} 님의 계정을 삭제했어요` });
+      if (self) throw A.fail(400, "You cannot delete yourself");
+      await db.pipeline([["DEL", tkey], ["SREM", "users", tkey], ...logCmds("Account deleted")]);
+      return res.status(200).json({ ok: true, msg: `Deleted ${target.nick}` });
     }
-    throw A.fail(400, "알 수 없는 요청이에요");
+    throw A.fail(400, "Unknown request");
   } catch (e) {
     res.status(e.status || 400).json({ error: e.message });
   }

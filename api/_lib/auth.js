@@ -2,14 +2,14 @@
 const crypto = require("crypto");
 const db = require("./db");
 
-const BLOCKED = "차단된 계정입니다";
+const BLOCKED = "This account is blocked";
 const fail = (status, msg) => { const e = new Error(msg); e.status = status; return e; };
 
 const NICK_RE = /^[0-9A-Za-z_\-가-힣ㄱ-ㅎ]{2,16}$/u;
 const normNick = s => String(s || "").normalize("NFC").trim().toLowerCase();
 function checkNick(s) {
   const t = String(s || "").normalize("NFC").trim();
-  if (!NICK_RE.test(t)) throw fail(400, "닉네임은 2~16자 (한글·영문·숫자·_ -)로 해주세요");
+  if (!NICK_RE.test(t)) throw fail(400, "Nickname must be 2–16 characters (letters, numbers, _ -)");
   return t;
 }
 const userKey = nick => "u:" + normNick(nick);
@@ -28,7 +28,7 @@ function verifyPin(pin, stored) {
 // 로그인 토큰: 서버에 저장하지 않는 서명 토큰 (Redis 명령 절약). PIN 이 바뀌면 자동으로 무효
 function secret() {
   const s = process.env.PAPER_SECRET || db.tokenForSecret();
-  if (!s) throw fail(500, "서버 비밀값(KV_REST_API_TOKEN 또는 PAPER_SECRET)을 못 찾았어요");
+  if (!s) throw fail(500, "Server secret (KV_REST_API_TOKEN or PAPER_SECRET) not found");
   return s;
 }
 const sign = (payload, ph) => crypto.createHmac("sha256", secret()).update(payload + "|" + ph).digest("base64url");
@@ -48,12 +48,12 @@ async function authed(req) {
   const [payload, sig] = tok.split(".");
   let p;
   try { p = JSON.parse(Buffer.from(payload || "", "base64url").toString()); } catch (e) { p = null; }
-  if (!p || !p.k || !sig || p.e < Date.now()) throw fail(401, "다시 로그인해주세요");
+  if (!p || !p.k || !sig || p.e < Date.now()) throw fail(401, "Please log in again");
   const user = await db.getJSON(p.k);
-  if (!user) throw fail(401, "다시 로그인해주세요");
+  if (!user) throw fail(401, "Please log in again");
   if (user.bl && !isAdminKey(p.k)) throw fail(403, BLOCKED);       // 이미 로그인된 기기도 다음 요청부터 막힘
   const want = sign(payload, user.ph);
-  if (want.length !== sig.length || !crypto.timingSafeEqual(Buffer.from(want), Buffer.from(sig))) throw fail(401, "다시 로그인해주세요");
+  if (want.length !== sig.length || !crypto.timingSafeEqual(Buffer.from(want), Buffer.from(sig))) throw fail(401, "Please log in again");
   return { key: p.k, user };
 }
 

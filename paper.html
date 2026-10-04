@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261004234323"></script>
-<title>모의투자 · ath TEST (참고용)</title>
-<link rel="stylesheet" href="common.css?v=20261004234323">
+<script src="theme.js?v=20261005002000"></script>
+<title>Paper Trading · ath TEST</title>
+<link rel="stylesheet" href="common.css?v=20261005002000">
 <style>
   html,body{overflow-x:hidden}
   .wrap{max-width:1500px}
@@ -161,8 +161,34 @@
   #modal label{margin-bottom:8px}
 
   .mobonly{display:none}
+
+  /* 포지션 카드 (좁은 화면) — 거래소 앱 스타일 */
+  .pcards{display:none}
+  .pcd{border-bottom:1px solid var(--line);padding:14px 2px 16px}
+  .pcd:last-child{border-bottom:0}
+  .pcd .h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .pcd .h b{font-size:16px;margin-right:2px}
+  .chip{font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .chip.long{color:var(--buy);border-color:var(--buy)} .chip.short{color:var(--sell);border-color:var(--sell)}
+  .pcd .k{display:block;color:var(--muted);font-size:11.5px;margin-bottom:2px;white-space:nowrap}
+  .pcd .pnl{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px}
+  .pcd .pnl b{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .pcd .pnl .rt{text-align:right}
+  .pcd .pnl .rt b{font-size:18px}
+  .pcd .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 8px;margin-bottom:12px}
+  .pcd .grid div{min-width:0;font-size:14px;font-variant-numeric:tabular-nums}
+  .pcd .grid div:nth-child(3n){text-align:right}
+  .pcd .sub2{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+  .pcd .sub2 div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  .pcd .sub2 span:first-child{color:var(--muted)}
+  .pcd .sub2 .ed{cursor:pointer}
+  .pcd .btn3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .pcd .btn3 button{padding:9px 4px;font-size:13.5px;border-radius:8px;background:var(--bg);color:var(--text);border:1px solid var(--line)}
+  .pctgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 10px}
+  .pctgrid button.on{border-color:var(--accent);color:var(--accent)}
   /* 중간 화면: 표 → 카드 */
   @media (max-width:1240px){
+    .pcards{display:block} .ptable{display:none}
     table.pt thead{display:none}
     table.pt,table.pt tbody{display:block}
     table.pt tbody{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
@@ -178,57 +204,105 @@
     table.pt .acts .pp button{padding:5px 8px}
     .tr-dep{grid-template-columns:1fr!important}
   }
-  /* 모바일: 위에서부터 가격 → 차트(접기/펼치기) → 호가|주문 좌우 → 포지션 */
+  /* 모바일 (선물 거래 앱 배치): 가격 → 차트(기본 접힘, 얇은 줄) → [호가 | 주문] 좌우 → 포지션 */
   @media (max-width:900px){
-    .term{grid-template-columns:minmax(0,44fr) minmax(0,56fr);grid-template-areas:"hd hd" "chart chart" "book order" "lower lower"}
-    .chartbody{min-height:360px}
-    #hd{padding:8px 10px;gap:6px 14px}
-    #price{font-size:21px}
+    .term{gap:8px;grid-template-columns:minmax(0,42fr) minmax(0,58fr);grid-template-areas:"hd hd" "chart chart" "book order" "lower lower"}
+    .wrap{padding:10px 8px 50px}
+    .wrap>h1{display:none}
+    .topbar{margin:0 0 8px;font-size:12px}
+    .topbar .long{display:none}
+    .box{border-radius:10px}
+
+    /* 상단: 1줄 = 코인 + 가격 + 변동률, 2줄 = 마크가·펀딩비 */
+    #hd{padding:8px 10px;gap:2px 12px}
+    .coinbtn{font-size:15px;padding:2px 6px;border:0}
+    #price{font-size:22px;order:2}
+    #hd .pickwrap{order:1}
+    #hd .st.chg{order:3;flex-direction:row;align-items:baseline;gap:4px}
+    #hd .st.chg span{display:none}
+    #hd .st.chg b{font-size:14px}
+    #hd .wsline{order:4;margin-left:auto}
+    #hd .st{order:5}
+    #hd .brk{order:4;flex-basis:100%;height:0}
+    #hd .st b{font-size:12px}
+
+    /* 차트: 접혀 있을 땐 얇은 한 줄 */
+    .chartbody{min-height:340px}
+    .chartbar{padding:6px 8px}
+    .chartbox.collapsed .chartbar .tabs2,.chartbox.collapsed .chartbar .iv{display:none}
+    .chartbox.collapsed .chartbar::before{content:"📈 Chart";font-size:13px;color:var(--muted)}
+
+    /* 주문 패널 (왼쪽) */
+    .orderbox{padding:8px}
+    .orderbox label{margin-bottom:7px}
+    .orderbox label>.lt{font-size:11.5px}
+    .orderbox input{padding:6px;font-size:13px}
+    .orderbox .seg{margin-bottom:7px}
+    .orderbox .seg button{padding:6px 2px;font-size:12.5px}
+    .levrow{margin-bottom:2px}
+    .levrow input[type=number]{width:52px;padding:4px 6px}
+    .quick{display:none}
+    #lev{margin-bottom:8px}
+    .pcts{gap:4px;margin:-2px 0 8px}
+    .pcts button{font-size:11px;padding:4px 0}
+    .tpsl{gap:6px}
+    .info{line-height:1.7;font-size:11px;margin:2px 0 8px}
+    .info div{gap:4px}
+    .info b{font-size:11px}
+    #liqnote{display:none!important}
+    .obtns{grid-template-columns:1fr;gap:6px}
+    .obtns button{padding:11px 4px;font-size:15px;border-radius:8px}
+
+    /* 호가 (오른쪽) */
     .mobonly{display:inline-flex}
     .bookbox{padding:6px 4px}
-    .brow,.bhead,.trow{font-size:11px;padding:1.5px 2px}
-    .orderbox{padding:8px}
-    .orderbox input{padding:6px 6px;font-size:13px}
-    .obtns{grid-template-columns:1fr}
-    .obtns button{padding:10px 4px}
-    .levrow input[type=number]{width:56px}
-    .quick button{font-size:11px;padding:4px 0}
-    .wrap{padding:12px 8px 50px}
-    table.pt tbody{grid-template-columns:1fr}
-    .adm input{width:80px}
+    .bookbox .seg button{padding:4px 10px;font-size:12px}
+    .brow,.bhead,.trow{font-size:11px;padding:2px 2px}
+    .brow span:last-child{color:var(--muted)}
+    .mid{font-size:16px;padding:7px 2px;flex-direction:column;gap:0;line-height:1.2}
+    .mid.up{color:var(--buy)} .mid.dn{color:var(--sell)}
     #trades,#book{display:none}
     .bookbox.showbook #book{display:block}
     .bookbox.showtr #trades{display:block;margin-top:0;border-top:0;padding-top:0;max-height:none}
+
+    /* 아래 */
+    .lower{padding:10px}
+    .tiles{gap:6px;margin-bottom:8px}
+    .tile{padding:8px 10px}
+    .tile .v{font-size:14px}
+    .foot2{font-size:11px;line-height:1.6}
+    table.pt tbody{grid-template-columns:1fr}
+    .adm input{width:80px}
   }
   @media (max-width:520px){ .st.hidem{display:none} .tiles{grid-template-columns:1fr 1fr} }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>모의투자</h1>
+  <h1>Paper Trading</h1>
   <nav id="nav"></nav>
 
   <!-- 로그인 -->
   <div id="login" class="card" hidden>
-    <h2>로그인 / 가입</h2>
-    <p class="sub">닉네임과 PIN(4자리 이상)을 입력하세요. 처음 쓰는 닉네임이면 새 계정을 만들어 드려요.</p>
+    <h2>Log in / Sign up</h2>
+    <p class="sub">Enter a nickname and PIN (4+ digits). A new nickname creates a new account.</p>
     <form id="lform">
-      <label><span class="lt">닉네임</span><input id="nick" autocomplete="username" maxlength="16"></label>
+      <label><span class="lt">Nickname</span><input id="nick" autocomplete="username" maxlength="16"></label>
       <label><span class="lt">PIN</span><input id="pin" type="password" autocomplete="current-password" inputmode="numeric" maxlength="32"></label>
       <div class="err" id="lerr"></div>
-      <button id="lbtn" type="submit">시작하기</button>
+      <button id="lbtn" type="submit">Start</button>
     </form>
   </div>
 
   <div id="app" hidden>
     <div class="topbar">
-      <span><b id="who"></b> 님 · 가상 돈으로 하는 연습용이에요 (실제 돈 아님)</span>
+      <span><b id="who"></b> <span class="long"> · Practice with virtual funds (not real money)</span></span>
       <span class="rt">
-        <button class="ghost" id="bell" title="알림">🔔<i id="bellN" hidden>0</i></button>
-        <button class="ghost mini" id="logout">로그아웃</button>
+        <button class="ghost" id="bell" title="Notifications">🔔<i id="bellN" hidden>0</i></button>
+        <button class="ghost mini" id="logout">Log out</button>
         <div id="bellpanel" hidden>
-          <div class="bh"><b>알림 (최근 50개)</b>
-            <span><button class="ghost mini" id="snd">소리 켜기</button> <button class="ghost mini" id="bclear">비우기</button></span></div>
+          <div class="bh"><b>Notifications (last 50)</b>
+            <span><button class="ghost mini" id="snd">Sound on</button> <button class="ghost mini" id="bclear">Clear</button></span></div>
           <div id="blist"></div>
         </div>
       </span>
@@ -237,74 +311,75 @@
       <div class="box" id="hd">
         <div class="pickwrap">
           <button class="coinbtn" id="coinbtn"></button>
-          <div id="picker" hidden><input id="psearch" placeholder="코인 검색 (시총 상위 100)"><div id="plist"></div></div>
+          <div id="picker" hidden><input id="psearch" placeholder="Search coins (top 100)"><div id="plist"></div></div>
         </div>
         <div id="price">-</div>
-        <span class="wsline" title="실시간 연결 상태"><i class="wsdot off" id="wsdot"></i><span id="wstxt">연결 중</span></span>
-        <div class="st"><span>24h 변동</span><b id="chg">-</b></div>
-        <div class="st"><span>마크가</span><b id="mark">-</b></div>
-        <div class="st hidem"><span>24h 고가</span><b id="hi">-</b></div>
-        <div class="st hidem"><span>24h 저가</span><b id="lo">-</b></div>
-        <div class="st hidem"><span>24h 거래대금(USDT)</span><b id="vol">-</b></div>
-        <div class="st"><span>펀딩비 / 다음 펀딩까지</span><b id="fund">-</b></div>
+        <span class="wsline" title="Live connection"><i class="wsdot off" id="wsdot"></i><span id="wstxt">Connecting</span></span>
+        <div class="st chg"><span>24h change</span><b id="chg">-</b></div>
+        <i class="brk"></i>
+        <div class="st"><span>Mark</span><b id="mark">-</b></div>
+        <div class="st hidem"><span>24h high</span><b id="hi">-</b></div>
+        <div class="st hidem"><span>24h low</span><b id="lo">-</b></div>
+        <div class="st hidem"><span>24h vol (USDT)</span><b id="vol">-</b></div>
+        <div class="st"><span>Funding / Countdown</span><b id="fund">-</b></div>
       </div>
 
       <div class="box chartbox" id="chartbox">
         <div class="chartbar">
-          <span class="seg tabs2" id="ctabs"><button data-c="tv" class="on">트레이딩뷰</button><button data-c="mine">내 포지션</button></span>
+          <span class="seg tabs2" id="ctabs"><button data-c="tv" class="on">TradingView</button><button data-c="mine">My positions</button></span>
           <span class="seg iv" id="iv" hidden></span>
           <span class="sp"></span>
-          <button class="ghost mini" id="ctoggle">차트 접기</button>
+          <button class="ghost mini" id="ctoggle">Hide chart</button>
         </div>
         <div class="chartbody">
           <div id="tv"></div>
           <div id="chart" hidden></div>
-          <div class="hint" id="chint" hidden>진입가·청산가·TP/SL 선이 표시돼요</div>
+          <div class="hint" id="chint" hidden>Shows entry, liq. and TP/SL lines</div>
         </div>
       </div>
 
       <div class="box bookbox showbook" id="bookbox">
-        <span class="seg mobonly" id="bseg"><button class="on" data-v="book">호가</button><button data-v="tr">체결</button></span>
+        <span class="seg mobonly" id="bseg"><button class="on" data-v="book">Book</button><button data-v="tr">Trades</button></span>
         <div id="book"></div>
         <div id="trades"></div>
       </div>
 
       <div class="box orderbox">
-        <div class="seg" id="mmode"><button data-m="isolated" class="on">격리</button><button data-m="cross">교차</button></div>
-        <div class="levrow"><span class="lt">레버리지</span><span style="flex:1"></span><input id="levn" type="number" min="1" max="100" step="1" value="10" inputmode="numeric"><span class="xs">x</span></div>
+        <div class="seg" id="mmode"><button data-m="isolated" class="on">Isolated</button><button data-m="cross">Cross</button></div>
+        <div class="levrow"><span class="lt">Leverage</span><span style="flex:1"></span><input id="levn" type="number" min="1" max="100" step="1" value="10" inputmode="numeric"><span class="xs">x</span></div>
         <input id="lev" type="range" min="1" max="100" step="1" value="10">
         <div class="quick" id="lquick"><button class="ghost" data-l="1">1x</button><button class="ghost" data-l="5">5x</button><button class="ghost" data-l="10">10x</button><button class="ghost" data-l="20">20x</button><button class="ghost" data-l="50">50x</button><button class="ghost" data-l="100">100x</button></div>
-        <div class="seg" id="otype"><button data-t="limit" class="on">지정가</button><button data-t="market">시장가</button></div>
-        <label id="prow"><span class="lt">가격 (USDT)</span><span class="inp"><input id="oprice" inputmode="decimal" placeholder="0"><button class="ghost mini" id="usecur" type="button">현재가</button></span></label>
-        <label><span class="lt">수량 (<span id="qunit">BTC</span>)</span><input id="qty" inputmode="decimal" placeholder="0"></label>
+        <div class="seg" id="otype"><button data-t="limit" class="on">Limit</button><button data-t="market">Market</button></div>
+        <label id="prow"><span class="lt">Price (USDT)</span><span class="inp"><input id="oprice" inputmode="decimal" placeholder="0"><button class="ghost mini" id="usecur" type="button">Last</button></span></label>
+        <label><span class="lt">Size (<span id="qunit">BTC</span>)</span><input id="qty" inputmode="decimal" placeholder="0"></label>
         <input id="pct" type="range" min="0" max="100" step="1" value="0">
         <div class="pcts"><button class="ghost" data-p="25">25%</button><button class="ghost" data-p="50">50%</button><button class="ghost" data-p="75">75%</button><button class="ghost" data-p="100">100%</button></div>
         <div class="tpsl">
-          <label><span class="lt">익절가 (TP)</span><input id="tp" inputmode="decimal" placeholder="선택"></label>
-          <label><span class="lt">손절가 (SL)</span><input id="sl" inputmode="decimal" placeholder="선택"></label>
+          <label><span class="lt">Take profit</span><input id="tp" inputmode="decimal" placeholder="Optional"></label>
+          <label><span class="lt">Stop loss</span><input id="sl" inputmode="decimal" placeholder="Optional"></label>
         </div>
         <div class="info">
-          <div><span>사용 가능</span><b id="avail">-</b></div>
-          <div><span>필요 증거금 (+수수료)</span><b id="need">-</b></div>
-          <div><span>예상 청산가 (롱)</span><b id="liqL">-</b></div>
-          <div><span>예상 청산가 (숏)</span><b id="liqS">-</b></div>
+          <div><span>Available</span><b id="avail">-</b></div>
+          <div><span>Cost (incl. fee)</span><b id="need">-</b></div>
+          <div><span>Est. liq. (long)</span><b id="liqL">-</b></div>
+          <div><span>Est. liq. (short)</span><b id="liqS">-</b></div>
           <div id="liqnote" class="small" style="display:block"></div>
         </div>
-        <div class="obtns"><button class="buy" id="bLong">롱 오픈</button><button class="sell" id="bShort">숏 오픈</button></div>
+        <div class="obtns"><button class="buy" id="bLong">Open long</button><button class="sell" id="bShort">Open short</button></div>
       </div>
 
       <div class="box lower">
         <div class="tiles" id="tiles"></div>
         <div class="tabs" id="tabs">
-          <button data-t="pos" class="on">포지션</button><button data-t="ord">미체결</button>
-          <button data-t="ol">주문기록</button><button data-t="th">거래기록</button><button data-t="adm" id="admtab" hidden>관리자</button>
+          <button data-t="pos" class="on">Positions</button><button data-t="ord">Orders</button>
+          <button data-t="ol">Order history</button><button data-t="th">Trade history</button><button data-t="adm" id="admtab" hidden>Admin</button>
         </div>
         <div id="tabbody"></div>
         <div class="foot foot2">
-          시장가 0.05% · 지정가 0.02% 수수료 · 유지증거금률 0.5% 기준 청산 · 펀딩비·호가 슬리피지는 반영하지 않아요.<br>
-          교차 마진은 교차 포지션들이 남은 잔고를 같이 증거금으로 쓰고, 계정 자산이 유지증거금 이하가 되면 교차 포지션이 전부 청산돼요 (한 봉 안에서는 모든 포지션이 가장 불리한 가격에 있다고 보는 보수적 계산).<br>
-          이 사이트는 서버가 계속 켜져 있지 않아서, 접속(또는 새로고침)할 때 바이낸스 1분봉으로 체결·TP·SL·청산을 시간 순서대로 소급 처리해요. 같은 1분봉에서 TP와 SL이 같이 닿으면 SL(청산)이 먼저 난 것으로 봐요.
-          <button class="ghost mini" id="reset" style="margin-left:6px">내 계정 초기화 (10,000 USDT)</button>
+          Fees: market 0.05% · limit 0.02% · maintenance margin 0.5% · funding and slippage are not applied.<br>
+          Cross margin shares the remaining balance across cross positions; if account equity falls to the maintenance margin, all cross positions are liquidated (conservative: within one candle every position is assumed at its worst price).<br>
+          The server isn't always on, so fills, TP/SL and liquidations are replayed from Binance 1-minute candles when you open or refresh the page. If TP and SL are both hit in the same candle, SL (or liquidation) is assumed first.
+          <button class="ghost mini" id="reset" style="margin-left:6px">Reset my account (10,000 USDT)</button>
         </div>
       </div>
     </div>
@@ -314,10 +389,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261004234323"></script>
-<script src="common.js?v=20261004234323"></script>
-<script src="meta.js?v=20261004234323"></script>
-<script src="paper-engine.js?v=20261004234323"></script>
-<script src="paper.js?v=20261004234323"></script>
+<script src="nav.js?v=20261005002000"></script>
+<script src="common.js?v=20261005002000"></script>
+<script src="meta.js?v=20261005002000"></script>
+<script src="paper-engine.js?v=20261005002000"></script>
+<script src="paper.js?v=20261005002000"></script>
 </body>
 </html>
