@@ -1,0 +1,23 @@
+name: 자동매매 봇 (ATH 모의투자)
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"     # 15분마다 (GitHub 사정에 따라 몇 분 늦을 수 있음)
+  workflow_dispatch:            # Actions 탭에서 "Run workflow" 버튼으로 바로 실행
+
+concurrency:
+  group: paper-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: 봇 실행 (/api/bot)
+        env:
+          BOT_SECRET: ${{ secrets.BOT_SECRET }}
+        run: |
+          if [ -z "$BOT_SECRET" ]; then echo "BOT_SECRET 이 아직 없어서 건너뜀"; exit 0; fi
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $BOT_SECRET" \
+            https://fibo-lab-kappa.vercel.app/api/bot
