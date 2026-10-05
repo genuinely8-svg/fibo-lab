@@ -5,7 +5,7 @@
 */
 (function () {
   const TABS = [
-    ["index.html", "TEST 참고용"],
+    ["index.html", "Signals"],
     ["paper.html", "모의투자"],
     ["market.html", "시장 방향"],
     ["liquidation.html", "청산히트맵"],
