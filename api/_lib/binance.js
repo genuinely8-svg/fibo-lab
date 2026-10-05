@@ -32,4 +32,10 @@ async function klines(sym, from, to) {
   return { candles: out, coveredTo: Math.min(start, to) };
 }
 
-module.exports = { price, klines, MIN };
+// 최근 봉 limit 개 (자동매매용 12시간봉 등). 마지막 봉은 아직 안 닫혔을 수 있어서 ct(마감 시각)도 같이
+async function candles(sym, interval, limit) {
+  const rows = await jget(`/fapi/v1/klines?symbol=${sym}&interval=${interval}&limit=${limit}`);
+  return rows.map(r => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], ct: r[6] }));
+}
+
+module.exports = { price, klines, candles, MIN };
