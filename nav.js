@@ -16,6 +16,10 @@
   ];
   const style = document.createElement("style");
   style.textContent = `
+    /* 글꼴: 본문은 Pretendard(한글·숫자 깔끔), 로고 "Artha"는 Cinzel */
+    body{font-family:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Malgun Gothic",sans-serif;font-feature-settings:"tnum"}
+    h1.brand{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.12em;font-size:26px}
+    @media (max-width:700px){ h1.brand{font-size:23px} }
     .navwrap{display:flex;align-items:stretch;margin:0 0 16px}
     /* overflow-y:hidden — 가로 스크롤 칸이 손가락 따라 위아래로 흔들리지 않게 (아이폰) */
     .navtabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
