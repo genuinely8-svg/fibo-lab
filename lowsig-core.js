@@ -9,7 +9,7 @@
   - 12시간봉 종가가 400개 이평 반대편이면 청산
   진입2·진입3·손절은 12시간봉 "안에서" 가격이 닿는 순간 일어나요.
   → fine(bar) 로 더 짧은 봉(1분·3분…)을 받아 순서대로 훑어서 정확한 시각·가격을 찾아요.
-     fine 이 없거나 null 을 주면 12시간봉 하나로 판단 (손절을 먼저 본다고 보수적으로 가정, 시각은 모름)
+     fine 이 없거나 null 을 주면 12시간봉 하나로 판단 (봉 안 순서는 양봉 시가→저가→고가, 음봉 시가→고가→저가로 가정, 시각은 모름)
 */
 (function (root) {
   "use strict";
@@ -97,24 +97,21 @@
           if (!exact) sub = [k];
           for (const c of sub) {
             const t = exact ? c.t : k.t;
-            if (hitStop(c)) {
-              // 같은 짧은 봉 안에서 불타기 가격도 닿았으면 순서를 알 수 없어 손절을 먼저로 봄 (보수적)
-              close(s === 1 ? Math.min(c.o, pos.stop) : Math.max(c.o, pos.stop), t, "stop", exact, hitAdd(c));
+            const both = hitStop(c) && hitAdd(c);
+            // 한 봉 안의 순서는 트레이딩뷰 백테스트와 같은 가정: 양봉 = 시가→저가→고가→종가, 음봉 = 시가→고가→저가→종가
+            // 롱은 고가 쪽이 유리한 쪽, 숏은 저가 쪽이 유리한 쪽 → 유리한 쪽이 먼저면 불타기 먼저, 아니면 손절 먼저
+            const favFirst = s === 1 ? c.c < c.o : c.c >= c.o;
+            const stopNow = () => {
+              close(s === 1 ? Math.min(c.o, pos.stop) : Math.max(c.o, pos.stop), t, "stop", exact, both);
               exited = true;
-              break;
-            }
-            let added = false;
+            };
+            if (!favFirst && hitStop(c)) { stopNow(); break; }
             while (hitAdd(c)) {
               const lvl = nextLvl();
-              addFill(s === 1 ? Math.max(c.o, lvl) : Math.min(c.o, lvl), t, exact);
-              added = true;
+              addFill(s === 1 ? Math.max(c.o, lvl) : Math.min(c.o, lvl), t, exact, both);
             }
-            // 손절선을 바로 올린 경우, 같은 봉 안에서 새 손절선에도 닿았으면 순서를 모르니 손절로 봄 (보수적)
-            if (added && tight && hitStop(c)) {
-              close(pos.stop, t, "stop", exact, true);
-              exited = true;
-              break;
-            }
+            // 불타기 뒤에 반대쪽(손절 방향)으로 움직이는 봉: (즉시 올린) 손절선에 닿았는지 확인
+            if (favFirst && hitStop(c)) { stopNow(); break; }
           }
         }
         if (pos) {
