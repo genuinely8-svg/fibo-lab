@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006223733"></script>
+<script src="theme.js?v=20261006224008"></script>
 <title>Artha Trend Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006223733">
+<link rel="stylesheet" href="common.css?v=20261006224008">
 <style>
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
@@ -113,11 +113,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006223733"></script>
-<script src="nav.js?v=20261006223733"></script>
-<script src="meta.js?v=20261006223733"></script>
-<script src="coinpicker.js?v=20261006223733"></script>
-<script src="lowsig-core.js?v=20261006223733"></script>
+<script src="common.js?v=20261006224008"></script>
+<script src="nav.js?v=20261006224008"></script>
+<script src="meta.js?v=20261006224008"></script>
+<script src="coinpicker.js?v=20261006224008"></script>
+<script src="lowsig-core.js?v=20261006224008"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -391,6 +391,8 @@ async function drawChart(focus) {
     if (o.next) lines.push(series.createPriceLine({ price: o.next, color: "#2563EB", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: `진입${o.n + 1}` }));
     lines.push(series.createPriceLine({ price: o.avg, color: css("--muted"), lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "평단" }));
   }
+  live.follow = !focus;
+  liveConnect();
   if (focus) {
     const i = cs.findIndex(b => b.t + step > focus.t);
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, i - 120), to: i + 120 });
@@ -398,12 +400,31 @@ async function drawChart(focus) {
 }
 
 // ── 현재가 (10초마다) ─────────────────────────────────
-async function tickPrice() {
-  try {
-    const j = await bnGet(`${F}/fapi/v1/ticker/price?symbol=${sym}USDT`);
-    lastPrice = +j.price;
-    if (result && result.open) paintNow();
-  } catch (e) {}
+// ── 실시간: 바이낸스 웹소켓으로 지금 만들어지는 봉과 현재가 (요청 한도에 안 들어감) ──
+// 선물 스트림 주소는 2026년 4월부터 /market 으로 바뀜
+let live = { ws: null, key: "", tries: 0, timer: null, follow: true, lastPaint: 0 };
+function liveConnect() {
+  const key = `${sym.toLowerCase()}usdt@kline_${fineTf}`;
+  if (live.key === key && live.ws && live.ws.readyState <= 1) return;
+  liveClose();
+  live.key = key;
+  const ws = live.ws = new WebSocket("wss://fstream.binance.com/market/ws/" + key);
+  ws.onopen = () => { live.tries = 0; };
+  ws.onmessage = m => {
+    let d; try { d = JSON.parse(m.data); } catch (e) { return; }
+    const k = d && d.k; if (!k) return;
+    lastPrice = +k.c;
+    // 차트가 최근 화면일 때만 마지막 봉을 갱신 (과거 신호를 눌러 보고 있을 땐 그대로)
+    if (series && live.follow) { try { series.update({ time: T(+k.t), open: +k.o, high: +k.h, low: +k.l, close: +k.c }); } catch (e) {} }
+    if (result && result.open && Date.now() - live.lastPaint > 2000) { live.lastPaint = Date.now(); paintNow(); }
+  };
+  ws.onclose = () => { if (live.ws === ws) live.timer = setTimeout(liveConnect, Math.min(15000, 1000 * ++live.tries)); };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+function liveClose() {
+  clearTimeout(live.timer);
+  const ws = live.ws; live.ws = null; live.key = "";
+  if (ws) { ws.onclose = null; try { ws.close(); } catch (e) {} }
 }
 
 // ── 이벤트 ─────────────────────────────────────────────
@@ -417,11 +438,10 @@ $("run").onclick = run;
 $("moreEv").onclick = () => { showN += 60; paintEvents(); };
 $("toLatest").onclick = () => { selEv = null; for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel"); drawChart(null); };
 CoinPicker.attach($("coin"), { onPick: () => { lastPrice = NaN; run(); } });
-setInterval(() => { if (!document.hidden) tickPrice(); }, 10e3);
 // 12시간봉이 새로 마감되면(오전·오후 9시) 다시 계산
 let lastSeen = Math.floor(Date.now() / H12);
 setInterval(() => { const n = Math.floor(Date.now() / H12); if (n !== lastSeen && !document.hidden) { lastSeen = n; setTimeout(run, 20e3); } }, 30e3);
-run().then(tickPrice);
+run();
 </script>
 </body>
 </html>
