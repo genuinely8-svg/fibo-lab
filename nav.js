@@ -7,6 +7,7 @@
   const TABS = [
     ["index.html", "Signals"],
     ["paper.html", "모의투자"],
+    ["calc.html", "계산기"],
     ["market.html", "시장 방향"],
     ["liquidation.html", "청산히트맵"],
     ["oi.html", "OI"],

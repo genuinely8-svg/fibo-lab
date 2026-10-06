@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="theme.js?v=20261006131146"></script>
+<title>계산기 · Artha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css?v=20261006131146">
+<style>
+  /* 계산기 3개를 위쪽 버튼으로 바꿔 보기 */
+  .calcnav{margin-bottom:14px;display:flex}
+  .calcnav .seg{flex:1;display:flex}
+  .calcnav .seg button{flex:1;padding:9px 6px;font-size:14px}
+  /* 입력칸: 넓은 화면 4칸, 휴대폰 2칸 */
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .grid label{min-width:0}
+  .grid input,.grid select{width:100%;min-width:0}
+  .grid .seg{display:flex}
+  .grid .seg button{flex:1;padding:6px 4px}
+  .hint{font-size:11px;color:var(--muted);margin-top:2px}
+  .tiles .v small{font-size:12px;font-weight:600;color:var(--muted)}
+  .note{font-size:12px;color:var(--muted);line-height:1.7;margin:12px 0 0}
+  .note b{color:var(--text)}
+  .ratebox{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:12px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}
+  .ratebox b{font-variant-numeric:tabular-nums}
+  .linkbtn{background:transparent;color:var(--accent);padding:0;font-weight:600;font-size:13px}
+  .ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  /* 물타기 계산기: 진입 줄 */
+  .legs{display:flex;flex-direction:column;gap:8px}
+  .leg{display:grid;grid-template-columns:44px minmax(0,1fr) minmax(0,1fr) 54px 34px;gap:8px;align-items:center}
+  .leg input{width:100%;min-width:0}
+  .leg .no{font-size:12px;color:var(--muted);font-weight:600}
+  .leg .tag{font-size:11px;font-weight:700;text-align:center;border-radius:6px;padding:3px 0}
+  .leg .tag.w{color:var(--down);background:color-mix(in srgb,var(--down) 14%,transparent)}
+  .leg .tag.p{color:var(--up);background:color-mix(in srgb,var(--up) 14%,transparent)}
+  .leg button.x{background:transparent;color:var(--muted);padding:4px 0;font-size:16px;line-height:1}
+  .leghead{display:grid;grid-template-columns:44px minmax(0,1fr) minmax(0,1fr) 54px 34px;gap:8px;font-size:12px;color:var(--muted)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .sep{border:0;border-top:1px solid var(--line);margin:16px 0}
+  .cp-wrap{display:block}
+  .cp-wrap input{width:100%}
+  @media (max-width:700px){
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .calcnav .seg button{font-size:13px;padding:8px 2px}
+    .leg,.leghead{grid-template-columns:30px minmax(0,1fr) minmax(0,1fr) 44px 26px;gap:6px}
+    .cp-list{width:min(320px,calc(100vw - 40px))!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="brand">Artha</h1>
+  <nav id="nav"></nav>
+
+  <div class="calcnav"><span class="seg" id="calcTabs">
+    <button data-t="fee" class="on">수수료</button>
+    <button data-t="funding">펀딩비</button>
+    <button data-t="avg">물타기·불타기</button>
+  </span></div>
+
+  <!-- ───────────────── 1. 수수료 계산기 ───────────────── -->
+  <section id="tab-fee">
+    <div class="card">
+      <h2>수수료 계산기</h2>
+      <p class="sub">얼마를 진입하면 수수료가 얼마나 나가는지, 수수료만큼 벌려면 가격이 몇 % 움직여야 하는지 계산해요.</p>
+      <div class="grid">
+        <label>증거금 (USDT)<input id="fMargin" type="number" inputmode="decimal" min="0" step="any" value="1000"></label>
+        <label>레버리지 (배)<input id="fLev" type="number" inputmode="decimal" min="1" step="any" value="10"></label>
+        <label>진입 주문
+          <span class="seg" id="fIn"><button data-v="taker" class="on">시장가</button><button data-v="maker">지정가</button></span>
+        </label>
+        <label>청산 주문
+          <span class="seg" id="fOut"><button data-v="taker" class="on">시장가</button><button data-v="maker">지정가</button></span>
+        </label>
+        <label>시장가 수수료 (%)<input id="fTaker" type="number" inputmode="decimal" min="0" step="0.001" value="0.05"><span class="hint">바이낸스 선물 기본 0.05%</span></label>
+        <label>지정가 수수료 (%)<input id="fMaker" type="number" inputmode="decimal" min="0" step="0.001" value="0.02"><span class="hint">바이낸스 선물 기본 0.02%</span></label>
+        <label>진입 가격 (선택)<input id="fPrice" type="number" inputmode="decimal" min="0" step="any" placeholder="비우면 % 만 계산"></label>
+        <label>방향
+          <span class="seg" id="fSide"><button data-v="long" class="on">롱</button><button data-v="short">숏</button></span>
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tiles" id="feeOut"></div>
+      <p class="note">수수료는 <b>증거금이 아니라 포지션 규모(증거금 × 레버리지)</b>에 붙어요. 그래서 레버리지가 높을수록 증거금 대비 수수료 부담이 커져요.<br>
+        청산 수수료는 진입 때와 같은 규모로 나간다고 보고 계산했어요 (실제로는 청산 가격에 따라 조금 달라요). VIP 등급·BNB 할인이 있으면 수수료 칸을 직접 고치세요.</p>
+    </div>
+  </section>
+
+  <!-- ───────────────── 2. 펀딩비 계산기 ───────────────── -->
+  <section id="tab-funding" hidden>
+    <div class="card">
+      <h2>펀딩비 계산기</h2>
+      <p class="sub">바이낸스 무기한 선물의 지금 펀딩비로, 포지션을 들고 있는 동안 내거나 받을 금액을 계산해요.</p>
+      <div class="grid">
+        <label>코인<input id="uCoin" value="BTC" placeholder="코인 검색 (예: 비트, SOL)"></label>
+        <label>방향
+          <span class="seg" id="uSide"><button data-v="long" class="on">롱</button><button data-v="short">숏</button></span>
+        </label>
+        <label>증거금 (USDT)<input id="uMargin" type="number" inputmode="decimal" min="0" step="any" value="1000"></label>
+        <label>레버리지 (배)<input id="uLev" type="number" inputmode="decimal" min="1" step="any" value="10"></label>
+        <label>보유 기간<input id="uHold" type="number" inputmode="decimal" min="0" step="any" value="7"></label>
+        <label>기간 단위
+          <span class="seg" id="uUnit"><button data-v="h">시간</button><button data-v="d" class="on">일</button></span>
+        </label>
+        <label>펀딩비 (%)<input id="uRate" type="number" inputmode="decimal" step="0.0001" value="0.01"><span class="hint">코인을 고르면 지금 값이 자동으로 들어가요</span></label>
+        <label>펀딩 주기 (시간)<input id="uInt" type="number" inputmode="decimal" min="1" step="1" value="8"><span class="hint">대부분 8시간, 일부 코인 4시간</span></label>
+      </div>
+      <div class="ratebox" id="uLive"><span class="muted">바이낸스 펀딩비 불러오는 중…</span></div>
+    </div>
+    <div class="card">
+      <div class="tiles" id="fundOut"></div>
+      <p class="note">펀딩비가 <b>+ 이면 롱이 숏에게 내고</b>, <b>− 이면 숏이 롱에게 내요</b>. 금액은 증거금이 아니라 <b>포지션 규모</b>에 붙어요.<br>
+        펀딩비는 주기마다 바뀌어서, 여러 날 계산은 "지금 비율이 계속된다면" 기준의 <b>추정치</b>예요. 펀딩 시각에 포지션이 있을 때만 붙어요.</p>
+    </div>
+  </section>
+
+  <!-- ───────────────── 3. 물타기·불타기 계산기 ───────────────── -->
+  <section id="tab-avg" hidden>
+    <div class="card">
+      <h2>물타기·불타기 계산기</h2>
+      <p class="sub">여러 번 나눠 진입했을 때의 평균 단가, 지금 손익, 예상 청산가를 계산해요. 불리한 가격에 더 사면 물타기, 유리한 가격에 더 사면 불타기로 표시돼요.</p>
+      <div class="grid">
+        <label>코인 (현재가 불러오기)<input id="aCoin" value="BTC" placeholder="코인 검색 (예: 비트, SOL)"></label>
+        <label>방향
+          <span class="seg" id="aSide"><button data-v="long" class="on">롱</button><button data-v="short">숏</button></span>
+        </label>
+        <label>레버리지 (배)<input id="aLev" type="number" inputmode="decimal" min="1" step="any" value="10"></label>
+        <label>현재가<input id="aNow" type="number" inputmode="decimal" min="0" step="any" placeholder="코인을 고르면 자동"></label>
+        <label>입력 방식
+          <span class="seg" id="aMode"><button data-v="usd" class="on">금액 (USDT)</button><button data-v="qty">수량</button></span>
+        </label>
+        <label>유지 증거금률 (%)<input id="aMmr" type="number" inputmode="decimal" min="0" step="0.05" value="0.5"><span class="hint">청산가 계산용 · 코인·규모마다 다름</span></label>
+      </div>
+      <hr class="sep">
+      <div class="leghead"><span>차수</span><span>진입 가격</span><span id="aAmtHead">포지션 금액 (USDT)</span><span style="text-align:center">구분</span><span></span></div>
+      <div class="legs" id="legs"></div>
+      <div class="row">
+        <button type="button" class="ghost" id="addLeg">+ 진입 추가</button>
+        <button type="button" class="ghost" id="resetLegs">초기화</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tiles" id="avgOut"></div>
+      <div class="row" id="avgLinks"></div>
+    </div>
+    <div class="card">
+      <h2>목표 평단 역계산</h2>
+      <p class="sub">평균 단가를 얼마로 맞추려면 <b>현재가</b>에 얼마를 더 진입해야 하는지 계산해요.</p>
+      <div class="grid">
+        <label>목표 평단<input id="aTarget" type="number" inputmode="decimal" min="0" step="any" placeholder="예: 85000"></label>
+      </div>
+      <div class="tiles" id="revOut" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <p class="note" style="margin:0">금액(USDT)은 <b>증거금이 아니라 포지션 규모</b>예요 (증거금 100 USDT × 10배 = 1,000 USDT). 필요한 증거금은 아래에 따로 계산돼요.<br>
+        예상 청산가는 <b>격리(Isolated) 마진 기준의 근사치</b>예요. 교차 마진이면 지갑 잔고 전체가 버팀목이라 청산가가 더 멀어지고, 거래소의 유지증거금 구간·수수료에 따라 실제와 조금 달라요.</p>
+    </div>
+  </section>
+
+  <p class="foot">참고용 계산기이며 투자 조언이 아닙니다. 실제 수수료·펀딩비·청산가는 거래소 화면에서 꼭 다시 확인하세요.</p>
+</div>
+
+<script src="common.js?v=20261006131146"></script>
+<script src="nav.js?v=20261006131146"></script>
+<script src="meta.js?v=20261006131146"></script>
+<script src="coinpicker.js?v=20261006131146"></script>
+<script>
+const F = "https://fapi.binance.com";
+const num = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : NaN; };
+const ok = v => isFinite(v) && v > 0;
+const money = v => !isFinite(v) ? "-" : (v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = v => !isFinite(v) ? "-" : (v > 0 ? "+" : v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const price = v => !isFinite(v) || v <= 0 ? "-" : "$" + v.toLocaleString("en-US", { maximumSignificantDigits: Math.abs(v) >= 1000 ? 8 : 6 });
+const qtyFmt = v => !isFinite(v) ? "-" : v.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+const tile = (k, v, s = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+
+// ── 세그먼트 버튼 (롱/숏 등) ─────────────────────────────
+const segVal = {};
+function seg(id, onChange) {
+  const box = $(id);
+  segVal[id] = (box.querySelector("button.on") || box.querySelector("button")).dataset.v;
+  for (const b of box.querySelectorAll("button")) b.onclick = e => {
+    e.preventDefault();
+    segVal[id] = b.dataset.v;
+    for (const x of box.querySelectorAll("button")) x.classList.toggle("on", x === b);
+    onChange && onChange();
+  };
+}
+function setSeg(id, v) { const b = $(id).querySelector(`button[data-v="${v}"]`); if (b) b.click(); }
+
+// ── 위쪽 계산기 바꾸기 (주소 #fee / #funding / #avg 로도 바로 열림) ──
+function showTab(t) {
+  for (const s of ["fee", "funding", "avg"]) $("tab-" + s).hidden = s !== t;
+  for (const b of $("calcTabs").querySelectorAll("button")) b.classList.toggle("on", b.dataset.t === t);
+  if (location.hash !== "#" + t) history.replaceState(null, "", "#" + t);
+}
+for (const b of $("calcTabs").querySelectorAll("button")) b.onclick = () => showTab(b.dataset.t);
+if (["#fee", "#funding", "#avg"].includes(location.hash)) showTab(location.hash.slice(1));
+
+// ═════════════════ 1. 수수료 ═════════════════
+function calcFee() {
+  const margin = num("fMargin"), lev = num("fLev"), taker = num("fTaker") / 100, maker = num("fMaker") / 100;
+  if (!ok(margin) || !ok(lev) || !(taker >= 0) || !(maker >= 0)) { $("feeOut").innerHTML = tile("입력 확인", "-", "증거금·레버리지·수수료를 넣어 주세요"); return; }
+  const size = margin * lev;
+  const rIn = segVal.fIn === "maker" ? maker : taker, rOut = segVal.fOut === "maker" ? maker : taker;
+  const feeIn = size * rIn, feeOut = size * rOut, total = feeIn + feeOut;
+  const be = (rIn + rOut) * 100;                                   // 손익분기 가격 변동 (%)
+  const p = num("fPrice"), long = segVal.fSide === "long";
+  const beP = ok(p) ? (long ? p * (1 + rIn) / (1 - rOut) : p * (1 - rIn) / (1 + rOut)) : NaN;
+  $("feeOut").innerHTML = [
+    tile("포지션 규모", money(size), `증거금 ${money(margin)} × ${lev}배`),
+    tile("진입 수수료", money(feeIn), `${segVal.fIn === "maker" ? "지정가" : "시장가"} ${(rIn * 100).toFixed(3)}%`),
+    tile("청산 수수료", money(feeOut), `${segVal.fOut === "maker" ? "지정가" : "시장가"} ${(rOut * 100).toFixed(3)}%`),
+    tile("왕복 수수료 합계", `<span class="up">${money(total)}</span>`, `증거금의 ${(total / margin * 100).toFixed(2)}%`),
+    tile("손익분기 가격 변동", `${be.toFixed(3)}%`, `이만큼 ${long ? "올라야" : "내려야"} 본전`),
+    tile("손익분기 가격", ok(p) ? price(beP) : "-", ok(p) ? `진입 ${price(p)} 기준 (${long ? "롱" : "숏"})` : "진입 가격을 넣으면 계산"),
+  ].join("");
+}
+seg("fIn", calcFee); seg("fOut", calcFee); seg("fSide", calcFee);
+for (const id of ["fMargin", "fLev", "fTaker", "fMaker", "fPrice"]) $(id).addEventListener("input", calcFee);
+
+// ═════════════════ 2. 펀딩비 ═════════════════
+let fundInfo = null;          // 펀딩 주기가 8시간이 아닌 코인 목록
+let liveRate = null, liveTimer = null;
+async function intervalOf(sym) {
+  try {
+    if (!fundInfo) {
+      const rows = await cached("bn-fundinginfo-v1", 6 * 3600e3, () => getJSON(`${F}/fapi/v1/fundingInfo`));
+      fundInfo = {}; for (const r of rows) fundInfo[r.symbol] = +r.fundingIntervalHours;
+    }
+  } catch (e) { fundInfo = fundInfo || {}; }
+  return fundInfo[sym + "USDT"] || 8;
+}
+async function loadFunding(sym) {
+  sym = (sym || "").toUpperCase().replace(/USDT$/, "");
+  if (!sym) return;
+  $("uLive").innerHTML = `<span class="muted">${esc(sym)} 펀딩비 불러오는 중…</span>`;
+  try {
+    const [pi, hrs] = await Promise.all([getJSON(`${F}/fapi/v1/premiumIndex?symbol=${sym}USDT`), intervalOf(sym)]);
+    liveRate = { sym, rate: +pi.lastFundingRate * 100, next: +pi.nextFundingTime, mark: +pi.markPrice, hrs };
+    $("uRate").value = +liveRate.rate.toFixed(4);
+    $("uInt").value = hrs;
+    paintLive();
+    calcFunding();
+  } catch (e) {
+    $("uLive").innerHTML = `<span class="muted">${esc(sym)} 펀딩비를 못 불러왔어요 (${esc(e.message)}). 펀딩비 칸에 직접 넣어도 계산돼요.</span>`;
+  }
+}
+function paintLive() {
+  if (!liveRate) return;
+  const left = Math.max(0, liveRate.next - Date.now()), h = Math.floor(left / 3600e3), m = Math.floor(left % 3600e3 / 60e3), s = Math.floor(left % 60e3 / 1000);
+  const r = liveRate.rate, who = r > 0 ? "롱이 냄" : r < 0 ? "숏이 냄" : "주고받음 없음";
+  $("uLive").innerHTML = `<span>${esc(liveRate.sym)} 지금 펀딩비 <b class="${r > 0 ? "up" : r < 0 ? "down" : ""}">${r > 0 ? "+" : ""}${r.toFixed(4)}%</b> <span class="muted">(${who})</span></span>
+    <span>주기 <b>${liveRate.hrs}시간</b></span>
+    <span>다음 펀딩까지 <b>${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}</b></span>
+    <span>마크 가격 <b>${price(liveRate.mark)}</b></span>
+    <button type="button" class="linkbtn" id="uReload">새로고침</button>`;
+  $("uReload").onclick = () => loadFunding(liveRate.sym);
+}
+function calcFunding() {
+  const margin = num("uMargin"), lev = num("uLev"), hold = num("uHold"), rate = num("uRate") / 100, hrs = num("uInt");
+  if (!ok(margin) || !ok(lev) || !(hold >= 0) || !isFinite(rate) || !ok(hrs)) { $("fundOut").innerHTML = tile("입력 확인", "-", "증거금·레버리지·기간·펀딩비를 넣어 주세요"); return; }
+  const size = margin * lev, long = segVal.uSide === "long";
+  const holdH = segVal.uUnit === "d" ? hold * 24 : hold;
+  const count = Math.floor(holdH / hrs);                           // 보유 기간 동안 펀딩 횟수
+  const per = size * rate * (long ? -1 : 1);                       // + 받음 / − 냄
+  const perDay = per * (24 / hrs), total = per * count;
+  const word = v => v > 0 ? "받음" : v < 0 ? "냄" : "";
+  const col = v => v > 0 ? "down" : v < 0 ? "up" : "";            // 받으면 파랑, 내면 빨강
+  const yr = rate * (24 / hrs) * 365 * 100;
+  $("fundOut").innerHTML = [
+    tile("포지션 규모", money(size), `증거금 ${money(margin)} × ${lev}배 · ${long ? "롱" : "숏"}`),
+    tile("펀딩 1회", `<span class="${col(per)}">${signed(per)}</span> <small>${word(per)}</small>`, `${hrs}시간마다`),
+    tile("하루", `<span class="${col(perDay)}">${signed(perDay)}</span> <small>${word(perDay)}</small>`, `하루 ${(24 / hrs).toFixed(0)}회`),
+    tile(`보유 기간 합계 (${count}회)`, `<span class="${col(total)}">${signed(total)}</span> <small>${word(total)}</small>`, `증거금의 ${(total / margin * 100).toFixed(2)}%`),
+    tile("일주일", signed(perDay * 7), `증거금의 ${(perDay * 7 / margin * 100).toFixed(2)}%`),
+    tile("한 달 (30일)", signed(perDay * 30), `증거금의 ${(perDay * 30 / margin * 100).toFixed(2)}%`),
+    tile("연 환산 펀딩비", `${yr > 0 ? "+" : ""}${yr.toFixed(1)}%`, "포지션 규모 기준, 지금 비율이 1년 계속된다면"),
+  ].join("");
+}
+seg("uSide", calcFunding); seg("uUnit", calcFunding);
+for (const id of ["uMargin", "uLev", "uHold", "uRate", "uInt"]) $(id).addEventListener("input", calcFunding);
+CoinPicker.attach($("uCoin"), { onPick: s => loadFunding(s) });
+setInterval(() => { if (!$("tab-funding").hidden && liveRate) { if (Date.now() > liveRate.next + 5000) loadFunding(liveRate.sym); else paintLive(); } }, 1000);
+
+// ═════════════════ 3. 물타기·불타기 ═════════════════
+let legs = [];
+function blankLegs() { legs = [{ p: "", a: "" }, { p: "", a: "" }]; }
+blankLegs();
+function drawLegs() {
+  $("aAmtHead").textContent = segVal.aMode === "qty" ? "수량 (코인)" : "포지션 금액 (USDT)";
+  $("legs").innerHTML = legs.map((l, i) => `<div class="leg">
+      <span class="no">${i + 1}차</span>
+      <input type="number" inputmode="decimal" min="0" step="any" data-i="${i}" data-k="p" value="${esc(l.p)}" placeholder="가격">
+      <input type="number" inputmode="decimal" min="0" step="any" data-i="${i}" data-k="a" value="${esc(l.a)}" placeholder="${segVal.aMode === "qty" ? "수량" : "금액"}">
+      <span class="tag" id="tag${i}"></span>
+      ${legs.length > 1 ? `<button type="button" class="x" data-del="${i}" title="이 줄 지우기">×</button>` : "<span></span>"}
+    </div>`).join("");
+  for (const inp of $("legs").querySelectorAll("input")) inp.addEventListener("input", () => { legs[+inp.dataset.i][inp.dataset.k] = inp.value; calcAvg(); });
+  for (const b of $("legs").querySelectorAll("button[data-del]")) b.onclick = () => { legs.splice(+b.dataset.del, 1); drawLegs(); calcAvg(); };
+}
+function calcAvg() {
+  const long = segVal.aSide === "long", lev = num("aLev"), mmr = num("aMmr") / 100, now = num("aNow");
+  const usdMode = segVal.aMode !== "qty";
+  let Q = 0, N = 0, first = null;
+  legs.forEach((l, i) => {
+    const p = parseFloat(l.p), a = parseFloat(l.a), tag = $("tag" + i);
+    if (!ok(p) || !ok(a)) { tag.className = "tag"; tag.textContent = ""; return; }
+    const q = usdMode ? a / p : a;
+    if (first == null) { first = p; tag.className = "tag"; tag.textContent = "첫 진입"; }
+    else {
+      const avgSoFar = N / Q;
+      const worse = long ? p < avgSoFar : p > avgSoFar;           // 지금까지 평단보다 불리한 가격 = 물타기
+      tag.className = "tag " + (worse ? "w" : "p"); tag.textContent = worse ? "물타기" : "불타기";
+    }
+    Q += q; N += q * p;
+  });
+  if (!(Q > 0) || !ok(lev)) {
+    $("avgOut").innerHTML = tile("입력 확인", "-", "진입 가격과 금액(또는 수량)을 한 줄 이상 넣어 주세요");
+    $("avgLinks").innerHTML = ""; $("revOut").innerHTML = ""; avgState = null; return;
+  }
+  const avg = N / Q, notional = N, margin = notional / lev;
+  const liq = long ? avg * (1 - 1 / lev + mmr) : avg * (1 + 1 / lev - mmr);
+  const out = [
+    tile("평균 단가", price(avg), `${long ? "롱" : "숏"} · ${legs.filter(l => ok(parseFloat(l.p)) && ok(parseFloat(l.a))).length}번 진입`),
+    tile("총 수량", qtyFmt(Q), "코인 개수"),
+    tile("총 포지션 규모", money(notional), "진입 가격 기준"),
+    tile("필요 증거금", money(margin), `${lev}배 기준`),
+    tile("예상 청산가 (격리)", `<span class="${long ? "up" : "down"}">${liq > 0 ? price(liq) : "-"}</span>`,
+      liq > 0 ? `평단에서 ${(Math.abs(liq - avg) / avg * 100).toFixed(2)}% ${long ? "아래" : "위"}` : "레버리지가 낮아 청산 없음"),
+  ];
+  if (ok(now)) {
+    const pnl = (long ? now - avg : avg - now) * Q;
+    out.push(tile("현재가 기준 손익", `<span class="${cls(pnl)}">${signed(pnl)}</span>`, `증거금 대비 ${pct(pnl / margin * 100)} · 현재가 ${price(now)}`));
+    const toLiq = Math.abs(now - liq) / now * 100;
+    const past = long ? now <= liq : now >= liq;                   // 현재가가 이미 청산가를 넘었는지
+    if (liq > 0) out.push(past
+      ? tile("청산까지 남은 거리", `<span class="up">이미 청산 구간</span>`, `현재가가 예상 청산가를 ${toLiq.toFixed(2)}% 넘었어요`)
+      : tile("청산까지 남은 거리", `${toLiq.toFixed(2)}%`, `현재가에서 ${long ? "내려가면" : "올라가면"} 청산`));
+  }
+  $("avgOut").innerHTML = out.join("");
+  avgState = { notional, margin, lev, long, avg };
+  $("avgLinks").innerHTML = `<button type="button" class="ghost" id="toFee">이 포지션으로 수수료 계산 →</button>
+    <button type="button" class="ghost" id="toFund">이 포지션으로 펀딩비 계산 →</button>`;
+  $("toFee").onclick = () => {
+    $("fMargin").value = +margin.toFixed(2); $("fLev").value = lev; $("fPrice").value = +avg.toPrecision(8);
+    setSeg("fSide", long ? "long" : "short"); calcFee(); showTab("fee"); scrollTo(0, 0);
+  };
+  $("toFund").onclick = () => {
+    $("uMargin").value = +margin.toFixed(2); $("uLev").value = lev;
+    setSeg("uSide", long ? "long" : "short");
+    const c = $("aCoin").value.trim().toUpperCase();
+    if (c && c !== $("uCoin").value.trim().toUpperCase()) { $("uCoin").value = c; loadFunding(c); }
+    calcFunding(); showTab("funding"); scrollTo(0, 0);
+  };
+  calcReverse();
+}
+let avgState = null;
+function calcReverse() {
+  const t = num("aTarget"), now = num("aNow");
+  if (!avgState) { $("revOut").innerHTML = ""; return; }
+  if (!ok(t) || !ok(now)) { $("revOut").innerHTML = tile("필요한 값", "-", "목표 평단과 현재가를 넣어 주세요"); return; }
+  const { avg, lev, long } = avgState, Q = avgState.notional / avg;
+  // 현재가 now 에 q 만큼 더 사면: (Q·avg + q·now) / (Q + q) = t → q = Q·(avg − t) / (t − now)
+  const between = (t - avg) * (t - now) < 0;
+  if (!between || t === now) {
+    $("revOut").innerHTML = tile("계산 불가", "-", `목표 평단은 지금 평단 ${price(avg)}과 현재가 ${price(now)} <b>사이</b>여야 해요`);
+    return;
+  }
+  const q = Q * (avg - t) / (t - now), add = q * now, newNotional = avgState.notional + add;
+  const kind = (long ? now < avg : now > avg) ? "물타기" : "불타기";
+  $("revOut").innerHTML = [
+    tile(`추가 진입 금액 (${kind})`, money(add), `현재가 ${price(now)}에 진입`),
+    tile("추가 수량", qtyFmt(q), "코인 개수"),
+    tile("추가 증거금", money(add / lev), `${lev}배 기준`),
+    tile("진입 후 총 규모", money(newNotional), `총 증거금 ${money(newNotional / lev)}`),
+  ].join("");
+}
+async function loadNow(sym) {
+  sym = (sym || "").toUpperCase().replace(/USDT$/, "");
+  if (!sym) return;
+  try {
+    const j = await getJSON(`${F}/fapi/v1/ticker/price?symbol=${sym}USDT`);
+    $("aNow").value = +(+j.price).toPrecision(8);
+    calcAvg();
+  } catch (e) {}
+}
+seg("aSide", calcAvg);
+seg("aMode", () => { for (const l of legs) l.a = ""; drawLegs(); calcAvg(); });
+for (const id of ["aLev", "aNow", "aMmr"]) $(id).addEventListener("input", calcAvg);
+$("aTarget").addEventListener("input", calcReverse);
+$("addLeg").onclick = () => { legs.push({ p: "", a: "" }); drawLegs(); calcAvg(); };
+$("resetLegs").onclick = () => { blankLegs(); $("aTarget").value = ""; drawLegs(); calcAvg(); };
+CoinPicker.attach($("aCoin"), { onPick: s => loadNow(s) });
+
+// ── 처음 열 때 ─────────────────────────────
+calcFee();
+calcFunding();
+drawLegs();
+calcAvg();
+loadFunding("BTC");
+loadNow("BTC");
+</script>
+</body>
+</html>
