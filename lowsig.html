@@ -3,18 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006224151"></script>
+<script src="theme.js?v=20261006224741"></script>
 <title>Artha Trend Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006224151">
+<link rel="stylesheet" href="common.css?v=20261006224741">
 <style>
-  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
+  .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end;max-width:560px}
   .grid label{min-width:0}
   .grid input,.grid select{width:100%;min-width:0}
   .grid .seg{display:flex}
   .grid .seg button{flex:1;padding:6px 4px}
-  .cp-wrap{display:block}
-  .cp-wrap input{width:100%}
   .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:10px}
   .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
   .state{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:12px}
@@ -27,6 +25,12 @@
   #chart{height:440px}
   .charthead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
   .charthead h2{margin:0}
+  /* 트레이딩뷰처럼 차트 위 시간 단위 버튼 */
+  .tfbar{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 8px;padding:3px;border:1px solid var(--line);border-radius:8px;width:max-content;max-width:100%}
+  .tfbar button{background:transparent;color:var(--muted);padding:5px 9px;font-size:13px;font-weight:600;border-radius:6px}
+  .tfbar button:hover{color:var(--text);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .tfbar button.on{color:var(--text);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+  .tfbar button:disabled{opacity:.6;cursor:wait}
   .ghost{background:transparent;color:var(--text);border:1px solid var(--line);padding:6px 12px;font-size:13px}
   table.ev td,table.ev th{white-space:nowrap}
   table.ev tr.click{cursor:pointer}
@@ -42,11 +46,11 @@
   .acc.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--line))}
   .more{margin-top:10px}
   @media (max-width:700px){
-    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+    .tfbar button{padding:5px 7px;font-size:12px}
     #chart{height:360px}
           .lab{font-size:12px;padding:2px 6px}
     table.ev .yr{display:none}                                              /* 휴대폰: 연도 숨김 */
-    .cp-list{width:min(320px,calc(100vw - 40px))!important}
   }
 </style>
 </head>
@@ -57,29 +61,13 @@
 
   <div class="card">
     <h2>Artha Trend Engine</h2>
-    <p class="sub">신호는 <b>12시간봉</b>으로 계산하고(진입1은 봉 마감 때 확정), 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지 보고 싶으면 아래에서 분봉을 고르세요. 분봉은 처음 한 번 바이낸스에서 받아 오느라 시간이 걸리고, 그다음부터는 이 브라우저에 저장돼서 빨라요.</p>
+    <p class="sub"><b>비트코인(BTCUSDT 무기한)</b> 전용 · 신호는 <b>12시간봉</b>으로 계산해요(진입1은 봉 마감 때 확정). 차트 위에서 분봉을 고르면 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지 그 봉 기준으로 다시 확인해요. 분봉은 처음 한 번 받아 오느라 시간이 걸리고, 그다음부터는 이 브라우저에 저장돼서 빨라요.</p>
     <div class="grid">
-      <label>코인<input id="coin" value="BTC" placeholder="코인 검색 (예: 비트, SOL)"></label>
-      <label>차트 · 시점 확인용 봉
-        <select id="fineTf">
-          <option value="12h" selected>12시간봉 (기본 · 빠름)</option>
-          <option value="1m">1분봉 (가장 정확 · 처음 한 번 1분쯤)</option>
-          <option value="3m">3분봉</option>
-          <option value="5m">5분봉</option>
-          <option value="15m">15분봉</option>
-          <option value="30m">30분봉</option>
-          <option value="1h">1시간봉</option>
-          <option value="4h">4시간봉</option>
-          <option value="6h">6시간봉</option>
-        </select>
-      </label>
       <label>방향
         <span class="seg" id="dir"><button data-v="both" class="on">롱+숏</button><button data-v="long">롱만</button><button data-v="short">숏만</button></span>
       </label>
       <label>&nbsp;<button id="run">새로고침</button></label>
     </div>
-    <div class="bar" id="bar" hidden><i></i></div>
-    <div class="status notranslate" id="status" translate="no"></div>
   </div>
 
   <div class="card">
@@ -93,6 +81,13 @@
       <h2 id="chartTitle">차트</h2>
       <button type="button" class="ghost" id="toLatest">최근으로</button>
     </div>
+    <div class="tfbar notranslate" id="tfbar" translate="no">
+      <button data-tf="1m">1m</button><button data-tf="3m">3m</button><button data-tf="5m">5m</button><button data-tf="15m">15m</button>
+      <button data-tf="30m">30m</button><button data-tf="1h">1H</button><button data-tf="4h">4H</button><button data-tf="6h">6H</button><button data-tf="12h" class="on">12H</button>
+    </div>
+    <div class="bar" id="bar" hidden><i></i></div>
+    <div style="margin-bottom:8px" class="status notranslate" id="status" translate="no"></div>
+
     <div id="chart"></div>
     <p class="foot" style="margin:10px 0 0">아래 신호 기록에서 줄을 누르면 그 시점으로 차트가 이동해요. 주황선 = 12시간봉 400개 이평, 빨간선 = 지금 손절선, 파란 점선 = 다음 불타기 가격.</p>
   </div>
@@ -112,11 +107,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006224151"></script>
-<script src="nav.js?v=20261006224151"></script>
-<script src="meta.js?v=20261006224151"></script>
-<script src="coinpicker.js?v=20261006224151"></script>
-<script src="lowsig-core.js?v=20261006224151"></script>
+<script src="common.js?v=20261006224741"></script>
+<script src="nav.js?v=20261006224741"></script>
+<script src="lowsig-core.js?v=20261006224741"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -132,7 +125,8 @@ const kst = (ms, withYear = true) => {
   return `${withYear ? d.getUTCFullYear() + "-" : ""}${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
 };
 
-let dir = "both", sym = "BTC", fineTf = "1m";
+const sym = "BTC";                                     // 비트코인 전용 (알트에는 잘 안 맞아서)
+let dir = "both", fineTf = "12h";
 let bars12 = [], result = null, showN = 40, selEv = null, lastPrice = NaN, runId = 0;
 const fineCache = new Map();          // `${sym}|${tf}|${barT}` → 짧은 봉 배열
 
@@ -211,9 +205,6 @@ async function prefetch(s, tf, list, onProg) {
 // ── 실행 ─────────────────────────────────────────────
 async function run() {
   const my = ++runId;
-  sym = ($("coin").value.trim().toUpperCase().replace(/USDT$/, "").replace(/[^A-Z0-9]/g, "")) || "BTC";
-  $("coin").value = sym;
-  fineTf = $("fineTf").value;
   $("run").disabled = true;
   const st = $("status"), bar = $("bar");
   try {
@@ -335,7 +326,7 @@ async function drawChart(focus) {
   // 차트에 쓸 봉: 12시간봉이면 이미 받아 둔 전체 기간을 그대로 (추가 요청 없음),
   // 분봉이면 한 번에 받을 수 있는 최대 1,500개 (특정 신호를 눌렀으면 그 주변, 아니면 최근)
   const tf = fineTf, step = TF_MS[tf], N = 1500;
-  $("chartTitle").innerHTML = `${esc(sym)} · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
+  $("chartTitle").innerHTML = `BTCUSDT · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
   let cs;
   if (tf === "12h") cs = bars12;
   else {
@@ -424,11 +415,16 @@ for (const b of $("dir").querySelectorAll("button")) b.onclick = () => {
   for (const x of $("dir").querySelectorAll("button")) x.classList.toggle("on", x === b);
   run();
 };
-$("fineTf").onchange = run;
+// 차트 위 시간 단위 버튼: 고르면 차트도 그 봉으로, 진입2·3·익절·SL 시각도 그 봉 기준으로 다시 확인
+for (const b of $("tfbar").querySelectorAll("button")) b.onclick = () => {
+  if (fineTf === b.dataset.tf) return;
+  fineTf = b.dataset.tf;
+  for (const x of $("tfbar").querySelectorAll("button")) x.classList.toggle("on", x === b);
+  run();
+};
 $("run").onclick = run;
 $("moreEv").onclick = () => { showN += 60; paintEvents(); };
 $("toLatest").onclick = () => { selEv = null; for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel"); drawChart(null); };
-CoinPicker.attach($("coin"), { onPick: () => { lastPrice = NaN; run(); } });
 // 12시간봉이 새로 마감되면(오전·오후 9시) 다시 계산
 let lastSeen = Math.floor(Date.now() / H12);
 setInterval(() => { const n = Math.floor(Date.now() / H12); if (n !== lastSeen && !document.hidden) { lastSeen = n; setTimeout(run, 20e3); } }, 30e3);
