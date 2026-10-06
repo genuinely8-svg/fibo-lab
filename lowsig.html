@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006224008"></script>
+<script src="theme.js?v=20261006224151"></script>
 <title>Artha Trend Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006224008">
+<link rel="stylesheet" href="common.css?v=20261006224151">
 <style>
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
@@ -44,8 +44,7 @@
   @media (max-width:700px){
     .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     #chart{height:360px}
-          table.ev th:nth-child(4),table.ev td:nth-child(4){display:none}        /* 휴대폰: 정확도 칸 숨김 */
-    .lab{font-size:12px;padding:2px 6px}
+          .lab{font-size:12px;padding:2px 6px}
     table.ev .yr{display:none}                                              /* 휴대폰: 연도 숨김 */
     .cp-list{width:min(320px,calc(100vw - 40px))!important}
   }
@@ -101,7 +100,7 @@
   <div class="card">
     <h2>신호 기록 <span class="muted small">(2020년부터, 최근 것이 위)</span></h2>
     <div class="tablewrap"><table class="ev">
-      <thead><tr><th class="l">시각</th><th class="l">신호</th><th>가격</th><th class="l">시점</th><th>손익</th></tr></thead>
+      <thead><tr><th class="l">시각</th><th class="l">신호</th><th>가격</th><th>손익</th></tr></thead>
       <tbody id="evBody"></tbody>
     </table></div>
     <button type="button" class="ghost more" id="moreEv" hidden>더 보기</button>
@@ -113,11 +112,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006224008"></script>
-<script src="nav.js?v=20261006224008"></script>
-<script src="meta.js?v=20261006224008"></script>
-<script src="coinpicker.js?v=20261006224008"></script>
-<script src="lowsig-core.js?v=20261006224008"></script>
+<script src="common.js?v=20261006224151"></script>
+<script src="nav.js?v=20261006224151"></script>
+<script src="meta.js?v=20261006224151"></script>
+<script src="coinpicker.js?v=20261006224151"></script>
+<script src="lowsig-core.js?v=20261006224151"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -125,7 +124,7 @@ const TF_MS = { "1m": 60e3, "3m": 180e3, "5m": 300e3, "15m": 900e3, "30m": 1800e
 const TF_KO = { "1m": "1분봉", "3m": "3분봉", "5m": "5분봉", "15m": "15분봉", "30m": "30분봉", "1h": "1시간봉", "4h": "4시간봉", "6h": "6시간봉", "12h": "12시간봉" };
 const START = Date.UTC(2020, 0, 1);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const px = v => !isFinite(v) ? "-" : "$" + v.toLocaleString("en-US", { maximumSignificantDigits: Math.abs(v) >= 1000 ? 8 : 6 });
+const px = v => !isFinite(v) ? "-" : Math.abs(v) >= 100 ? "$" + Math.trunc(v).toLocaleString("en-US") : "$" + v.toLocaleString("en-US", { maximumSignificantDigits: 6 });   // 100 이상은 소수점 아래 버림
 const money = v => !isFinite(v) ? "-" : (v > 0 ? "+" : v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 });
 // 한국시간으로 표시 (사이트의 다른 탭과 같음)
 const kst = (ms, withYear = true) => {
@@ -288,14 +287,6 @@ function paintNow() {
   $("now").innerHTML = tiles.map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
 }
 
-function accOf(e) {
-  if (e.kind === "entry" && e.n === 1) return `<span class="acc ok">12시간봉 마감</span>`;
-  if (e.kind === "exit" && e.why === "trend") return `<span class="acc ok">12시간봉 마감 (추세 이탈)</span>`;
-  if (e.kind === "exit" && e.why === "stop-close") return `<span class="acc ok">12시간봉 마감 (손절선 갱신)</span>`;
-  if (!e.exact) return `<span class="acc warn">12시간봉 안 (시각 모름)</span>`;
-  if (e.same) return `<span class="acc warn">${TF_KO[fineTf]} 안 (순서 추정)</span>`;
-  return `<span class="acc ok">${TF_KO[fineTf]} 확인</span>`;
-}
 function labHtml(e) {
   if (e.kind === "entry") return `<span class="lab in ${e.s === 1 ? "long" : "short"}">${e.s === 1 ? "롱" : "숏"} ${e.label}</span>`;
   return `<span class="lab ${e.label.includes("익절") ? "tp" : "sl"}">${e.label.split(" · ").join("<br>")}</span>`;
@@ -307,9 +298,9 @@ function paintEvents() {
     const full = kst(e.t), t = `<span class="yr">${full.slice(0, 5)}</span>` + (e.exact ? full.slice(5) : full.slice(5, 10) + " (12h)");
     return `<tr class="click${selEv === e ? " sel" : ""}" data-i="${ev.length - 1 - i}">
       <td class="l notranslate" translate="no">${t}</td><td class="l">${labHtml(e)}</td>
-      <td class="notranslate" translate="no">${px(e.px)}</td><td class="l">${accOf(e)}</td><td class="notranslate" translate="no">${pnl}</td></tr>`;
+      <td class="notranslate" translate="no">${px(e.px)}</td><td class="notranslate" translate="no">${pnl}</td></tr>`;
   });
-  $("evBody").innerHTML = rows.join("") || `<tr><td colspan="5" class="l muted">2020년 이후 신호가 없어요</td></tr>`;
+  $("evBody").innerHTML = rows.join("") || `<tr><td colspan="4" class="l muted">2020년 이후 신호가 없어요</td></tr>`;
   $("moreEv").hidden = ev.length <= showN;
   for (const tr of $("evBody").querySelectorAll("tr.click")) tr.onclick = () => {
     selEv = result.events[+tr.dataset.i];
