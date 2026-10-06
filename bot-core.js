@@ -6,6 +6,7 @@
   - 숏: 12시간봉 종가 < 400개 이평 + 직전 40개 최저가 이탈 → 진입1, ATR 1·2배 더 내리면 진입2·진입3
   - 한 번 진입 = 계좌의 (롱 4배 / 숏 2배) ÷ 3  (진입1 때의 자산 기준)
   - 손절: 계좌의 2%를 잃는 가격, 평단이 유리해지면 따라옴 + 추적 손절(최고/최저가 ∓ ATR x 3)
+    진입2·3이 체결되는 순간 손절선을 바로 다시 계산 (체결 즉시 손절선 올리기)
     → 모의투자의 SL 주문으로 걸어 두어서 가격이 닿는 순간 청산돼요
   - 청산: 12시간봉 종가가 400개 이평 반대편이면 시장가로 청산
   step() 은 15분마다 불려요. 불타기는 매번 현재가로 확인하고, 나머지는 12시간봉이 새로 마감됐을 때만 처리해요.
@@ -85,13 +86,20 @@ function step(user, bars, cur, now, E) {
     say(`${lbl(s)} ${why} ${qty} BTC @ ${fx(cur)} · 손절 ${fx(b.stop)}`);
   }
   // 불타기: ext(유리한 쪽 극값)가 진입2·3 가격에 닿았으면 현재가로 추가
+  // 체결 즉시 손절선 올리기: 추가하는 순간 "지금까지 산 물량 전체가 손절돼도 계좌 2%만 잃는 가격"으로 손절선을 다시 계산해서
+  // 같은 주문의 SL 로 같이 걸어요 (12시간봉 마감까지 기다리지 않음 → 불타기 직후 급반전에도 한 번 손실이 2% 근처로 묶임)
   function pyramid(ext) {
     const s = b.side;
     while (b.side && b.n < 3) {
       const lvl = b.e1 + s * b.a0 * (b.n === 1 ? P.add1 : P.add2);
       if (!(s === 1 ? ext >= lvl : ext <= lvl)) break;
-      if (s === 1 ? b.stop >= cur : b.stop <= cur) break;           // 이미 손절선을 넘은 가격이면 추가하지 않음
-      try { buy(s, `진입${b.n + 1} (불타기)`, lvl); } catch (e) { say(`진입${b.n + 1} 실패: ${e.message}`); break; }
+      const n2 = b.n + 1, avg2 = (b.fills.reduce((a, x) => a + x, 0) + lvl) / n2;
+      const dist2 = b.e1 * 3 * P.lossPct / (100 * (s === 1 ? P.levL : P.levS) * n2);
+      const ns = s === 1 ? Math.max(b.stop, avg2 - dist2) : Math.min(b.stop, avg2 + dist2);
+      if (s === 1 ? ns >= cur : ns <= cur) break;                   // 새 손절선을 이미 넘은 가격이면 추가하지 않음
+      const prev = b.stop;
+      b.stop = ns;
+      try { buy(s, `진입${n2} (불타기)`, lvl); } catch (e) { b.stop = prev; say(`진입${n2} 실패: ${e.message}`); break; }
     }
   }
   function exit(reason) {

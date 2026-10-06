@@ -37,7 +37,7 @@
 참고용 도구이며 투자 조언이 아닙니다.
 
 ## 자동매매 봇 (관리자 모의투자 계정)
-- `bot-core.js` — 양방향 추세추종 v4(12시간봉, 이평 400·돌파 40·ATR 28) 규칙. 롱 4배·숏 2배를 3번에 나눠 진입, 손절은 모의투자 SL 주문
+- `bot-core.js` — 양방향 추세추종 v4(12시간봉, 이평 400·돌파 40·ATR 28) 규칙. 롱 4배·숏 2배를 3번에 나눠 진입, 손절은 모의투자 SL 주문 (진입2·3이 체결되는 순간 손절선을 바로 다시 계산해서 한 번 손실을 계좌 2% 근처로 묶음)
 - `api/bot.js` — 관리자(ADMIN_NICKNAME) 계정의 모의투자에만 주문. `Authorization: Bearer <BOT_SECRET>` 필요
 - `.github/workflows/bot.yml` — 15분마다 `/api/bot` 호출
 - 설정: Vercel 환경변수 `BOT_SECRET` + GitHub 저장소 Secrets `BOT_SECRET` (같은 값). 멈추려면 Vercel 에 `BOT_PAUSED=1`
