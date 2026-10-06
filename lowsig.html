@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="theme.js?v=20261006203652"></script>
+<title>Low Signals · Artha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css?v=20261006203652">
+<style>
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+  .grid label{min-width:0}
+  .grid input,.grid select{width:100%;min-width:0}
+  .grid .seg{display:flex}
+  .grid .seg button{flex:1;padding:6px 4px}
+  .cp-wrap{display:block}
+  .cp-wrap input{width:100%}
+  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:10px}
+  .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  .state{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-weight:700;font-size:14px}
+  .pill.long{color:var(--up);background:color-mix(in srgb,var(--up) 14%,transparent)}
+  .pill.short{color:var(--down);background:color-mix(in srgb,var(--down) 14%,transparent)}
+  .pill.wait{color:var(--muted);background:var(--bg);border:1px solid var(--line)}
+  .cd{font-size:13px;color:var(--muted)}
+  .cd b{color:var(--text);font-variant-numeric:tabular-nums}
+  #chart{height:440px}
+  .charthead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+  .charthead h2{margin:0}
+  .ghost{background:transparent;color:var(--text);border:1px solid var(--line);padding:6px 12px;font-size:13px}
+  table.ev td,table.ev th{white-space:nowrap}
+  table.ev tr.click{cursor:pointer}
+  table.ev tr.click:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  table.ev tr.sel td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .lab{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12.5px;white-space:nowrap;line-height:1.45}
+  .lab.in.long{color:#fff;background:#16A34A}
+  .lab.in.short{color:#fff;background:#DC2626}
+  .lab.tp{color:#fff;background:#2563EB}
+  .lab.sl{color:#fff;background:#6B7280}
+  .acc{font-size:11px;font-weight:600;padding:2px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+  .acc.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+  .acc.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--line))}
+  .cmp{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:0}
+  .cmp div{padding:9px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;text-align:right}
+  .cmp div:nth-child(3n+1){text-align:left;color:var(--muted);font-size:13px}
+  .cmp .h{font-size:12px;color:var(--muted);font-weight:600}
+  .more{margin-top:10px}
+  @media (max-width:700px){
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    #chart{height:360px}
+    table.ev th:nth-child(4),table.ev td:nth-child(4){display:none}        /* 휴대폰: 정확도 칸 숨김 */
+    .lab{font-size:12px;padding:2px 6px}
+    table.ev .yr{display:none}                                              /* 휴대폰: 연도 숨김 */
+    .cp-list{width:min(320px,calc(100vw - 40px))!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="brand">Artha</h1>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <h2>Low Signals · 12시간봉 추세추종</h2>
+    <p class="sub">신호는 <b>12시간봉</b>으로 계산하고(진입1은 봉 마감 때 확정), 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지는 아래에서 고른 짧은 봉으로 찾아요.</p>
+    <div class="grid">
+      <label>코인<input id="coin" value="BTC" placeholder="코인 검색 (예: 비트, SOL)"></label>
+      <label>시점 확인용 봉
+        <select id="fineTf">
+          <option value="1m" selected>1분봉 (가장 정확)</option>
+          <option value="3m">3분봉</option>
+          <option value="5m">5분봉</option>
+          <option value="15m">15분봉</option>
+          <option value="30m">30분봉</option>
+          <option value="1h">1시간봉</option>
+          <option value="4h">4시간봉</option>
+          <option value="6h">6시간봉</option>
+          <option value="12h">12시간봉 (봉 안 시각 확인 안 함)</option>
+        </select>
+      </label>
+      <label>방향
+        <span class="seg" id="dir"><button data-v="both" class="on">롱+숏</button><button data-v="long">롱만</button><button data-v="short">숏만</button></span>
+      </label>
+      <label>&nbsp;<button id="run">새로고침</button></label>
+    </div>
+    <div class="bar" id="bar" hidden><i></i></div>
+    <div class="status notranslate" id="status" translate="no"></div>
+  </div>
+
+  <div class="card">
+    <div class="state" id="state"></div>
+    <div class="tiles" id="now"></div>
+  </div>
+
+  <div class="card">
+    <div class="charthead">
+      <h2 id="chartTitle">차트</h2>
+      <button type="button" class="ghost" id="toLatest">최근으로</button>
+    </div>
+    <div id="chart"></div>
+    <p class="foot" style="margin:10px 0 0">아래 신호 기록에서 줄을 누르면 그 시점으로 차트가 이동해요. 주황선 = 12시간봉 400개 이평, 빨간선 = 지금 손절선, 파란 점선 = 다음 불타기 가격.</p>
+  </div>
+
+  <div class="card">
+    <h2>신호 기록 <span class="muted small">(2020년부터, 최근 것이 위)</span></h2>
+    <div class="tablewrap"><table class="ev">
+      <thead><tr><th class="l">시각</th><th class="l">신호</th><th>가격</th><th class="l">시점</th><th>손익</th></tr></thead>
+      <tbody id="evBody"></tbody>
+    </table></div>
+    <button type="button" class="ghost more" id="moreEv" hidden>더 보기</button>
+  </div>
+
+  <div class="card">
+    <h2>12시간봉만 볼 때 vs 짧은 봉으로 확인할 때</h2>
+    <p class="sub">같은 규칙을 2020년부터 계좌 50,000달러로 돌린 결과예요. 12시간봉만 보면 한 봉 안에서 불타기와 손절 중 무엇이 먼저였는지 몰라서 "손절이 먼저"라고 가정해요.</p>
+    <div class="cmp" id="cmp"></div>
+    <p class="note foot" id="cmpNote" style="margin:12px 0 0"></p>
+  </div>
+
+  <p class="foot">규칙: 12시간봉 종가가 400개 이평 위 + 직전 40개 최고가 돌파 → 롱 진입1 (숏은 반대). ATR(28) 1·2배 유리하게 가면 진입2·3.
+    손절은 계좌 2%를 잃는 가격(롱 4배·숏 2배를 3번 나눠 진입 기준)과 추적 손절(최고/최저가 ∓ ATR x 3) 중 유리한 쪽, 12시간봉 종가가 400개 이평 반대편이면 청산.
+    수수료 0.05% 반영, 펀딩비는 빠져 있어요. 참고용 도구이며 투자 조언이 아닙니다.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="common.js?v=20261006203652"></script>
+<script src="nav.js?v=20261006203652"></script>
+<script src="meta.js?v=20261006203652"></script>
+<script src="coinpicker.js?v=20261006203652"></script>
+<script src="lowsig-core.js?v=20261006203652"></script>
+<script>
+const F = "https://fapi.binance.com";
+const H12 = 12 * 3600e3, KST = 9 * 3600;
+const TF_MS = { "1m": 60e3, "3m": 180e3, "5m": 300e3, "15m": 900e3, "30m": 1800e3, "1h": 3600e3, "4h": 4 * 3600e3, "6h": 6 * 3600e3, "12h": H12 };
+const TF_KO = { "1m": "1분봉", "3m": "3분봉", "5m": "5분봉", "15m": "15분봉", "30m": "30분봉", "1h": "1시간봉", "4h": "4시간봉", "6h": "6시간봉", "12h": "12시간봉" };
+const START = Date.UTC(2020, 0, 1);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const px = v => !isFinite(v) ? "-" : "$" + v.toLocaleString("en-US", { maximumSignificantDigits: Math.abs(v) >= 1000 ? 8 : 6 });
+const money = v => !isFinite(v) ? "-" : (v > 0 ? "+" : v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 });
+// 한국시간으로 표시 (사이트의 다른 탭과 같음)
+const kst = (ms, withYear = true) => {
+  const d = new Date(ms + KST * 1000), p = n => String(n).padStart(2, "0");
+  return `${withYear ? d.getUTCFullYear() + "-" : ""}${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+};
+
+let dir = "both", sym = "BTC", fineTf = "1m";
+let bars12 = [], result = null, coarse = null, showN = 40, selEv = null, lastPrice = NaN, runId = 0;
+const fineCache = new Map();          // `${sym}|${tf}|${barT}` → 짧은 봉 배열
+
+// ── 데이터 ─────────────────────────────────────────────
+const toBar = r => ({ t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], ct: +r[6] });
+async function load12h(s) {
+  // 400개 이평이 2020년 1월에 준비되도록 2019년 6월부터 (상장이 늦은 코인은 있는 만큼)
+  let from = Date.UTC(2019, 5, 1), out = [];
+  for (let k = 0; k < 10; k++) {
+    const rows = await getJSON(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=12h&startTime=${from}&limit=1500`);
+    if (!rows.length) break;
+    out = out.concat(rows.map(toBar));
+    if (rows.length < 1500) break;
+    from = +rows[rows.length - 1][0] + 1;
+  }
+  const now = Date.now();
+  return out.filter(b => b.ct < now);                          // 마감된 봉만
+}
+async function fineBars(s, tf, bar) {
+  const key = `${s}|${tf}|${bar.t}`;
+  if (fineCache.has(key)) return fineCache.get(key);
+  const rows = await getJSON(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=${tf}&startTime=${bar.t}&endTime=${bar.t + H12 - 1}&limit=1500`);
+  const arr = rows.map(toBar);
+  fineCache.set(key, arr);
+  return arr;
+}
+// 여러 개를 동시에 (요청 제한에 안 걸리게 6개씩)
+async function prefetch(s, tf, list, onProg) {
+  let done = 0, idx = 0;
+  const work = async () => {
+    while (idx < list.length) {
+      const b = list[idx++];
+      try { await fineBars(s, tf, b); } catch (e) {}
+      onProg(++done, list.length);
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, work));
+}
+
+// ── 실행 ─────────────────────────────────────────────
+async function run() {
+  const my = ++runId;
+  sym = ($("coin").value.trim().toUpperCase().replace(/USDT$/, "").replace(/[^A-Z0-9]/g, "")) || "BTC";
+  $("coin").value = sym;
+  fineTf = $("fineTf").value;
+  $("run").disabled = true;
+  const st = $("status"), bar = $("bar");
+  try {
+    st.textContent = `${sym} 12시간봉 불러오는 중…`;
+    bars12 = await load12h(sym);
+    if (my !== runId) return;
+    if (bars12.length < LowSig.P.trendLen + 10) throw new Error(`${sym}는 12시간봉이 ${bars12.length}개뿐이라 400개 이평을 계산할 수 없어요 (최근 상장 코인)`);
+    const lastT = bars12[bars12.length - 1].t;
+    const cKey = `lowsig-v1|${sym}|${fineTf}|${dir}|${lastT}`;
+    const hit = cacheGet(cKey, 13 * 3600e3);
+    coarse = await LowSig.run(bars12, { dir, startT: START });
+    if (hit) result = hit;
+    else if (fineTf === "12h") result = coarse;
+    else {
+      // 12시간봉 결과에서 "봉 안을 확인해야 하는 봉"을 먼저 한꺼번에 받아 두고, 짧은 봉으로 다시 계산
+      const need = coarse.touchBars.map(t => bars12.find(b => b.t === t)).filter(Boolean);
+      bar.hidden = false;
+      await prefetch(sym, fineTf, need, (d, n) => {
+        if (my !== runId) return;
+        st.textContent = `${TF_KO[fineTf]}으로 봉 안 시점 확인 중… ${d}/${n}`;
+        bar.firstElementChild.style.width = (d / n * 100) + "%";
+      });
+      if (my !== runId) return;
+      result = await LowSig.run(bars12, { dir, startT: START, fine: async b => { try { return await fineBars(sym, fineTf, b); } catch (e) { return null; } } });
+      cacheSet(cKey, { events: result.events, trades: result.trades.map(t => ({ s: t.s, t0: t.t0, t1: t.t1, pnl: t.pnl, ret: t.ret })), open: result.open, stats: result.stats });
+    }
+    if (my !== runId) return;
+    bar.hidden = true;
+    showN = 40; selEv = null;
+    paintAll();
+    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 ${sym}USDT 무기한 · 시점 확인 ${TF_KO[fineTf]}`;
+  } catch (e) {
+    bar.hidden = true;
+    st.textContent = e.message;
+  }
+  $("run").disabled = false;
+}
+
+// ── 그리기 ─────────────────────────────────────────────
+function paintAll() { paintNow(); paintEvents(); paintCompare(); drawChart(null); }
+
+function paintNow() {
+  const r = result, s = r.stats, o = r.open, P = LowSig.P;
+  const cur = isFinite(lastPrice) ? lastPrice : s.lastClose;
+  const dist = v => isFinite(v) && cur ? ` <small class="muted">(${pct((v - cur) / cur * 100)})</small>` : "";
+  let pill;
+  if (o) {
+    const nm = o.s === 1 ? "롱" : "숏";
+    pill = `<span class="pill ${o.s === 1 ? "long" : "short"}">${nm} 보유 중 · 진입${o.n}까지</span>`;
+  } else pill = `<span class="pill wait">대기 중 (포지션 없음)</span>`;
+  $("state").innerHTML = pill + `<span class="cd notranslate" translate="no" id="cd"></span>`;
+  const tiles = [];
+  tiles.push(["현재가", `<span class="notranslate" translate="no" id="curPx">${px(cur)}</span>`, `12시간봉 마지막 종가 ${px(s.lastClose)}`]);
+  tiles.push(["12시간봉 400개 이평", px(s.ma) + dist(s.ma), s.lastClose > s.ma ? "종가가 이평 위 → 롱만 찾는 구간" : "종가가 이평 아래 → 숏만 찾는 구간"]);
+  if (o) {
+    const nm = o.s === 1 ? "롱" : "숏";
+    tiles.push(["진입 가격", o.fills.map(f => `<span class="notranslate" translate="no">${px(f.px)}</span>`).join("<br>"), o.fills.map(f => `진입${f.n} ${kst(f.t, false)}`).join(" · ")]);
+    tiles.push(["평균 단가", px(o.avg), `${nm} ${o.n}번 진입`]);
+    tiles.push(["지금 손절선", `<span class="up">${px(o.stop)}</span>` + dist(o.stop), "닿는 순간 전량 청산 (12시간봉 마감 때 갱신)"]);
+    tiles.push(["다음 불타기", o.next ? px(o.next) + dist(o.next) : "-", o.next ? `진입${o.n + 1} 가격 (닿는 순간)` : "3번 다 들어감"]);
+    const upnlPct = o.upnl / o.base * 100;
+    tiles.push(["평가 손익 (계좌 대비)", `<span class="${cls(upnlPct)}">${pct(upnlPct)}</span>`, "12시간봉 마지막 종가 기준"]);
+  } else {
+    const L = Math.max(s.ma, s.nextHH), S = Math.min(s.ma, s.nextLL);
+    if (dir !== "short") tiles.push(["롱 진입1 조건", `종가 &gt; ${px(L)}` + dist(L), "다음 12시간봉 마감 때 이 가격 위로 닫히면"]);
+    if (dir !== "long") tiles.push(["숏 진입1 조건", `종가 &lt; ${px(S)}` + dist(S), "다음 12시간봉 마감 때 이 가격 아래로 닫히면"]);
+  }
+  $("now").innerHTML = tiles.map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
+  tickCountdown();
+}
+function tickCountdown() {
+  const el = $("cd"); if (!el) return;
+  const next = Math.ceil((Date.now() + 1) / H12) * H12, left = next - Date.now();
+  const h = Math.floor(left / 3600e3), m = Math.floor(left % 3600e3 / 60e3), s = Math.floor(left % 60e3 / 1000), p = n => String(n).padStart(2, "0");
+  const KO = (window.ARTHA_LANG || "ko") === "ko";
+  el.innerHTML = KO ? `다음 12시간봉 마감까지 <b>${p(h)}:${p(m)}:${p(s)}</b> (${kst(next, false)})` : `Next 12h close in <b>${p(h)}:${p(m)}:${p(s)}</b> (${kst(next, false)} KST)`;
+}
+
+function accOf(e) {
+  if (e.kind === "entry" && e.n === 1) return `<span class="acc ok">12시간봉 마감</span>`;
+  if (e.kind === "exit" && e.why === "trend") return `<span class="acc ok">12시간봉 마감 (추세 이탈)</span>`;
+  if (e.kind === "exit" && e.why === "stop-close") return `<span class="acc ok">12시간봉 마감 (손절선 갱신)</span>`;
+  if (!e.exact) return `<span class="acc warn">12시간봉 안 (시각 모름)</span>`;
+  if (e.same) return `<span class="acc warn">${TF_KO[fineTf]} 안 (순서 추정)</span>`;
+  return `<span class="acc ok">${TF_KO[fineTf]} 확인</span>`;
+}
+function labHtml(e) {
+  if (e.kind === "entry") return `<span class="lab in ${e.s === 1 ? "long" : "short"}">${e.s === 1 ? "롱" : "숏"} ${e.label}</span>`;
+  return `<span class="lab ${e.label.includes("익절") ? "tp" : "sl"}">${e.label.split(" · ").join("<br>")}</span>`;
+}
+function paintEvents() {
+  const ev = result.events.slice().reverse();
+  const rows = ev.slice(0, showN).map((e, i) => {
+    const pnl = e.kind === "exit" ? `<span class="${cls(e.pnl)}">${(e.pnl > 0 ? "+" : "") + shortUsd(e.pnl)}</span>` : "";
+    const full = kst(e.t), t = `<span class="yr">${full.slice(0, 5)}</span>` + (e.exact ? full.slice(5) : full.slice(5, 10) + " (12h)");
+    return `<tr class="click${selEv === e ? " sel" : ""}" data-i="${ev.length - 1 - i}">
+      <td class="l notranslate" translate="no">${t}</td><td class="l">${labHtml(e)}</td>
+      <td class="notranslate" translate="no">${px(e.px)}</td><td class="l">${accOf(e)}</td><td class="notranslate" translate="no">${pnl}</td></tr>`;
+  });
+  $("evBody").innerHTML = rows.join("") || `<tr><td colspan="5" class="l muted">2020년 이후 신호가 없어요</td></tr>`;
+  $("moreEv").hidden = ev.length <= showN;
+  for (const tr of $("evBody").querySelectorAll("tr.click")) tr.onclick = () => {
+    selEv = result.events[+tr.dataset.i];
+    for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel");
+    tr.classList.add("sel");
+    drawChart(selEv);
+    $("chart").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+}
+
+function paintCompare() {
+  const a = coarse.stats, b = result.stats, same = result === coarse;
+  const row = (k, f) => `<div>${k}</div><div class="notranslate" translate="no">${f(a)}</div><div class="notranslate" translate="no">${same ? "-" : f(b)}</div>`;
+  const posWin = s => `${s.trades ? (s.wins / s.trades * 100).toFixed(0) : 0}% <small class="muted">(${s.wins}/${s.trades})</small>`;
+  $("cmp").innerHTML = `<div class="h">2020년~ · 50,000달러</div><div class="h">12시간봉만</div><div class="h">${TF_KO[fineTf]}으로 확인</div>` +
+    row("총 수익률", s => `<span class="${cls(s.ret)}">${pct(s.ret * 100)}</span>`) +
+    row("최종 자금", s => "$" + Math.round(s.equity).toLocaleString("en-US")) +
+    row("최대 낙폭", s => (s.mdd * 100).toFixed(1) + "%") +
+    row("이긴 매매 / 전체", posWin) +
+    row("수익 팩터", s => isFinite(s.pf) ? s.pf.toFixed(2) : "∞");
+  if (same) { $("cmpNote").textContent = "12시간봉을 골라서 봉 안 시점은 확인하지 않았어요. 위에서 1분봉 등을 고르면 비교가 나와요."; return; }
+  const unknown = coarse.events.filter(e => !e.exact).length;
+  const guess = result.events.filter(e => e.same).length;
+  const diffTrades = Math.abs(result.trades.length - coarse.trades.length);
+  $("cmpNote").innerHTML = `12시간봉만 볼 때 시각을 알 수 없던 신호 <b>${unknown}개</b>를 ${TF_KO[fineTf]}으로 확인했어요.` +
+    (guess ? ` 그중 <b>${guess}개</b>는 ${TF_KO[fineTf]} 하나 안에서 불타기와 손절이 같이 일어나 순서를 추정했어요 (1분봉을 고르면 줄어요).` : "") +
+    (diffTrades ? ` 확인 결과 매매 횟수가 ${diffTrades}번 달라졌어요.` : "") +
+    ` 진입2·3이 들어간 뒤 같은 12시간봉 안에서 손절되면, 손절선이 아직 진입1 기준이라 손실이 계좌 2%보다 커질 수 있어요.`;
+}
+
+// ── 차트 ─────────────────────────────────────────────
+let chart = null, series = null, maSeries = null, lines = [];
+function initChart() {
+  if (chart || !window.LightweightCharts) return;
+  chart = LightweightCharts.createChart($("chart"), {
+    autoSize: true,
+    layout: { background: { color: css("--card") }, textColor: css("--muted"), fontFamily: "system-ui, 'Malgun Gothic', sans-serif" },
+    grid: { vertLines: { color: css("--line") }, horzLines: { color: css("--line") } },
+    rightPriceScale: { borderColor: css("--line") },
+    timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
+  });
+  series = chart.addCandlestickSeries({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down"), borderVisible: false });
+  maSeries = chart.addLineSeries({ color: "#F59E0B", lineWidth: 2, lineType: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  addEventListener("themechange", () => {
+    chart.applyOptions({ layout: { background: { color: css("--card") }, textColor: css("--muted") }, grid: { vertLines: { color: css("--line") }, horzLines: { color: css("--line") } } });
+    series.applyOptions({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down") });
+  });
+}
+const T = ms => Math.floor(ms / 1000) + KST;
+async function drawChart(focus) {
+  initChart(); if (!chart || !result) return;
+  // 차트에 쓸 봉: 고른 확인용 봉. 특정 신호를 눌렀으면 그 주변, 아니면 최근
+  const tf = fineTf, step = TF_MS[tf], N = 1000;
+  let end = focus ? focus.t + step * 300 : Date.now();
+  let start = end - step * N;
+  $("chartTitle").innerHTML = `${esc(sym)} · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
+  let rows;
+  try { rows = await getJSON(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${tf}&startTime=${start}&endTime=${end}&limit=1000`); }
+  catch (e) { $("chartTitle").textContent = "차트를 못 불러왔어요"; return; }
+  const cs = rows.map(toBar);
+  if (!cs.length) return;
+  series.setData(cs.map(b => ({ time: T(b.t), open: b.o, high: b.h, low: b.l, close: b.c })));
+  // 12시간봉 400개 이평 (계단 모양)
+  const I = LowSig.calc(bars12), t0 = cs[0].t, t1 = cs[cs.length - 1].t;
+  const ma = [];
+  for (let i = 0; i < bars12.length; i++) {
+    if (!isFinite(I.ma[i])) continue;
+    const at = bars12[i].t + H12;                 // 봉이 마감된 뒤부터 그 값이 쓰임
+    if (at + H12 < t0 || at > t1 + step) continue;
+    ma.push({ time: T(Math.max(at, t0) - ((Math.max(at, t0) - t0) % step)), value: I.ma[i] });
+  }
+  const seen = new Set(); maSeries.setData(ma.filter(p => !seen.has(p.time) && seen.add(p.time)));
+  // 신호 표시: 그 신호가 일어난 봉 위에
+  const mk = [];
+  for (const e of result.events) {
+    if (e.t < t0 || e.t > t1 + step) continue;
+    const bt = e.t - ((e.t - t0) % step);
+    const isIn = e.kind === "entry", L = e.s === 1;
+    mk.push({
+      time: T(bt),
+      position: isIn ? (L ? "belowBar" : "aboveBar") : (L ? "aboveBar" : "belowBar"),
+      shape: isIn ? (L ? "arrowUp" : "arrowDown") : "circle",
+      color: isIn ? (L ? "#16A34A" : "#DC2626") : (e.label.includes("익절") ? "#2563EB" : "#6B7280"),
+      text: (isIn ? (L ? "롱 " : "숏 ") + e.label : e.label) + (focus === e ? " ◀" : ""),
+      size: focus === e ? 2 : 1,
+    });
+  }
+  mk.sort((a, b) => a.time - b.time);
+  series.setMarkers(mk);
+  for (const l of lines) series.removePriceLine(l);
+  lines = [];
+  const o = result.open;
+  if (o && !focus) {
+    lines.push(series.createPriceLine({ price: o.stop, color: "#DC2626", lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "손절" }));
+    if (o.next) lines.push(series.createPriceLine({ price: o.next, color: "#2563EB", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: `진입${o.n + 1}` }));
+    lines.push(series.createPriceLine({ price: o.avg, color: css("--muted"), lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "평단" }));
+  }
+  if (focus) {
+    const i = cs.findIndex(b => b.t + step > focus.t);
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, i - 120), to: i + 120 });
+  } else chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, cs.length - 250), to: cs.length + 5 });
+}
+
+// ── 현재가 (10초마다) ─────────────────────────────────
+async function tickPrice() {
+  try {
+    const j = await getJSON(`${F}/fapi/v1/ticker/price?symbol=${sym}USDT`, 1);
+    lastPrice = +j.price;
+    const el = $("curPx"); if (el) el.textContent = px(lastPrice);
+  } catch (e) {}
+}
+
+// ── 이벤트 ─────────────────────────────────────────────
+for (const b of $("dir").querySelectorAll("button")) b.onclick = () => {
+  dir = b.dataset.v;
+  for (const x of $("dir").querySelectorAll("button")) x.classList.toggle("on", x === b);
+  run();
+};
+$("fineTf").onchange = run;
+$("run").onclick = run;
+$("moreEv").onclick = () => { showN += 60; paintEvents(); };
+$("toLatest").onclick = () => { selEv = null; for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel"); drawChart(null); };
+CoinPicker.attach($("coin"), { onPick: () => { lastPrice = NaN; run(); } });
+setInterval(tickCountdown, 1000);
+setInterval(() => { if (!document.hidden) tickPrice(); }, 10e3);
+// 12시간봉이 새로 마감되면(오전·오후 9시) 다시 계산
+let lastSeen = Math.floor(Date.now() / H12);
+setInterval(() => { const n = Math.floor(Date.now() / H12); if (n !== lastSeen && !document.hidden) { lastSeen = n; setTimeout(run, 20e3); } }, 30e3);
+run().then(tickPrice);
+</script>
+</body>
+</html>
