@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006230751"></script>
+<script src="theme.js?v=20261006231556"></script>
 <title>Artha Trading Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006230751">
+<link rel="stylesheet" href="common.css?v=20261006231556">
 <style>
   .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end;max-width:560px}
   .grid label{min-width:0}
@@ -56,7 +56,12 @@
   .acc{font-size:11px;font-weight:600;padding:2px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
   .acc.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
   .acc.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--line))}
-  .more{margin-top:10px}
+  /* MORE 버튼: 표 아래 가운데, 강조색 */
+  .more{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:12px;padding:11px 16px;border-radius:10px;
+        background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);
+        font-size:14px;font-weight:800;letter-spacing:.08em}
+  .more:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
+  .more span{font-size:12px}
   @media (max-width:700px){
     .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
     .tfbar button{padding:5px 7px;font-size:12px}
@@ -108,7 +113,7 @@
       <thead><tr><th class="l">시각</th><th class="l">신호</th><th>가격</th><th>손익</th></tr></thead>
       <tbody id="evBody"></tbody>
     </table></div>
-    <button type="button" class="ghost more" id="moreEv" hidden>더 보기</button>
+    <button type="button" class="more notranslate" id="moreEv" translate="no" hidden>MORE <span>▾</span></button>
   </div>
 
   <p class="foot">규칙: 12시간봉 종가가 400개 이평 위 + 직전 40개 최고가 돌파 → 롱 진입1 (숏은 반대). ATR(28) 1·2배 유리하게 가면 진입2·3.
@@ -117,9 +122,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006230751"></script>
-<script src="nav.js?v=20261006230751"></script>
-<script src="lowsig-core.js?v=20261006230751"></script>
+<script src="common.js?v=20261006231556"></script>
+<script src="nav.js?v=20261006231556"></script>
+<script src="lowsig-core.js?v=20261006231556"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
