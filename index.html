@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006200117"></script>
+<script src="theme.js?v=20261006200806"></script>
 <title>Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -315,7 +315,7 @@
   </div>
 
   <div class="card tablewrap">
-    <div class="sumrow"><div class="summary" id="summary"></div><span class="live" id="live"><i></i><b>실시간 준비 중</b></span></div>
+    <div class="sumrow"><div class="summary notranslate" id="summary" translate="no"></div><span class="live notranslate" id="live" translate="no"><i></i><b>실시간 준비 중</b></span></div>
     <table>
       <thead><tr>
         <th style="text-align:left">#</th><th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
@@ -352,10 +352,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261006200117"></script>
-<script src="chart.js?v=20261006200117"></script>
-<script src="nav.js?v=20261006200117"></script>
-<script src="meta.js?v=20261006200117"></script>
+<script src="fib-core.js?v=20261006200806"></script>
+<script src="chart.js?v=20261006200806"></script>
+<script src="nav.js?v=20261006200806"></script>
+<script src="meta.js?v=20261006200806"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -615,14 +615,26 @@ function evHtml(r, withTd) {
   return withTd ? `<td class="ev ${cls}">${txt}</td>` : `<span class="ev ${cls}">${txt}</span>`;
 }
 
+// 요약줄·실시간 표시는 자주 바뀌어서 구글 번역이 따라가다 깜빡임 → 한국어가 아니면 영어로 직접 쓰고 번역에서 제외
+const KO = (window.ARTHA_LANG || "ko") === "ko";
+let lastSummary = "";
+if (!KO) $("live").querySelector("b").textContent = "Getting ready";
 function renderSummary() {
   const ok = results.filter(r => !r.error && r.current?.level);
   const cnt = l => ok.filter(r => FibCore.label(r.current) === l).length;
-  $("summary").innerHTML = `<span class="modetag">${dir.toUpperCase()} 모드 ·</span><span>분석 <b>${results.length}</b>개</span>
+  const ev = $("sort").value === "ev";
+  const html = KO
+    ? `<span class="modetag">${dir.toUpperCase()} 모드 ·</span><span>분석 <b>${results.length}</b>개</span>
     <span>진입 구간 <b style="color:var(--accent)">${cnt("진입 구간")}</b>개</span>
     <span>진입 근접(5% 이내) <b class="up">${cnt("진입 근접")}</b>개</span>
     <span>이탈 <b class="up">${cnt("이탈")}</b>개</span>
-    <span style="color:var(--muted)">${$("sort").value === "ev" ? "기대값 높은 순서" : "진입 가격에 가까운 순서"}</span>`;
+    <span style="color:var(--muted)">${ev ? "기대값 높은 순서" : "진입 가격에 가까운 순서"}</span>`
+    : `<span class="modetag">${dir.toUpperCase()} mode ·</span><span>Scanned <b>${results.length}</b></span>
+    <span>In entry zone <b style="color:var(--accent)">${cnt("진입 구간")}</b></span>
+    <span>Near entry (within 5%) <b class="up">${cnt("진입 근접")}</b></span>
+    <span>Broken <b class="up">${cnt("이탈")}</b></span>
+    <span style="color:var(--muted)">${ev ? "Sorted by expected value" : "Sorted by distance to entry"}</span>`;
+  if (html !== lastSummary) { $("summary").innerHTML = html; lastSummary = html; }   // 숫자가 그대로면 다시 그리지 않음
 }
 let shownOrder = "";     // 지금 화면에 보이는 코인 순서 (실시간 정렬 때 바뀌었는지 비교용)
 let shownSet = "";       // 지금 화면에 보이는 코인 묶음 (순서 무시, 재분석 때 종목이 바뀌었는지 비교용)
@@ -962,10 +974,15 @@ const Live = (() => {
   const latest = new Map();        // 코인 → 가장 최근 실시간 가격
   const pending = new Map();       // 화면에 아직 안 그린 가격 변화
 
+  const EN_LIVE = [[/^실시간 연결됨 · 방금 수신$/, "Live · just now"], [/^실시간 연결됨 · (\d+)초 전 수신$/, "Live · $1s ago"], [/^실시간 연결됨$/, "Live"],
+                   [/^실시간 연결 중…$/, "Connecting…"], [/^재연결 중… \((\d+)초 뒤\)$/, "Reconnecting in $1s…"], [/^재연결 중…$/, "Reconnecting…"],
+                   [/^실시간 꺼짐$/, "Live off"], [/^실시간 준비 중$/, "Getting ready"]];
   function setStatus(kind, text) {
     const el = $("live");
-    el.className = "live " + kind;
-    el.querySelector("b").textContent = text;
+    if (!KO) for (const [re, en] of EN_LIVE) if (re.test(text)) { text = text.replace(re, en); break; }
+    if (el.className !== "live " + kind) el.className = "live " + kind;
+    const b = el.querySelector("b");
+    if (b.textContent !== text) b.textContent = text;
   }
 
   function connect(newEx, newCoins) {

@@ -133,6 +133,7 @@
   const stored = (() => { try { return localStorage.getItem(KEY); } catch (e) { return null; } })();
   const fromCookie = (() => { const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : null; })();
   const cur = stored || fromCookie || "en";
+  window.ARTHA_LANG = cur;                                   // 페이지가 직접 영어로 쓸 부분을 고를 때 씀
 
   const style = document.createElement("style");
   style.textContent = `
