@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006221801"></script>
+<script src="theme.js?v=20261006222042"></script>
 <title>Low Signals · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006221801">
+<link rel="stylesheet" href="common.css?v=20261006222042">
 <style>
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
@@ -112,11 +112,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006221801"></script>
-<script src="nav.js?v=20261006221801"></script>
-<script src="meta.js?v=20261006221801"></script>
-<script src="coinpicker.js?v=20261006221801"></script>
-<script src="lowsig-core.js?v=20261006221801"></script>
+<script src="common.js?v=20261006222042"></script>
+<script src="nav.js?v=20261006222042"></script>
+<script src="meta.js?v=20261006222042"></script>
+<script src="coinpicker.js?v=20261006222042"></script>
+<script src="lowsig-core.js?v=20261006222042"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -351,15 +351,19 @@ function initChart() {
 const T = ms => Math.floor(ms / 1000) + KST;
 async function drawChart(focus) {
   initChart(); if (!chart || !result) return;
-  // 차트에 쓸 봉: 고른 확인용 봉. 특정 신호를 눌렀으면 그 주변, 아니면 최근
-  const tf = fineTf, step = TF_MS[tf], N = 1000;
-  let end = focus ? focus.t + step * 300 : Date.now();
-  let start = end - step * N;
+  // 차트에 쓸 봉: 12시간봉이면 이미 받아 둔 전체 기간을 그대로 (추가 요청 없음),
+  // 분봉이면 한 번에 받을 수 있는 최대 1,500개 (특정 신호를 눌렀으면 그 주변, 아니면 최근)
+  const tf = fineTf, step = TF_MS[tf], N = 1500;
   $("chartTitle").innerHTML = `${esc(sym)} · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
-  let rows;
-  try { rows = await bnGet(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${tf}&startTime=${start}&endTime=${end}&limit=1000`); }
-  catch (e) { $("chartTitle").textContent = "차트를 못 불러왔어요"; return; }
-  const cs = rows.map(toBar);
+  let cs;
+  if (tf === "12h") cs = bars12;
+  else {
+    const end = focus ? focus.t + step * 700 : Date.now(), start = end - step * N;
+    let rows;
+    try { rows = await bnGet(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${tf}&startTime=${start}&endTime=${end}&limit=1500`); }
+    catch (e) { $("chartTitle").textContent = "차트를 못 불러왔어요"; return; }
+    cs = rows.map(toBar);
+  }
   if (!cs.length) return;
   series.setData(cs.map(b => ({ time: T(b.t), open: b.o, high: b.h, low: b.l, close: b.c })));
   // 12시간봉 400개 이평 (계단 모양)
@@ -400,7 +404,7 @@ async function drawChart(focus) {
   if (focus) {
     const i = cs.findIndex(b => b.t + step > focus.t);
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, i - 120), to: i + 120 });
-  } else chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, cs.length - 250), to: cs.length + 5 });
+  } else chart.timeScale().fitContent();                       // 받은 기간 전체를 한 화면에
 }
 
 // ── 현재가 (10초마다) ─────────────────────────────────
