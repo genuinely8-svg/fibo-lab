@@ -10,7 +10,7 @@ const BASE = "https://fapi.binance.com";
 const SYM = "BTCUSDT";
 const H12 = 12 * 3600e3;
 const START = Date.UTC(2020, 0, 1);
-const KEY = "lowsig:btc:v1", LOCK = "lowsig:btc:lock";
+const KEY = "lowsig:btc:v2", LOCK = "lowsig:btc:lock";
 
 async function jget(path) {
   const res = await fetch(BASE + path, { signal: AbortSignal.timeout(8000) });

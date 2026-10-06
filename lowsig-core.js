@@ -55,7 +55,7 @@
     function addFill(px, t, exact, same) {
       const n = pos.fills.length + 1;
       pos.fills.push({ px, t, n });
-      events.push({ t, px, kind: "entry", s: pos.s, n, label: "진입" + n, exact, same: !!same, trade: trades.length });
+      events.push({ t, px, kind: "entry", s: pos.s, n, label: "진입" + n, exact, same: !!same, trade: trades.length, eq });   // eq = 그 시점 계좌 잔고 (끝난 매매 기준)
       // 체결 즉시 손절선 올리기: 지금까지 산 물량 전체가 손절돼도 계좌 2%(lossCap)만 잃는 가격으로 (유리한 쪽으로만)
       if (tight && n > 1) {
         const avg = pos.fills.reduce((a, f) => a + f.px, 0) / n, dist = pos.lossCap / (pos.unit * n);
@@ -75,7 +75,7 @@
       if (anyLoss) parts.push(`${name(s)} SL`);
       eq += pnl; peak = Math.max(peak, eq); mdd = Math.max(mdd, (peak - eq) / peak);
       const tr = { s, t0: pos.fills[0].t, t1: t, e1: pos.e1, exit: px, why, fills, pnl, ret: pnl / pos.base, eqAfter: eq };
-      events.push({ t, px, kind: "exit", s, label: parts.join(" · "), why, exact, same: !!same, win: pnl > 0, pnl, trade: trades.length });
+      events.push({ t, px, kind: "exit", s, label: parts.join(" · "), why, exact, same: !!same, win: pnl > 0, pnl, trade: trades.length, eq });   // eq = 청산 후 잔고
       trades.push(tr);
       pos = null;
     }

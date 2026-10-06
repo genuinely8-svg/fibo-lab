@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006232529"></script>
+<script src="theme.js?v=20261007004002"></script>
 <title>Artha Trading Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006232529">
+<link rel="stylesheet" href="common.css?v=20261007004002">
 <style>
   .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end;max-width:560px}
   .grid label{min-width:0}
@@ -52,6 +52,7 @@
   table.ev tr.click:hover .tlink{text-decoration:underline;text-underline-offset:3px}
   table.ev tr.sel .tlink{color:var(--text)}
   .thhint{font-weight:400;color:var(--accent)}
+  table.ev td.bal{color:var(--muted)}
   table.ev tr.click:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
   table.ev tr.sel td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
   .lab{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12.5px;white-space:nowrap;line-height:1.45}
@@ -117,7 +118,7 @@
   <div class="card">
     <h2>신호 기록 <span class="muted small">(2020년부터, 최근 것이 위)</span></h2>
     <div class="tablewrap"><table class="ev">
-      <thead><tr><th class="l">시각 <span class="thhint">· 누르면 차트로</span></th><th class="l">신호</th><th>가격</th><th>손익</th></tr></thead>
+      <thead><tr><th class="l">시각 <span class="thhint">· 누르면 차트로</span></th><th class="l">신호</th><th>가격</th><th>손익</th><th>잔고</th></tr></thead>
       <tbody id="evBody"></tbody>
     </table></div>
     <button type="button" class="more notranslate" id="moreEv" translate="no" hidden>MORE <span>▾</span></button>
@@ -129,9 +130,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006232529"></script>
-<script src="nav.js?v=20261006232529"></script>
-<script src="lowsig-core.js?v=20261006232529"></script>
+<script src="common.js?v=20261007004002"></script>
+<script src="nav.js?v=20261007004002"></script>
+<script src="lowsig-core.js?v=20261007004002"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -271,9 +272,9 @@ function paintEvents() {
     const full = kst(e.t), t = `<span class="yr">${full.slice(0, 5)}</span>` + (e.exact ? full.slice(5) : full.slice(5, 10));
     return `<tr class="click${selEv === e ? " sel" : ""}" data-i="${ev.length - 1 - i}">
       <td class="l notranslate" translate="no"><span class="tlink" title="차트에서 보기"><svg class="ci" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M3 10l3-3 2.5 2L13 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${t}</span></span></td><td class="l">${labHtml(e)}</td>
-      <td class="notranslate" translate="no">${px(e.px)}</td><td class="notranslate" translate="no">${pnl}</td></tr>`;
+      <td class="notranslate" translate="no">${px(e.px)}</td><td class="notranslate" translate="no">${pnl}</td><td class="notranslate bal" translate="no">${isFinite(e.eq) ? Math.round(e.eq).toLocaleString("en-US") + " USDT" : ""}</td></tr>`;
   });
-  $("evBody").innerHTML = rows.join("") || `<tr><td colspan="4" class="l muted">2020년 이후 신호가 없어요</td></tr>`;
+  $("evBody").innerHTML = rows.join("") || `<tr><td colspan="5" class="l muted">2020년 이후 신호가 없어요</td></tr>`;
   $("moreEv").hidden = ev.length <= showN;
   for (const tr of $("evBody").querySelectorAll("tr.click")) tr.onclick = () => {
     selEv = result.events[+tr.dataset.i];
