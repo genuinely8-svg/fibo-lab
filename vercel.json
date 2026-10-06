@@ -1,3 +1,10 @@
 {
-  "regions": ["icn1"]
+  "regions": [
+    "icn1"
+  ],
+  "functions": {
+    "api/lowsig.js": {
+      "maxDuration": 60
+    }
+  }
 }

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006225558"></script>
+<script src="theme.js?v=20261006230014"></script>
 <title>Artha Trend Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006225558">
+<link rel="stylesheet" href="common.css?v=20261006230014">
 <style>
   .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end;max-width:560px}
   .grid label{min-width:0}
@@ -25,6 +25,10 @@
   #chart{height:440px}
   .charthead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
   .charthead h2{margin:0}
+  /* 성적 카드: PC 4칸 x 2줄 = 8칸, 휴대폰 2칸 */
+  #now{grid-template-columns:repeat(4,minmax(0,1fr))}
+  #now .tile{min-width:0}
+  .spark{display:block;width:100%;height:46px;margin-top:2px}
   .ctitle{display:flex;align-items:center;gap:10px;min-width:0}
   /* LIVE 표시: 실시간 연결되면 녹색으로 깜빡임, 끊기거나 과거 시점을 보는 중이면 회색 */
   .livebadge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--muted);
@@ -56,6 +60,7 @@
   @media (max-width:700px){
     .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
     .tfbar button{padding:5px 7px;font-size:12px}
+    #now{grid-template-columns:repeat(2,minmax(0,1fr))}
     #chart{height:360px}
           .lab{font-size:12px;padding:2px 6px}
     table.ev .yr{display:none}                                              /* 휴대폰: 연도 숨김 */
@@ -69,7 +74,7 @@
 
   <div class="card">
     <h2>Artha Trend Engine</h2>
-    <p class="sub"><b>비트코인(BTCUSDT 무기한)</b> 전용 · 신호는 <b>12시간봉</b>으로 계산해요(진입1은 봉 마감 때 확정). 차트 위에서 분봉을 고르면 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지 그 봉 기준으로 다시 확인해요. 분봉은 처음 한 번 받아 오느라 시간이 걸리고, 그다음부터는 이 브라우저에 저장돼서 빨라요.</p>
+    <p class="sub"><b>비트코인(BTCUSDT 무기한)</b> 전용 · 신호는 <b>12시간봉</b>으로 계산해요(진입1은 봉 마감 때 확정). 진입2·진입3·익절·SL은 <b>1분봉</b>으로 확인한 정확한 시각·가격이에요.</p>
     <div class="grid">
       <label>방향
         <span class="seg" id="dir"><button data-v="both" class="on">롱+숏</button><button data-v="long">롱만</button><button data-v="short">숏만</button></span>
@@ -91,7 +96,6 @@
       <button data-tf="1m">1m</button><button data-tf="3m">3m</button><button data-tf="5m">5m</button><button data-tf="15m">15m</button>
       <button data-tf="30m">30m</button><button data-tf="1h">1H</button><button data-tf="4h">4H</button><button data-tf="6h">6H</button><button data-tf="12h" class="on">12H</button>
     </div>
-    <div class="bar" id="bar" hidden><i></i></div>
     <div style="margin-bottom:8px" class="status notranslate" id="status" translate="no"></div>
 
     <div id="chart"></div>
@@ -113,9 +117,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006225558"></script>
-<script src="nav.js?v=20261006225558"></script>
-<script src="lowsig-core.js?v=20261006225558"></script>
+<script src="common.js?v=20261006230014"></script>
+<script src="nav.js?v=20261006230014"></script>
+<script src="lowsig-core.js?v=20261006230014"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -134,7 +138,6 @@ const kst = (ms, withYear = true) => {
 const sym = "BTC";                                     // 비트코인 전용 (알트에는 잘 안 맞아서)
 let dir = "both", fineTf = "12h";
 let bars12 = [], result = null, showN = 40, selEv = null, lastPrice = NaN, runId = 0;
-const fineCache = new Map();          // `${sym}|${tf}|${barT}` → 짧은 봉 배열
 
 // ── 데이터 ─────────────────────────────────────────────
 const toBar = r => ({ t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], ct: +r[6] });
@@ -171,90 +174,55 @@ async function bnGet(url) {
   return r.json();
 }
 
-// ── 짧은 봉 저장소 (IndexedDB): 지나간 12시간봉 안의 분봉은 바뀌지 않으니 한 번 받으면 이 브라우저에 계속 저장 ──
-const IDB = (() => {
-  let dbp = null;
-  const open = () => dbp || (dbp = new Promise((res, rej) => {
-    try {
-      const q = indexedDB.open("lowsig-fine", 1);
-      q.onupgradeneeded = () => q.result.createObjectStore("bars");
-      q.onsuccess = () => res(q.result);
-      q.onerror = () => rej(q.error);
-    } catch (e) { rej(e); }
-  }));
-  const tx = async (mode, fn) => { try { const db = await open(); return await new Promise((res, rej) => { const t = db.transaction("bars", mode); const r = fn(t.objectStore("bars")); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); }); } catch (e) { return null; } };
-  return { get: k => tx("readonly", st => st.get(k)), put: (k, v) => tx("readwrite", st => st.put(v, k)) };
-})();
-
-async function fineBars(s, tf, bar) {
-  const key = `${s}|${tf}|${bar.t}`;
-  if (fineCache.has(key)) return fineCache.get(key);
-  const done = bar.t + H12 < Date.now();                       // 이미 끝난 12시간봉만 저장
-  const saved = done ? await IDB.get(key) : null;
-  if (saved && saved.length) { const arr = saved.map(r => ({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4] })); fineCache.set(key, arr); return arr; }
-  // limit 1000 이하는 무게 5 (1500 은 10). 12시간 = 1분봉 720개라 1000 이면 충분
-  const rows = await bnGet(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=${tf}&startTime=${bar.t}&endTime=${bar.t + H12 - 1}&limit=1000`);
-  const arr = rows.map(toBar);
-  fineCache.set(key, arr);
-  if (done && arr.length) IDB.put(key, arr.map(b => [b.t, b.o, b.h, b.l, b.c]));
-  return arr;
-}
-// 받아야 할 봉들을 차례로 (한도에 걸리면 그 자리에서 멈춤)
-async function prefetch(s, tf, list, onProg) {
-  let done = 0;
-  for (const b of list) {
-    try { await fineBars(s, tf, b); } catch (e) { if (e.message === "BN_LIMIT") break; }
-    onProg(++done, list.length);
-  }
-}
-
 // ── 실행 ─────────────────────────────────────────────
+let api = null;                                       // 서버 결과 { both, long, short } (12시간마다 새로 계산됨)
 async function run() {
   const my = ++runId;
-  const st = $("status"), bar = $("bar");
+  const st = $("status");
   try {
-    st.textContent = `${sym} 12시간봉 불러오는 중…`;
-    bars12 = await load12h(sym);
+    st.textContent = "불러오는 중…";
+    const [bars, j] = await Promise.all([
+      load12h(sym),
+      fetch("api/lowsig").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
     if (my !== runId) return;
-    if (bars12.length < LowSig.P.trendLen + 10) throw new Error(`${sym}는 12시간봉이 ${bars12.length}개뿐이라 400개 이평을 계산할 수 없어요 (최근 상장 코인)`);
+    bars12 = bars;
     const lastT = bars12[bars12.length - 1].t;
-    const cKey = `lowsig-v5|${sym}|${fineTf}|${dir}|${lastT}`;
-    const hit = cacheGet(cKey, 13 * 3600e3);
-    // 규칙: 진입2·3이 체결되는 순간 손절선을 바로 다시 계산 (자동매매 봇과 같음)
-    let partial = false;
-    const coarse = await LowSig.run(bars12, { dir, startT: START, tight: true });
-    if (hit) result = hit;
-    else if (fineTf === "12h") result = coarse;
-    else {
-      // 12시간봉 결과에서 "봉 안을 확인해야 하는 봉"을 먼저 한꺼번에 받아 두고, 짧은 봉으로 다시 계산
-      const need = bars12.filter(b => coarse.touchBars.includes(b.t));
-      bar.hidden = false;
-      await prefetch(sym, fineTf, need, (d, n) => {
-        if (my !== runId) return;
-        st.textContent = `${TF_KO[fineTf]}으로 봉 안 시점 확인 중… ${d}/${n}`;
-        bar.firstElementChild.style.width = (d / n * 100) + "%";
-      });
-      if (my !== runId) return;
-      const fine = async b => { if (Date.now() < bnBlockedUntil) return fineCache.get(`${sym}|${fineTf}|${b.t}`) || null; try { return await fineBars(sym, fineTf, b); } catch (e) { return null; } };
-      const r = await LowSig.run(bars12, { dir, startT: START, fine, tight: true });
-      result = { events: r.events, open: r.open, stats: r.stats };
-      partial = Date.now() < bnBlockedUntil;
-      if (!partial) cacheSet(cKey, result);
+    if (j && j.both) {
+      api = j;
+      result = api[dir];
+      fromServer = true;
+    } else {
+      // 서버 결과를 못 받으면 12시간봉만으로 추정 (봉 안 순서는 양봉·음봉으로 가정, 시각은 모름)
+      const r = await LowSig.run(bars12, { dir, startT: START, tight: true });
+      result = { events: r.events, open: r.open, stats: r.stats, curve: r.trades.map(t => [t.t1, Math.round(t.eqAfter)]) };
+      fromServer = false;
     }
-    if (my !== runId) return;
-    bar.hidden = true;
     showN = 40; selEv = null;
     paintAll();
-    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 ${sym}USDT 무기한 · 시점 확인 ${TF_KO[fineTf]}` +
-      (partial ? ` · 바이낸스 요청 한도에 걸려 일부 신호는 12시간봉 기준으로 표시했어요. 몇 분 뒤 새로고침하면 나머지를 마저 확인해요` : "");
+    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 BTCUSDT 무기한 · ` +
+      (fromServer ? "1분봉 기준 계산" : "12시간봉 기준 추정 (서버 결과를 못 받아서)");
   } catch (e) {
-    bar.hidden = true;
     st.textContent = e.message === "BN_LIMIT" ? "바이낸스 요청 한도에 걸렸어요. 몇 분 뒤 새로고침해 주세요" : e.message;
   }
 }
+let fromServer = false;
 
 // ── 그리기 ─────────────────────────────────────────────
 function paintAll() { paintNow(); paintEvents(); drawChart(null); }
+
+// 자산 곡선 (작은 선 그래프): 시작 50,000 → 매매가 끝날 때마다의 계좌 → 지금
+function spark(curve, nowEq) {
+  const pts = [[START, LowSig.P.capital], ...(curve || []), [Date.now(), nowEq]];
+  if (pts.length < 2) return "--";
+  const W = 220, H = 46, t0 = pts[0][0], t1 = pts[pts.length - 1][0];
+  const vs = pts.map(p => p[1]), lo = Math.min(...vs), hi = Math.max(...vs);
+  const x = t => (t - t0) / Math.max(1, t1 - t0) * W, y = v => H - 3 - (v - lo) / Math.max(1e-9, hi - lo) * (H - 6);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
+  const c = nowEq >= LowSig.P.capital ? "var(--up)" : "var(--down)";
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Equity curve">
+    <path d="${line}L${W},${H}L0,${H}Z" fill="${c}" opacity=".12"/><path d="${line}" fill="none" stroke="${c}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
 
 // 성적 카드: 같은 규칙을 2020년부터 과거 차트에 적용한 결과 (백테스트)
 function paintNow() {
@@ -275,6 +243,7 @@ function paintNow() {
     ["Position", o ? `<span class="${o.s === 1 ? "up" : "down"}">${o.s === 1 ? "LONG" : "SHORT"}</span> · Entry ${o.n}` : "--",
       o ? "Avg " + px(o.avg) + " · SL " + px(o.stop) : ""],
     ["Profit", o ? `<span class="${cls(profit)}">${sgn(profit)}</span>` : "--", o ? "@ " + px(cur) : ""],
+    ["Equity Curve", spark(r.curve, nowEq), "Max DD " + (s.mdd * 100).toFixed(1) + "%"],
   ];
   $("now").innerHTML = tiles.map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
 }
@@ -287,7 +256,7 @@ function paintEvents() {
   const ev = result.events.slice().reverse();
   const rows = ev.slice(0, showN).map((e, i) => {
     const pnl = e.kind === "exit" ? `<span class="${cls(e.pnl)}">${(e.pnl > 0 ? "+" : "") + shortUsd(e.pnl)}</span>` : "";
-    const full = kst(e.t), t = `<span class="yr">${full.slice(0, 5)}</span>` + (e.exact ? full.slice(5) : full.slice(5, 10) + " (12h)");
+    const full = kst(e.t), t = `<span class="yr">${full.slice(0, 5)}</span>` + (e.exact ? full.slice(5) : full.slice(5, 10));
     return `<tr class="click${selEv === e ? " sel" : ""}" data-i="${ev.length - 1 - i}">
       <td class="l notranslate" translate="no">${t}</td><td class="l">${labHtml(e)}</td>
       <td class="notranslate" translate="no">${px(e.px)}</td><td class="notranslate" translate="no">${pnl}</td></tr>`;
@@ -421,14 +390,14 @@ function liveClose() {
 for (const b of $("dir").querySelectorAll("button")) b.onclick = () => {
   dir = b.dataset.v;
   for (const x of $("dir").querySelectorAll("button")) x.classList.toggle("on", x === b);
-  run();
+  if (api) { result = api[dir]; showN = 40; selEv = null; paintAll(); } else run();
 };
-// 차트 위 시간 단위 버튼: 고르면 차트도 그 봉으로, 진입2·3·익절·SL 시각도 그 봉 기준으로 다시 확인
+// 차트 위 시간 단위 버튼: 차트만 그 봉으로 바뀜 (신호 시각은 서버가 1분봉으로 계산해 둠)
 for (const b of $("tfbar").querySelectorAll("button")) b.onclick = () => {
   if (fineTf === b.dataset.tf) return;
   fineTf = b.dataset.tf;
   for (const x of $("tfbar").querySelectorAll("button")) x.classList.toggle("on", x === b);
-  run();
+  drawChart(selEv);
 };
 $("moreEv").onclick = () => { showN += 60; paintEvents(); };
 $("toLatest").onclick = () => { selEv = null; for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel"); drawChart(null); };
