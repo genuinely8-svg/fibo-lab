@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006224741"></script>
+<script src="theme.js?v=20261006225558"></script>
 <title>Artha Trend Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006224741">
+<link rel="stylesheet" href="common.css?v=20261006225558">
 <style>
   .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end;max-width:560px}
   .grid label{min-width:0}
@@ -25,6 +25,14 @@
   #chart{height:440px}
   .charthead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
   .charthead h2{margin:0}
+  .ctitle{display:flex;align-items:center;gap:10px;min-width:0}
+  /* LIVE 표시: 실시간 연결되면 녹색으로 깜빡임, 끊기거나 과거 시점을 보는 중이면 회색 */
+  .livebadge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--muted);
+             padding:3px 8px;border-radius:999px;border:1px solid var(--line)}
+  .livebadge i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .livebadge.on{color:#22c55e;border-color:color-mix(in srgb,#22c55e 45%,transparent);background:color-mix(in srgb,#22c55e 10%,transparent)}
+  .livebadge.on i{background:#22c55e;animation:lvpulse 1.6s ease-in-out infinite}
+  @keyframes lvpulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.6)}50%{opacity:.55;box-shadow:0 0 0 4px rgba(34,197,94,0)}}
   /* 트레이딩뷰처럼 차트 위 시간 단위 버튼 */
   .tfbar{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 8px;padding:3px;border:1px solid var(--line);border-radius:8px;width:max-content;max-width:100%}
   .tfbar button{background:transparent;color:var(--muted);padding:5px 9px;font-size:13px;font-weight:600;border-radius:6px}
@@ -66,19 +74,17 @@
       <label>방향
         <span class="seg" id="dir"><button data-v="both" class="on">롱+숏</button><button data-v="long">롱만</button><button data-v="short">숏만</button></span>
       </label>
-      <label>&nbsp;<button id="run">새로고침</button></label>
     </div>
   </div>
 
   <div class="card">
-    <div class="state" id="state"></div>
-    <div class="tiles" id="now"></div>
+    <div class="tiles notranslate" id="now" translate="no"></div>
     <p class="foot" style="margin:10px 0 0">실제로 거래한 기록이 아니라, 과거 차트에 같은 규칙을 적용해 계산한 결과예요. 수수료 0.05% 포함, 펀딩비 미포함.</p>
   </div>
 
   <div class="card">
     <div class="charthead">
-      <h2 id="chartTitle">차트</h2>
+      <div class="ctitle"><h2 id="chartTitle">차트</h2><span class="livebadge notranslate" id="liveBadge" translate="no"><i></i>LIVE</span></div>
       <button type="button" class="ghost" id="toLatest">최근으로</button>
     </div>
     <div class="tfbar notranslate" id="tfbar" translate="no">
@@ -107,9 +113,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006224741"></script>
-<script src="nav.js?v=20261006224741"></script>
-<script src="lowsig-core.js?v=20261006224741"></script>
+<script src="common.js?v=20261006225558"></script>
+<script src="nav.js?v=20261006225558"></script>
+<script src="lowsig-core.js?v=20261006225558"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -205,7 +211,6 @@ async function prefetch(s, tf, list, onProg) {
 // ── 실행 ─────────────────────────────────────────────
 async function run() {
   const my = ++runId;
-  $("run").disabled = true;
   const st = $("status"), bar = $("bar");
   try {
     st.textContent = `${sym} 12시간봉 불러오는 중…`;
@@ -246,7 +251,6 @@ async function run() {
     bar.hidden = true;
     st.textContent = e.message === "BN_LIMIT" ? "바이낸스 요청 한도에 걸렸어요. 몇 분 뒤 새로고침해 주세요" : e.message;
   }
-  $("run").disabled = false;
 }
 
 // ── 그리기 ─────────────────────────────────────────────
@@ -260,20 +264,17 @@ function paintNow() {
   const realized = s.equity - P.capital;                          // 끝난 매매들의 손익 합계
   const nowEq = s.equity + profit;
   const lose = s.trades - s.wins;
-  const n = v => `<span class="notranslate" translate="no">${v}</span>`;
   const usdt = v => Math.round(v).toLocaleString("en-US") + " USDT";
   const sgn = v => (v > 0 ? "+" : v < 0 ? "-" : "") + Math.abs(Math.round(v)).toLocaleString("en-US") + " USDT";
-  $("state").innerHTML = `<span class="pill wait">과거 검증 · 같은 규칙을 2020년부터 적용했다면</span>`;
   const tiles = [
-    ["스타트", n(usdt(P.capital)), "2020년 1월 시작"],
-    ["현재", n(`<span class="${cls(nowEq - P.capital)}">${usdt(nowEq)}</span>`), n(pct((nowEq - P.capital) / P.capital * 100))],
-    ["총 트레이딩 횟수", n(s.trades + "번" + (o ? " + 진행 중 1" : "")), "진입부터 청산까지 1번으로 셈"],
-    ["WIN / LOSE", n(`<span class="up">${s.wins}</span> / <span class="down">${lose}</span>`), "승률 " + n((s.trades ? s.wins / s.trades * 100 : 0).toFixed(0) + "%")],
-    ["총 PNL", n(`<span class="${cls(realized)}">${sgn(realized)}</span>`), "끝난 매매의 손익 합계 (수수료 포함)"],
-    ["현재 포지션", o ? `<span class="${o.s === 1 ? "up" : "down"}">${o.s === 1 ? "롱" : "숏"}</span> ${n("진입" + o.n)}` : "—",
-      o ? "평단 " + n(px(o.avg)) + " · 손절 " + n(px(o.stop)) : "포지션 없음"],
-    ["현재 프로핏", o ? n(`<span class="${cls(profit)}" id="curProfit">${sgn(profit)}</span>`) : "—",
-      o ? "현재가 " + n(`<span id="curPx">${px(cur)}</span>`) + " 기준" : "포지션 없음"],
+    ["Start", usdt(P.capital), "Since Jan 2020"],
+    ["Current", `<span class="${cls(nowEq - P.capital)}">${usdt(nowEq)}</span>`, pct((nowEq - P.capital) / P.capital * 100)],
+    ["Total Trades", s.trades + (o ? " + 1 open" : ""), ""],
+    ["WIN / LOSE", `<span class="up">${s.wins}</span> / <span class="down">${lose}</span>`, "Win rate " + (s.trades ? s.wins / s.trades * 100 : 0).toFixed(0) + "%"],
+    ["Total PNL", `<span class="${cls(realized)}">${sgn(realized)}</span>`, ""],
+    ["Position", o ? `<span class="${o.s === 1 ? "up" : "down"}">${o.s === 1 ? "LONG" : "SHORT"}</span> · Entry ${o.n}` : "--",
+      o ? "Avg " + px(o.avg) + " · SL " + px(o.stop) : ""],
+    ["Profit", o ? `<span class="${cls(profit)}">${sgn(profit)}</span>` : "--", o ? "@ " + px(cur) : ""],
   ];
   $("now").innerHTML = tiles.map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
 }
@@ -375,6 +376,7 @@ async function drawChart(focus) {
   }
   live.follow = !focus;
   liveConnect();
+  paintLive();
   if (focus) {
     const i = cs.findIndex(b => b.t + step > focus.t);
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, i - 120), to: i + 120 });
@@ -396,13 +398,19 @@ function liveConnect() {
     let d; try { d = JSON.parse(m.data); } catch (e) { return; }
     const k = d && d.k; if (!k) return;
     lastPrice = +k.c;
+    live.last = Date.now(); paintLive();
     // 차트가 최근 화면일 때만 마지막 봉을 갱신 (과거 신호를 눌러 보고 있을 땐 그대로)
     if (series && live.follow) { try { series.update({ time: T(+k.t), open: +k.o, high: +k.h, low: +k.l, close: +k.c }); } catch (e) {} }
     if (result && result.open && Date.now() - live.lastPaint > 2000) { live.lastPaint = Date.now(); paintNow(); }
   };
-  ws.onclose = () => { if (live.ws === ws) live.timer = setTimeout(liveConnect, Math.min(15000, 1000 * ++live.tries)); };
+  ws.onclose = () => { paintLive(); if (live.ws === ws) live.timer = setTimeout(liveConnect, Math.min(15000, 1000 * ++live.tries)); };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
 }
+function paintLive() {
+  const b = $("liveBadge"); if (!b) return;
+  b.classList.toggle("on", !!(live.ws && live.ws.readyState === 1 && live.follow && Date.now() - (live.last || 0) < 15000));
+}
+setInterval(paintLive, 3000);
 function liveClose() {
   clearTimeout(live.timer);
   const ws = live.ws; live.ws = null; live.key = "";
@@ -422,7 +430,6 @@ for (const b of $("tfbar").querySelectorAll("button")) b.onclick = () => {
   for (const x of $("tfbar").querySelectorAll("button")) x.classList.toggle("on", x === b);
   run();
 };
-$("run").onclick = run;
 $("moreEv").onclick = () => { showN += 60; paintEvents(); };
 $("toLatest").onclick = () => { selEv = null; for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel"); drawChart(null); };
 // 12시간봉이 새로 마감되면(오전·오후 9시) 다시 계산
