@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006212911"></script>
+<script src="theme.js?v=20261006213904"></script>
 <title>Low Signals · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006212911">
+<link rel="stylesheet" href="common.css?v=20261006213904">
 <style>
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
@@ -112,11 +112,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006212911"></script>
-<script src="nav.js?v=20261006212911"></script>
-<script src="meta.js?v=20261006212911"></script>
-<script src="coinpicker.js?v=20261006212911"></script>
-<script src="lowsig-core.js?v=20261006212911"></script>
+<script src="common.js?v=20261006213904"></script>
+<script src="nav.js?v=20261006213904"></script>
+<script src="meta.js?v=20261006213904"></script>
+<script src="coinpicker.js?v=20261006213904"></script>
+<script src="lowsig-core.js?v=20261006213904"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -142,7 +142,7 @@ async function load12h(s) {
   // 400개 이평이 2020년 1월에 준비되도록 2019년 6월부터 (상장이 늦은 코인은 있는 만큼)
   let from = Date.UTC(2019, 5, 1), out = [];
   for (let k = 0; k < 10; k++) {
-    const rows = await getJSON(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=12h&startTime=${from}&limit=1500`);
+    const rows = await bnGet(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=12h&startTime=${from}&limit=1500`);
     if (!rows.length) break;
     out = out.concat(rows.map(toBar));
     if (rows.length < 1500) break;
@@ -151,25 +151,61 @@ async function load12h(s) {
   const now = Date.now();
   return out.filter(b => b.ct < now);                          // 마감된 봉만
 }
+// ── 바이낸스 요청 한도 지키기 ─────────────────────────────
+// 바이낸스는 IP 하나에 1분당 요청 무게(weight) 한도가 있고, 429(한도 초과)를 받은 뒤에도 계속 요청하면 418(일정 시간 차단)을 줘요.
+// → 짧은 봉 요청은 0.25초 간격으로 하나씩만, 429/418 을 받으면 그 즉시 멈추고 Retry-After 동안 더 요청하지 않음
+let bnBlockedUntil = 0, bnNext = 0;
+const BN_GAP = 250;
+async function bnGet(url) {
+  if (Date.now() < bnBlockedUntil) throw new Error("BN_LIMIT");
+  const wait = bnNext - Date.now();
+  bnNext = Math.max(Date.now(), bnNext) + BN_GAP;
+  if (wait > 0) await sleep(wait);
+  if (Date.now() < bnBlockedUntil) throw new Error("BN_LIMIT");
+  const r = await fetch(url);
+  if (r.status === 429 || r.status === 418) {
+    bnBlockedUntil = Date.now() + Math.max(60, +r.headers.get("retry-after") || 0) * 1000;
+    throw new Error("BN_LIMIT");
+  }
+  if (!r.ok) throw new Error("응답 오류 " + r.status);
+  return r.json();
+}
+
+// ── 짧은 봉 저장소 (IndexedDB): 지나간 12시간봉 안의 분봉은 바뀌지 않으니 한 번 받으면 이 브라우저에 계속 저장 ──
+const IDB = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    try {
+      const q = indexedDB.open("lowsig-fine", 1);
+      q.onupgradeneeded = () => q.result.createObjectStore("bars");
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => rej(q.error);
+    } catch (e) { rej(e); }
+  }));
+  const tx = async (mode, fn) => { try { const db = await open(); return await new Promise((res, rej) => { const t = db.transaction("bars", mode); const r = fn(t.objectStore("bars")); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); }); } catch (e) { return null; } };
+  return { get: k => tx("readonly", st => st.get(k)), put: (k, v) => tx("readwrite", st => st.put(v, k)) };
+})();
+
 async function fineBars(s, tf, bar) {
   const key = `${s}|${tf}|${bar.t}`;
   if (fineCache.has(key)) return fineCache.get(key);
-  const rows = await getJSON(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=${tf}&startTime=${bar.t}&endTime=${bar.t + H12 - 1}&limit=1500`);
+  const done = bar.t + H12 < Date.now();                       // 이미 끝난 12시간봉만 저장
+  const saved = done ? await IDB.get(key) : null;
+  if (saved && saved.length) { const arr = saved.map(r => ({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4] })); fineCache.set(key, arr); return arr; }
+  // limit 1000 이하는 무게 5 (1500 은 10). 12시간 = 1분봉 720개라 1000 이면 충분
+  const rows = await bnGet(`${F}/fapi/v1/klines?symbol=${s}USDT&interval=${tf}&startTime=${bar.t}&endTime=${bar.t + H12 - 1}&limit=1000`);
   const arr = rows.map(toBar);
   fineCache.set(key, arr);
+  if (done && arr.length) IDB.put(key, arr.map(b => [b.t, b.o, b.h, b.l, b.c]));
   return arr;
 }
-// 여러 개를 동시에 (요청 제한에 안 걸리게 6개씩)
+// 받아야 할 봉들을 차례로 (한도에 걸리면 그 자리에서 멈춤)
 async function prefetch(s, tf, list, onProg) {
-  let done = 0, idx = 0;
-  const work = async () => {
-    while (idx < list.length) {
-      const b = list[idx++];
-      try { await fineBars(s, tf, b); } catch (e) {}
-      onProg(++done, list.length);
-    }
-  };
-  await Promise.all(Array.from({ length: 6 }, work));
+  let done = 0;
+  for (const b of list) {
+    try { await fineBars(s, tf, b); } catch (e) { if (e.message === "BN_LIMIT") break; }
+    onProg(++done, list.length);
+  }
 }
 
 // ── 실행 ─────────────────────────────────────────────
@@ -189,6 +225,7 @@ async function run() {
     const cKey = `lowsig-v3|${sym}|${fineTf}|${dir}|${lastT}`;
     const hit = cacheGet(cKey, 13 * 3600e3);
     // 규칙: 진입2·3이 체결되는 순간 손절선을 바로 다시 계산 (자동매매 봇과 같음)
+    let partial = false;
     const coarse = await LowSig.run(bars12, { dir, startT: START, tight: true });
     if (hit) result = hit;
     else if (fineTf === "12h") result = coarse;
@@ -202,19 +239,21 @@ async function run() {
         bar.firstElementChild.style.width = (d / n * 100) + "%";
       });
       if (my !== runId) return;
-      const fine = async b => { try { return await fineBars(sym, fineTf, b); } catch (e) { return null; } };
+      const fine = async b => { if (Date.now() < bnBlockedUntil) return fineCache.get(`${sym}|${fineTf}|${b.t}`) || null; try { return await fineBars(sym, fineTf, b); } catch (e) { return null; } };
       const r = await LowSig.run(bars12, { dir, startT: START, fine, tight: true });
       result = { events: r.events, open: r.open, stats: r.stats };
-      cacheSet(cKey, result);
+      partial = Date.now() < bnBlockedUntil;
+      if (!partial) cacheSet(cKey, result);
     }
     if (my !== runId) return;
     bar.hidden = true;
     showN = 40; selEv = null;
     paintAll();
-    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 ${sym}USDT 무기한 · 시점 확인 ${TF_KO[fineTf]}`;
+    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 ${sym}USDT 무기한 · 시점 확인 ${TF_KO[fineTf]}` +
+      (partial ? ` · 바이낸스 요청 한도에 걸려 일부 신호는 12시간봉 기준으로 표시했어요. 몇 분 뒤 새로고침하면 나머지를 마저 확인해요` : "");
   } catch (e) {
     bar.hidden = true;
-    st.textContent = e.message;
+    st.textContent = e.message === "BN_LIMIT" ? "바이낸스 요청 한도에 걸렸어요. 몇 분 뒤 새로고침해 주세요" : e.message;
   }
   $("run").disabled = false;
 }
@@ -318,7 +357,7 @@ async function drawChart(focus) {
   let start = end - step * N;
   $("chartTitle").innerHTML = `${esc(sym)} · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
   let rows;
-  try { rows = await getJSON(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${tf}&startTime=${start}&endTime=${end}&limit=1000`); }
+  try { rows = await bnGet(`${F}/fapi/v1/klines?symbol=${sym}USDT&interval=${tf}&startTime=${start}&endTime=${end}&limit=1000`); }
   catch (e) { $("chartTitle").textContent = "차트를 못 불러왔어요"; return; }
   const cs = rows.map(toBar);
   if (!cs.length) return;
@@ -367,7 +406,7 @@ async function drawChart(focus) {
 // ── 현재가 (10초마다) ─────────────────────────────────
 async function tickPrice() {
   try {
-    const j = await getJSON(`${F}/fapi/v1/ticker/price?symbol=${sym}USDT`, 1);
+    const j = await bnGet(`${F}/fapi/v1/ticker/price?symbol=${sym}USDT`);
     lastPrice = +j.price;
     const el = $("curPx"); if (el) el.textContent = px(lastPrice);
   } catch (e) {}
