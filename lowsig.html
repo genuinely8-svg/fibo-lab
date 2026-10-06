@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006213904"></script>
+<script src="theme.js?v=20261006221801"></script>
 <title>Low Signals · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006213904">
+<link rel="stylesheet" href="common.css?v=20261006221801">
 <style>
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
@@ -58,12 +58,13 @@
 
   <div class="card">
     <h2>Low Signals · 12시간봉 추세추종</h2>
-    <p class="sub">신호는 <b>12시간봉</b>으로 계산하고(진입1은 봉 마감 때 확정), 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지는 아래에서 고른 짧은 봉으로 찾아요.</p>
+    <p class="sub">신호는 <b>12시간봉</b>으로 계산하고(진입1은 봉 마감 때 확정), 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지 보고 싶으면 아래에서 분봉을 고르세요. 분봉은 처음 한 번 바이낸스에서 받아 오느라 시간이 걸리고, 그다음부터는 이 브라우저에 저장돼서 빨라요.</p>
     <div class="grid">
       <label>코인<input id="coin" value="BTC" placeholder="코인 검색 (예: 비트, SOL)"></label>
-      <label>시점 확인용 봉
+      <label>차트 · 시점 확인용 봉
         <select id="fineTf">
-          <option value="1m" selected>1분봉 (가장 정확)</option>
+          <option value="12h" selected>12시간봉 (기본 · 빠름)</option>
+          <option value="1m">1분봉 (가장 정확 · 처음 한 번 1분쯤)</option>
           <option value="3m">3분봉</option>
           <option value="5m">5분봉</option>
           <option value="15m">15분봉</option>
@@ -71,7 +72,6 @@
           <option value="1h">1시간봉</option>
           <option value="4h">4시간봉</option>
           <option value="6h">6시간봉</option>
-          <option value="12h">12시간봉 (봉 안 시각 확인 안 함)</option>
         </select>
       </label>
       <label>방향
@@ -112,11 +112,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006213904"></script>
-<script src="nav.js?v=20261006213904"></script>
-<script src="meta.js?v=20261006213904"></script>
-<script src="coinpicker.js?v=20261006213904"></script>
-<script src="lowsig-core.js?v=20261006213904"></script>
+<script src="common.js?v=20261006221801"></script>
+<script src="nav.js?v=20261006221801"></script>
+<script src="meta.js?v=20261006221801"></script>
+<script src="coinpicker.js?v=20261006221801"></script>
+<script src="lowsig-core.js?v=20261006221801"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
