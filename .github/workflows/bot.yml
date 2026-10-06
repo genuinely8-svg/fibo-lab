@@ -21,5 +21,5 @@ jobs:
           if [ -z "$BOT_SECRET" ]; then echo "BOT_SECRET 이 아직 없어서 건너뜀"; exit 0; fi
           curl -sS --fail-with-body -X POST -H "Authorization: Bearer $BOT_SECRET" \
             https://fibo-lab-kappa.vercel.app/api/bot
-      - name: Trend Engine 결과 미리 계산 (/api/lowsig)
+      - name: Trading Engine 결과 미리 계산 (/api/lowsig)
         run: curl -sS -o /dev/null -w "lowsig %{http_code} %{time_total}s\n" https://fibo-lab-kappa.vercel.app/api/lowsig || true
