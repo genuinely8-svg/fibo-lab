@@ -128,7 +128,11 @@
     ["ru", "Русский"], ["uk", "Українська"], ["ar", "العربية"], ["es", "Español"], ["pt", "Português"],
     ["fr", "Français"], ["de", "Deutsch"], ["it", "Italiano"], ["nl", "Nederlands"], ["pl", "Polski"],
   ];
-  const cur = (() => { const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : "ko"; })();
+  // 기본 언어는 영어. 한 번 고르면 이 브라우저에 기억 (한국어를 고른 사람은 계속 원문으로)
+  const KEY = "artha-lang";
+  const stored = (() => { try { return localStorage.getItem(KEY); } catch (e) { return null; } })();
+  const fromCookie = (() => { const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : null; })();
+  const cur = stored || fromCookie || "en";
 
   const style = document.createElement("style");
   style.textContent = `
@@ -184,11 +188,13 @@
   for (const b of list.querySelectorAll("button")) b.onclick = () => {
     const c = b.dataset.c;
     if (c === cur) { open(false); return; }
+    try { localStorage.setItem(KEY, c); } catch (e) {}
     setCookie(c === "ko" ? "" : `/ko/${c}`);
     location.reload();
   };
 
-  if (cur === "ko") return;
+  if (cur === "ko") { if (fromCookie) setCookie(""); return; }
+  if (fromCookie !== cur) setCookie(`/ko/${cur}`);          // 처음 온 사람(기본 영어)도 번역 엔진이 알 수 있게
   // 번역하면 안 되는 것: 로고, 코인 이름·기호, 가격, 순위 꼬리표 (MAG → "자석"처럼 바뀌는 것 방지)
   const KEEP = "h1.brand,.name,.px,.lv,.xp,td.rk,.rk,.chip,.mc,.tf,.tick,.ccard .c1 b,.aclist b,.ncell,.sym,.coin";
   const mark = () => { for (const e of document.querySelectorAll(KEEP)) if (!e.classList.contains("notranslate")) { e.classList.add("notranslate"); e.translate = false; } };
