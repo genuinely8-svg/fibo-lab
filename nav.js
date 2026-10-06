@@ -154,7 +154,9 @@
     /* 구글 번역이 붙이는 위쪽 막대·말풍선·밑줄 숨김 */
     body > .skiptranslate, .goog-te-banner-frame, #goog-gt-tt, .goog-te-balloon-frame, #gt_el{display:none!important}
     body{top:0!important}
-    .goog-text-highlight{background:none!important;box-shadow:none!important}`;
+    .goog-text-highlight{background:none!important;box-shadow:none!important}
+    /* 번역 중에 왼쪽 위에 뜨는 구글 로딩 아이콘·말풍선 (로고를 가림) */
+    [class*="VIpgJd-ZVi9od-aZ2wEe"], [class*="VIpgJd-yAWNEb"]{display:none!important}`;
   document.head.appendChild(style);
 
   // 버튼 자리: 바로 위 제목(h1)과 한 줄로. 제목이 없는 페이지는 탭 위 오른쪽에
