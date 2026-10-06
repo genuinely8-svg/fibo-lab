@@ -114,3 +114,109 @@
   setInterval(() => { if (!document.hidden) check(false); }, 3 * 60 * 1000);   // 켜두면 3분마다 확인 → 안내만
   document.addEventListener("visibilitychange", () => { if (!document.hidden) check(true); });   // 다른 앱 갔다 돌아오면
 })();
+
+// ── 언어 선택 (구글 자동번역) ───────────────────────────────────────
+// 다크모드 버튼 위(제목 줄 오른쪽)에 🌐 버튼. 고르면 googtrans 쿠키를 저장하고 새로고침 → 모든 탭이 같은 언어로 번역돼요
+// 한국어(원문)를 고르면 쿠키를 지우고 원래대로. 번역 엔진(구글)은 다른 언어를 골랐을 때만 불러와요
+(function () {
+  const nav = document.getElementById("nav");
+  if (!nav) return;
+  // 바이비트를 쓸 수 있는 나라들의 언어 (미국·캐나다·싱가포르·중국 본토·홍콩 등은 이용 불가 → 간체 중국어 대신 번체)
+  const LANGS = [
+    ["ko", "한국어"], ["en", "English"], ["ja", "日本語"], ["zh-TW", "繁體中文"], ["vi", "Tiếng Việt"], ["th", "ไทย"],
+    ["id", "Bahasa Indonesia"], ["ms", "Bahasa Melayu"], ["tl", "Filipino"], ["hi", "हिन्दी"], ["tr", "Türkçe"],
+    ["ru", "Русский"], ["uk", "Українська"], ["ar", "العربية"], ["es", "Español"], ["pt", "Português"],
+    ["fr", "Français"], ["de", "Deutsch"], ["it", "Italiano"], ["nl", "Nederlands"], ["pl", "Polski"],
+  ];
+  // 기본 언어는 영어. 한 번 고르면 이 브라우저에 기억 (한국어를 고른 사람은 계속 원문으로)
+  const KEY = "artha-lang";
+  const stored = (() => { try { return localStorage.getItem(KEY); } catch (e) { return null; } })();
+  const fromCookie = (() => { const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : null; })();
+  const cur = stored || fromCookie || "en";
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .toprow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .toprow > h1{min-width:0}
+    .langrow{display:flex;justify-content:flex-end;margin:0 0 6px}
+    .langbox{position:relative;flex:none}
+    .langbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;
+             color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+    .langbtn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+    .langbtn .cv{color:var(--muted);font-size:10px}
+    .langlist{position:absolute;right:0;top:calc(100% + 6px);z-index:60;width:200px;max-height:min(60vh,420px);overflow:auto;padding:4px;
+              background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.3)}
+    .langlist button{display:flex;justify-content:space-between;width:100%;padding:8px 10px;border:0;border-radius:7px;background:transparent;
+                     color:var(--text);font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
+    .langlist button:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+    .langlist button.on{color:var(--accent);font-weight:700}
+    .langlist button.on::after{content:"✓"}
+    /* 구글 번역이 붙이는 위쪽 막대·말풍선·밑줄 숨김 */
+    body > .skiptranslate, .goog-te-banner-frame, #goog-gt-tt, .goog-te-balloon-frame, #gt_el{display:none!important}
+    body{top:0!important}
+    .goog-text-highlight{background:none!important;box-shadow:none!important}`;
+  document.head.appendChild(style);
+
+  // 버튼 자리: 바로 위 제목(h1)과 한 줄로. 제목이 없는 페이지는 탭 위 오른쪽에
+  const box = document.createElement("div");
+  box.className = "langbox notranslate"; box.translate = false;
+  const label = (LANGS.find(l => l[0] === cur) || LANGS[0])[1];
+  box.innerHTML = `<button type="button" class="langbtn" aria-haspopup="listbox" aria-expanded="false" title="Language">🌐 <span>${label}</span><span class="cv">▾</span></button>
+    <div class="langlist" role="listbox" hidden>${LANGS.map(([c, n]) => `<button type="button" role="option" data-c="${c}"${c === cur ? ' class="on" aria-selected="true"' : ""}>${n}</button>`).join("")}</div>`;
+  const prev = nav.previousElementSibling;
+  if (prev && prev.tagName === "H1") {
+    const row = document.createElement("div"); row.className = "toprow";
+    prev.before(row); row.append(prev, box);
+  } else {
+    const row = document.createElement("div"); row.className = "langrow";
+    row.append(box); nav.before(row);
+  }
+  const btn = box.querySelector(".langbtn"), list = box.querySelector(".langlist");
+  const open = v => { list.hidden = !v; btn.setAttribute("aria-expanded", String(v)); };
+  btn.onclick = e => { e.stopPropagation(); open(list.hidden); };
+  document.addEventListener("click", e => { if (!box.contains(e.target)) open(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") open(false); });
+
+  function setCookie(v) {
+    const host = location.hostname, parts = host.split(".");
+    const domains = ["", host, parts.length > 1 ? "." + parts.slice(-2).join(".") : null].filter(d => d !== null);
+    for (const d of domains) {
+      const dom = d ? `;domain=${d}` : "";
+      document.cookie = v ? `googtrans=${v};path=/${dom};max-age=31536000` : `googtrans=;path=/${dom};expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    }
+  }
+  for (const b of list.querySelectorAll("button")) b.onclick = () => {
+    const c = b.dataset.c;
+    if (c === cur) { open(false); return; }
+    try { localStorage.setItem(KEY, c); } catch (e) {}
+    setCookie(c === "ko" ? "" : `/ko/${c}`);
+    location.reload();
+  };
+
+  if (cur === "ko") { if (fromCookie) setCookie(""); return; }
+  if (fromCookie !== cur) setCookie(`/ko/${cur}`);          // 처음 온 사람(기본 영어)도 번역 엔진이 알 수 있게
+  // 번역하면 안 되는 것: 로고, 코인 이름·기호, 가격, 순위 꼬리표 (MAG → "자석"처럼 바뀌는 것 방지)
+  const KEEP = "h1.brand,.name,.px,.lv,.xp,td.rk,.rk,.chip,.mc,.tf,.tick,.ccard .c1 b,.aclist b,.ncell,.sym,.coin";
+  const mark = () => { for (const e of document.querySelectorAll(KEEP)) if (!e.classList.contains("notranslate")) { e.classList.add("notranslate"); e.translate = false; } };
+  mark();
+  let t = null;
+  new MutationObserver(() => { if (!t) t = setTimeout(() => { t = null; mark(); }, 200); }).observe(document.body, { childList: true, subtree: true });
+  const holder = document.createElement("div"); holder.id = "gt_el"; document.body.appendChild(holder);
+  // 탭 이름은 기계번역이 어색해서("청산히트맵" → "Cheongsan Heatmap") 다른 언어에서는 정해 둔 영어 이름으로
+  const EN = { "index.html": "Signals", "paper.html": "Paper Trading", "calc.html": "Calculator", "market.html": "Market Direction",
+               "liquidation.html": "Liquidation Map", "oi.html": "OI", "rank.html": "Rankings", "movers.html": "Top Movers", "news.html": "News" };
+  for (const a of nav.querySelectorAll(".navtabs a")) { const n = EN[a.getAttribute("href")]; if (n) { a.textContent = n; a.classList.add("notranslate"); a.translate = false; } }
+  // 위젯이 쿠키만으로는 번역을 시작하지 않을 때가 있어서, 숨겨 둔 언어 목록에 직접 골라 줌
+  window.googleTranslateElementInit = () => {
+    new google.translate.TranslateElement({ pageLanguage: "ko", autoDisplay: false }, "gt_el");
+    let n = 0;
+    const kick = setInterval(() => {
+      const c = document.querySelector(".goog-te-combo");
+      if (document.documentElement.classList.contains("translated-ltr") || document.documentElement.classList.contains("translated-rtl") || ++n > 40) return clearInterval(kick);
+      if (c && [...c.options].some(o => o.value === cur)) { c.value = cur; c.dispatchEvent(new Event("change")); }
+    }, 250);
+  };
+  const s = document.createElement("script");
+  s.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+  document.body.appendChild(s);
+})();
