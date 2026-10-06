@@ -3,11 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261007005010"></script>
+<script src="theme.js?v=20261007010042"></script>
 <title>계산기 · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261007005010">
+<link rel="stylesheet" href="common.css?v=20261007010042">
 <style>
+  /* 복리 계산기 */
+  .cchart{width:100%;height:190px;display:block;margin-top:12px}
+  .ctbl{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;margin-top:12px}
+  .ctbl th,.ctbl td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  .ctbl th{color:var(--muted);font-weight:600;font-size:12px}
+  .ctbl th:first-child,.ctbl td:first-child{text-align:left}
+  .ctbl .up{color:var(--up)} .ctbl .dn{color:var(--down)}
+  .ctbl tr.mile td{font-weight:700}
+  .more{display:block;margin:12px auto 0;padding:8px 22px;font-weight:700;letter-spacing:.05em}
   /* 계산기 3개를 위쪽 버튼으로 바꿔 보기 */
   .calcnav{margin-bottom:14px;display:flex}
   .calcnav .seg{flex:1;display:flex}
@@ -57,6 +66,7 @@
     <button data-t="fee" class="on">수수료</button>
     <button data-t="funding">펀딩비</button>
     <button data-t="avg">물타기·불타기</button>
+    <button data-t="comp">복리</button>
   </span></div>
 
   <!-- ───────────────── 1. 수수료 계산기 ───────────────── -->
@@ -159,13 +169,48 @@
     </div>
   </section>
 
+  <!-- ───────────────── 4. 복리 계산기 ───────────────── -->
+  <section id="tab-comp" hidden>
+    <div class="card">
+      <h2>복리 계산기</h2>
+      <p class="sub">번 돈을 다시 굴리면(복리) 시간이 지나 얼마가 되는지 계산해요. 손실(마이너스 %)도 넣을 수 있어요.</p>
+      <div class="grid">
+        <label>시작 금액 (USDT)<input id="cStart" type="number" inputmode="decimal" min="0" step="any" value="10000"></label>
+        <label>한 번에 수익률 (%)<input id="cRate" type="number" inputmode="decimal" step="any" value="1"><span class="hint">손실이면 -2 처럼</span></label>
+        <label>주기
+          <span class="seg" id="cUnit"><button data-v="day" class="on">일</button><button data-v="week">주</button><button data-v="month">월</button><button data-v="trade">매매</button></span>
+        </label>
+        <label>횟수<input id="cN" type="number" inputmode="numeric" min="1" max="3650" step="1" value="365"><span class="hint">최대 3,650</span></label>
+        <label>매번 추가 입금 (USDT)<input id="cAdd" type="number" inputmode="decimal" min="0" step="any" value="0"><span class="hint">없으면 0</span></label>
+        <label>매번 출금 비율 (%)<input id="cWd" type="number" inputmode="decimal" min="0" max="100" step="any" value="0"><span class="hint">번 돈 중 빼 쓰는 비율</span></label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tiles" id="compOut"></div>
+      <svg class="cchart" id="cChart" viewBox="0 0 600 190" preserveAspectRatio="none"></svg>
+      <div style="overflow-x:auto"><table class="ctbl" id="cTbl"></table></div>
+      <button type="button" class="ghost more" id="cMore" hidden>MORE</button>
+    </div>
+    <div class="card">
+      <h2>목표 금액 역계산</h2>
+      <p class="sub">목표 금액까지 <b>지금 수익률로 몇 번</b> 걸리는지, <b>정한 횟수 안에</b> 가려면 한 번에 몇 %가 필요한지 계산해요.</p>
+      <div class="grid">
+        <label>목표 금액 (USDT)<input id="cTarget" type="number" inputmode="decimal" min="0" step="any" value="1000000"></label>
+      </div>
+      <div class="tiles" id="cRevOut" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <p class="note" style="margin:0">수수료·펀딩비·세금은 빠져 있어요. 매일 1%처럼 작은 수익률도 복리로 쌓이면 커지지만, <b>손실 한 번이 그동안의 수익을 크게 깎는다</b>는 점도 같이 보세요 (−50% 를 메우려면 +100% 가 필요).</p>
+    </div>
+  </section>
+
   <p class="foot">참고용 계산기이며 투자 조언이 아닙니다. 실제 수수료·펀딩비·청산가는 거래소 화면에서 꼭 다시 확인하세요.</p>
 </div>
 
-<script src="common.js?v=20261007005010"></script>
-<script src="nav.js?v=20261007005010"></script>
-<script src="meta.js?v=20261007005010"></script>
-<script src="coinpicker.js?v=20261007005010"></script>
+<script src="common.js?v=20261007010042"></script>
+<script src="nav.js?v=20261007010042"></script>
+<script src="meta.js?v=20261007010042"></script>
+<script src="coinpicker.js?v=20261007010042"></script>
 <script>
 const F = "https://fapi.binance.com";
 const num = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : NaN; };
@@ -192,12 +237,12 @@ function setSeg(id, v) { const b = $(id).querySelector(`button[data-v="${v}"]`);
 
 // ── 위쪽 계산기 바꾸기 (주소 #fee / #funding / #avg 로도 바로 열림) ──
 function showTab(t) {
-  for (const s of ["fee", "funding", "avg"]) $("tab-" + s).hidden = s !== t;
+  for (const s of ["fee", "funding", "avg", "comp"]) $("tab-" + s).hidden = s !== t;
   for (const b of $("calcTabs").querySelectorAll("button")) b.classList.toggle("on", b.dataset.t === t);
   if (location.hash !== "#" + t) history.replaceState(null, "", "#" + t);
 }
 for (const b of $("calcTabs").querySelectorAll("button")) b.onclick = () => showTab(b.dataset.t);
-if (["#fee", "#funding", "#avg"].includes(location.hash)) showTab(location.hash.slice(1));
+if (["#fee", "#funding", "#avg", "#comp"].includes(location.hash)) showTab(location.hash.slice(1));
 
 // ═════════════════ 1. 수수료 ═════════════════
 function calcFee() {
@@ -394,6 +439,82 @@ $("aTarget").addEventListener("input", calcReverse);
 $("addLeg").onclick = () => { legs.push({ p: "", a: "" }); drawLegs(); calcAvg(); };
 $("resetLegs").onclick = () => { blankLegs(); $("aTarget").value = ""; drawLegs(); calcAvg(); };
 CoinPicker.attach($("aCoin"), { onPick: s => loadNow(s) });
+
+// ── 4. 복리 계산기 ─────────────────────────────
+const UNIT = { day: "일", week: "주", month: "개월", trade: "번째 매매" };
+const UNIT_N = { day: "일", week: "주", month: "개월", trade: "번" };
+let compRows = [], compShow = 30;
+const cpct = v => !isFinite(v) ? "-" : (v > 0 ? "+" : "") + v.toLocaleString("en-US", { maximumFractionDigits: 2 }) + "%";
+const big = v => !isFinite(v) ? "-" : Math.abs(v) >= 1e15 ? "$" + v.toExponential(2) : money(v);
+function compSim(start, r, n, add, wd) {
+  let bal = start, inv = start, out = 0;
+  const rows = [];
+  for (let i = 1; i <= n; i++) {
+    const g = bal * r;
+    const w = g > 0 ? g * wd : 0;            // 번 돈 중 일부를 빼 씀
+    bal = bal + g - w + add; inv += add; out += w;
+    if (bal <= 0) { bal = 0; rows.push({ i, g, bal, inv, out }); break; }
+    rows.push({ i, g, bal, inv, out });
+  }
+  return rows;
+}
+function calcComp() {
+  const start = num("cStart"), r = num("cRate") / 100, n = Math.min(3650, Math.floor(num("cN"))), add = Math.max(0, num("cAdd") || 0), wd = Math.min(1, Math.max(0, (num("cWd") || 0) / 100));
+  const u = segVal.cUnit;
+  if (!ok(start) || !isFinite(r) || !(n >= 1) || r <= -1) {
+    $("compOut").innerHTML = tile("필요한 값", "-", "시작 금액·수익률·횟수를 넣어 주세요"); $("cTbl").innerHTML = ""; $("cChart").innerHTML = ""; $("cMore").hidden = true; calcCompRev(); return;
+  }
+  compRows = compSim(start, r, n, add, wd);
+  const last = compRows[compRows.length - 1], fin = last.bal, profit = fin + last.out - last.inv;
+  const dbl = r > 0 ? Math.log(2) / Math.log(1 + r * (1 - wd)) : NaN;
+  $("compOut").innerHTML = [
+    tile("최종 금액", `<span style="color:${fin >= last.inv ? "var(--up)" : "var(--down)"}">${big(fin)}</span>`, `${last.i}${UNIT_N[u]} 뒤${fin === 0 ? " · 잔고 0" : ""}`),
+    tile("총 수익", big(profit), `넣은 돈 ${big(last.inv)}${last.out > 0 ? ` · 뺀 돈 ${big(last.out)}` : ""}`),
+    tile("총 수익률", cpct(profit / last.inv * 100), `원금 대비 ${(fin / last.inv).toLocaleString("en-US", fin / last.inv < 1 ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: 2 })}배`),
+    tile("두 배가 되는 데", isFinite(dbl) ? `${Math.ceil(dbl).toLocaleString()}${UNIT_N[u]}` : "-", r > 0 ? "추가 입금 없이 복리만으로" : "수익률이 플러스일 때만"),
+  ].join("");
+  drawCompChart(start, u);
+  compShow = 30; drawCompTbl(u);
+  calcCompRev();
+}
+function drawCompChart(start, u) {
+  const W = 600, H = 190, pad = 6, pts = [{ i: 0, bal: start }].concat(compRows);
+  const max = Math.max(...pts.map(p => p.bal)), min = Math.min(...pts.map(p => p.bal), 0);
+  const x = i => pad + (W - 2 * pad) * i / (pts.length - 1 || 1), y = v => H - pad - (H - 2 * pad) * (v - min) / ((max - min) || 1);
+  const d = pts.map((p, k) => `${k ? "L" : "M"}${x(k).toFixed(1)},${y(p.bal).toFixed(1)}`).join("");
+  const up = pts[pts.length - 1].bal >= start, c = up ? "var(--up)" : "var(--down)";
+  $("cChart").innerHTML = `<line x1="${pad}" x2="${W - pad}" y1="${y(start)}" y2="${y(start)}" stroke="var(--line)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+    <path d="${d}L${x(pts.length - 1)},${H - pad}L${pad},${H - pad}Z" fill="${c}" opacity=".12"/>
+    <path d="${d}" fill="none" stroke="${c}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+function drawCompTbl(u) {
+  const rows = compRows.slice(0, compShow), mile = new Set();
+  // 금액이 2배·10배·100배… 를 처음 넘은 줄은 굵게
+  const s0 = num("cStart");
+  let next = 2;
+  for (const r of compRows) { while (r.bal >= s0 * next) { mile.add(r.i); next = next < 10 ? 10 : next * 10; } }
+  const showOut = compRows.some(r => r.out > 0);
+  $("cTbl").innerHTML = `<tr><th>${u === "trade" ? "매매" : UNIT[u]}</th><th>이번 손익</th><th>잔고</th><th>누적 수익률</th>${showOut ? "<th>누적 출금</th>" : ""}</tr>`
+    + rows.map(r => { const prof = r.bal + r.out - r.inv; return `<tr class="${mile.has(r.i) ? "mile" : ""}"><td>${r.i}${UNIT_N[u]}</td><td class="${r.g >= 0 ? "up" : "dn"}">${r.g >= 0 ? "+" : "-"}${big(Math.abs(r.g))}</td><td>${big(r.bal)}</td><td class="${prof >= 0 ? "up" : "dn"}">${cpct(prof / r.inv * 100)}</td>${showOut ? `<td>${big(r.out)}</td>` : ""}</tr>`; }).join("");
+  $("cMore").hidden = compRows.length <= compShow;
+}
+function calcCompRev() {
+  const start = num("cStart"), tgt = num("cTarget"), r = num("cRate") / 100, n = Math.floor(num("cN")), u = segVal.cUnit, wd = Math.min(1, Math.max(0, (num("cWd") || 0) / 100));
+  if (!ok(start) || !ok(tgt)) { $("cRevOut").innerHTML = tile("필요한 값", "-", "시작 금액과 목표 금액을 넣어 주세요"); return; }
+  if (tgt <= start) { $("cRevOut").innerHTML = tile("이미 도달", "-", "목표 금액이 시작 금액보다 작거나 같아요"); return; }
+  const mult = tgt / start, re = r * (1 - wd);
+  const need = re > 0 ? Math.ceil(Math.log(mult) / Math.log(1 + re)) : NaN;
+  const needR = n >= 1 ? (Math.pow(mult, 1 / n) - 1) * 100 : NaN;
+  $("cRevOut").innerHTML = [
+    tile(`지금 수익률(${cpct(r * 100)})로`, isFinite(need) ? `${need.toLocaleString()}${UNIT_N[u]}` : "-", isFinite(need) ? `${big(start)} → ${big(tgt)} (${mult.toLocaleString("en-US", { maximumFractionDigits: 1 })}배)` : "수익률이 플러스여야 도달해요"),
+    tile(`${n >= 1 ? n.toLocaleString() + UNIT_N[u] : "-"} 안에 가려면`, isFinite(needR) ? `한 번에 ${cpct(needR)}` : "-", "추가 입금 없이 복리만으로"),
+  ].join("");
+}
+seg("cUnit", calcComp);
+for (const id of ["cStart", "cRate", "cN", "cAdd", "cWd"]) $(id).addEventListener("input", calcComp);
+$("cTarget").addEventListener("input", calcCompRev);
+$("cMore").onclick = () => { compShow += 100; drawCompTbl(segVal.cUnit); };
+calcComp();
 
 // ── 처음 열 때 ─────────────────────────────
 calcFee();

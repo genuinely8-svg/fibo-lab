@@ -14,7 +14,7 @@
 | Signals | `index.html` | 바이낸스 캔들 → 진입 가격 통계 |
 | Trading Engine (Artha Trading Engine) | `lowsig.html`, `lowsig-core.js` | 비트코인 전용 · 바이낸스 12시간봉 추세추종(v4) 신호, 차트 위 1m~12H 버튼으로 진입2·3·익절·SL 시각 확인 |
 | (코인 상세) | `coin.html` | 바이낸스 + 코인게코 |
-| 계산기 | `calc.html` | 수수료·펀딩비(바이낸스 실시간)·물타기/불타기 평단·청산가 계산 |
+| 계산기 | `calc.html` | 수수료·펀딩비(바이낸스 실시간)·물타기/불타기 평단·청산가·복리 계산 |
 | 청산히트맵 | `liquidation.html` | 바이낸스 OI로 추정한 청산 지도 + 실시간 청산 |
 | OI | `oi.html` | 바이낸스 선물 OI·펀딩비·롱숏 비율 |
 | 코인순위 | `rank.html` | 코인게코 시가총액 순위 |
