@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006232041"></script>
+<script src="theme.js?v=20261006232529"></script>
 <title>Artha Trading Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006232041">
+<link rel="stylesheet" href="common.css?v=20261006232529">
 <style>
   .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end;max-width:560px}
   .grid label{min-width:0}
@@ -129,9 +129,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006232041"></script>
-<script src="nav.js?v=20261006232041"></script>
-<script src="lowsig-core.js?v=20261006232041"></script>
+<script src="common.js?v=20261006232529"></script>
+<script src="nav.js?v=20261006232529"></script>
+<script src="lowsig-core.js?v=20261006232529"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -267,7 +267,7 @@ function labHtml(e) {
 function paintEvents() {
   const ev = result.events.slice().reverse();
   const rows = ev.slice(0, showN).map((e, i) => {
-    const pnl = e.kind === "exit" ? `<span class="${cls(e.pnl)}">${(e.pnl > 0 ? "+" : "") + shortUsd(e.pnl)}</span>` : "";
+    const pnl = e.kind === "exit" ? `<span class="${cls(e.pnl)}">${(e.pnl > 0 ? "+" : e.pnl < 0 ? "-" : "") + Math.abs(Math.round(e.pnl)).toLocaleString("en-US")} USDT</span>` : "";
     const full = kst(e.t), t = `<span class="yr">${full.slice(0, 5)}</span>` + (e.exact ? full.slice(5) : full.slice(5, 10));
     return `<tr class="click${selEv === e ? " sel" : ""}" data-i="${ev.length - 1 - i}">
       <td class="l notranslate" translate="no"><span class="tlink" title="차트에서 보기"><svg class="ci" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13h12M3 10l3-3 2.5 2L13 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${t}</span></span></td><td class="l">${labHtml(e)}</td>
