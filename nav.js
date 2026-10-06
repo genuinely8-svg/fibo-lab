@@ -6,6 +6,7 @@
 (function () {
   const TABS = [
     ["index.html", "Signals"],
+    ["lowsig.html", "Low Signals"],
     ["paper.html", "모의투자"],
     ["calc.html", "계산기"],
     ["market.html", "시장 방향"],
@@ -206,7 +207,7 @@
   new MutationObserver(() => { if (!t) t = setTimeout(() => { t = null; mark(); }, 200); }).observe(document.body, { childList: true, subtree: true });
   const holder = document.createElement("div"); holder.id = "gt_el"; document.body.appendChild(holder);
   // 탭 이름은 기계번역이 어색해서("청산히트맵" → "Cheongsan Heatmap") 다른 언어에서는 정해 둔 영어 이름으로
-  const EN = { "index.html": "Signals", "paper.html": "Paper Trading", "calc.html": "Calculator", "market.html": "Market Direction",
+  const EN = { "index.html": "Signals", "lowsig.html": "Low Signals", "paper.html": "Paper Trading", "calc.html": "Calculator", "market.html": "Market Direction",
                "liquidation.html": "Liquidation Map", "oi.html": "OI", "rank.html": "Rankings", "movers.html": "Top Movers", "news.html": "News" };
   for (const a of nav.querySelectorAll(".navtabs a")) { const n = EN[a.getAttribute("href")]; if (n) { a.textContent = n; a.classList.add("notranslate"); a.translate = false; } }
   // 원래 영어로 만든 페이지(모의투자: <html lang="en">)는 번역하지 않음 → 가격·주문 칸이 계속 바뀌어도 깜빡이지 않게
