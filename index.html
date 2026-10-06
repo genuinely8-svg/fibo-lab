@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006200806"></script>
+<script src="theme.js?v=20261006201101"></script>
 <title>Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -331,7 +331,7 @@
   <!-- 차트 묶음: 평소엔 숨겨져 있다가, 코인을 누르면 그 줄 바로 아래로 옮겨져서 펼쳐짐 -->
   <div id="chartHolder" hidden><div id="chartPanel">
     <div class="chead">
-      <h2 id="chartTitle"><span id="chartTitleText">차트</span> <span id="barCd" style="margin-left:10px;font-size:13px;font-weight:400"></span></h2>
+      <h2 id="chartTitle"><span id="chartTitleText">차트</span> <span id="barCd" class="notranslate" translate="no" style="margin-left:10px;font-size:13px;font-weight:400"></span></h2>
       <div class="tabs">
         <button id="tabLw" class="on">분석 차트</button>
         <button id="tabTv"><img class="tvlogo" src="https://static.tradingview.com/static/images/favicon.ico" alt="TradingView" onerror="this.remove()">트레이딩뷰</button>
@@ -352,10 +352,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261006200806"></script>
-<script src="chart.js?v=20261006200806"></script>
-<script src="nav.js?v=20261006200806"></script>
-<script src="meta.js?v=20261006200806"></script>
+<script src="fib-core.js?v=20261006201101"></script>
+<script src="chart.js?v=20261006201101"></script>
+<script src="nav.js?v=20261006201101"></script>
+<script src="meta.js?v=20261006201101"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -367,6 +367,8 @@ const EX = {
 };
 const BINANCE_INTERVAL = { 240: "4h", 120: "2h", 60: "1h", 30: "30m", 15: "15m" };
 const $ = id => document.getElementById(id);
+const KO = (window.ARTHA_LANG || "ko") === "ko";   // 한국어가 아니면 자주 바뀌는 표·카드는 영어로 직접 쓰고 구글 번역에서 제외 (번역이 따라가며 움찔거림)
+const NT = KO ? "" : ' translate="no"';           // 표 줄·카드에 붙이는 "번역하지 마" 표시
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let results = [];          // 코인별 분석 결과
 let openCoin = null;       // 차트가 펼쳐져 있는 코인 (없으면 null)
@@ -586,7 +588,8 @@ const err = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
 function badge(cur) {
   const l = FibCore.label(cur);
   const cls = { "진입 구간": "b-hit", "진입 근접": "b-near", "이탈": "b-out", "대기": "b-wait" }[l];
-  return `<span class="badge ${cls}">${l}</span>`;
+  const txt = KO ? l : ({ "진입 구간": "In zone", "진입 근접": "Near entry", "이탈": "Broken", "대기": "Waiting" }[l] || l);
+  return `<span class="badge ${cls}">${txt}</span>`;
 }
 
 // 순위: ① 진입 구간 → ② 진입 근접 → ③ 이탈 → ④ 대기 (진입가에 가까운 순, 진입가 없는 건 맨 뒤) → ⑤ 오류
@@ -616,7 +619,6 @@ function evHtml(r, withTd) {
 }
 
 // 요약줄·실시간 표시는 자주 바뀌어서 구글 번역이 따라가다 깜빡임 → 한국어가 아니면 영어로 직접 쓰고 번역에서 제외
-const KO = (window.ARTHA_LANG || "ko") === "ko";
 let lastSummary = "";
 if (!KO) $("live").querySelector("b").textContent = "Getting ready";
 function renderSummary() {
@@ -649,7 +651,7 @@ function rowTds(r, rank, name) {
       <td class="lv">${won(c?.level)}</td>
       <td class="ds${c?.level && c.distance < 0 ? " up" : ""}">${pct(c?.distance)}</td>
       <td class="st">${badge(c)}</td>
-      <td class="${few}">${s.count}회</td>
+      <td class="${few}">${s.count}${KO ? "회" : "x"}</td>
       <td class="up">${pct(s.reboundAvg)}${err(s.reboundErr)}</td>
       <td class="down">${pct(s.fallAvg)}${err(s.fallErr)}</td>
       <td>${pct(s.winRate)}</td>
@@ -696,8 +698,8 @@ function renderTable() {
     const logo = logoHtml(r.market);
     const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
       + `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a></div>`;
-    if (r.error) return `<tr><td class="rk">-</td><td>${name}</td><td colspan="10" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
-    const row = `<tr data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}${isLow(r) ? " lowsample" : ""}" title="${isLow(r) ? LOW_TIP : ROW_TIP}">${rowTds(r, ++rank, name)}</tr>`;
+    if (r.error) return `<tr${NT}><td class="rk">-</td><td>${name}</td><td colspan="10" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
+    const row = `<tr${NT} data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}${isLow(r) ? " lowsample" : ""}" title="${isLow(r) ? LOW_TIP : ROW_TIP}">${rowTds(r, ++rank, name)}</tr>`;
     // 펼친 코인이면 바로 아래에 차트 줄을 하나 더
     return r.market === openCoin ? row + `<tr class="exp"><td colspan="12" id="expCell"></td></tr>` : row;
   }).join("");
@@ -721,13 +723,13 @@ function cardParts(r) {
   const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
   return {
     st: badge(c),
-    c2: `<span class="px">${won(r.price)}</span><span class="arrow">→</span>진입 <span class="lv">${won(c?.level)}</span>${dist}`,
-    c3: `${LBL[dir].avg} <span class="up">${pct(s.reboundAvg)}</span> · 터치 <span class="${s.count < 5 ? "few" : ""}">${s.count}회</span>${more}`,
+    c2: `<span class="px">${won(r.price)}</span><span class="arrow">→</span>${KO ? "진입" : "Entry"} <span class="lv">${won(c?.level)}</span>${dist}`,
+    c3: `${LB().avg} <span class="up">${pct(s.reboundAvg)}</span> · ${KO ? "터치" : "Touches"} <span class="${s.count < 5 ? "few" : ""}">${s.count}${KO ? "회" : ""}</span>${more}`,
     cdet: `
-          <div><span>${LBL[dir].adv}</span><b class="down">${pct(s.fallAvg)}</b></div>
-          <div><span>${LBL[dir].win}</span><b>${pct(s.winRate)}</b></div>
-          <div><span>${LBL[dir].exp}</span><b class="xp">${won(c?.expected)}</b></div>
-          <div><span>기대값(참고)</span><b>${evHtml(r, false)}</b></div>
+          <div><span>${LB().adv}</span><b class="down">${pct(s.fallAvg)}</b></div>
+          <div><span>${LB().win}</span><b>${pct(s.winRate)}</b></div>
+          <div><span>${LB().exp}</span><b class="xp">${won(c?.expected)}</b></div>
+          <div><span>${KO ? "기대값(참고)" : "Expected value"}</span><b>${evHtml(r, false)}</b></div>
         `,
   };
 }
@@ -736,10 +738,10 @@ function renderCards(rows) {
   $("cards").innerHTML = rows.filter(r => !r.error || mode === "watch").map(r => {
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
     const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
-    if (r.error) return `<div class="ccard"><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
+    if (r.error) return `<div class="ccard"${NT}><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
       <div class="c3">${r.error}${more}</div></div>`;
     const open = r.market === openCoin, p = cardParts(r);
-    return `<div class="ccard${open ? " open" : ""}${isLow(r) ? " lowsample" : ""}" data-m="${r.market}"${isLow(r) ? ` title="${LOW_TIP}"` : ""}>
+    return `<div${NT} class="ccard${open ? " open" : ""}${isLow(r) ? " lowsample" : ""}" data-m="${r.market}"${isLow(r) ? ` title="${LOW_TIP}"` : ""}>
       <div class="c1"><span class="rk">${++rank}</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}<span class="st" style="margin-left:auto;text-align:right">${p.st}</span></div>
       <div class="c2">${p.c2}</div>
       <div class="c3">${p.c3}</div>
@@ -890,6 +892,11 @@ const LBL = {
   long:  { avg: "평균 반등",   adv: "평균 추가하락", win: "반등 우세",   exp: "예상 반등가",   mark: "▲" },
   short: { avg: "평균 하락", adv: "평균 추가상승", win: "하락 우세", exp: "예상 하락가", mark: "▼" },
 };
+const LBL_EN = {
+  long:  { avg: "Avg bounce", adv: "Avg further drop", win: "Bounce win rate", exp: "Expected bounce" },
+  short: { avg: "Avg drop", adv: "Avg further rise", win: "Drop win rate", exp: "Expected drop" },
+};
+const LB = () => (KO ? LBL : LBL_EN)[dir];       // 카드 안 글자 (카드는 번역에서 빠져서 직접 영어로)
 function applyDirUI() {
   const L = LBL[dir];
   document.documentElement.dataset.dir = dir;               // 모드 색(--accent)이 여기서 바뀜
@@ -953,7 +960,7 @@ function tickCountdown() {
   const u = unitMs(), left = Math.max(0, Math.ceil(((barIdx() + 1) * u - Date.now()) / 1000));
   const h = Math.floor(left / 3600), m = String(Math.floor(left % 3600 / 60)).padStart(2, "0"), s = String(left % 60).padStart(2, "0");
   const stale = lastBar != null && barIdx() > lastBar && Date.now() % u > STALE_GRACE;
-  el.innerHTML = `봉 마감까지 ${h ? h + ":" : ""}${m}:${s}` + (stale ? ` <span style="color:#e5484d;font-weight:700">갱신 지연</span>` : "");
+  el.innerHTML = `${KO ? "봉 마감까지" : "Candle closes in"} ${h ? h + ":" : ""}${m}:${s}` + (stale ? ` <span style="color:#e5484d;font-weight:700">${KO ? "갱신 지연" : "Update delayed"}</span>` : "");
 }
 setInterval(tickCountdown, 1000); tickCountdown();
 $("auto").onchange = () => { setAuto(); saveSettings(); };
