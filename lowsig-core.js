@@ -150,7 +150,7 @@
       open = {
         s: pos.s, n, fills: pos.fills, avg, stop: pos.stop, e1: pos.e1, a0: pos.a0,
         next: n < 3 ? pos.e1 + pos.s * pos.a0 * (n === 1 ? P.add1 : P.add2) : null,
-        upnl: pos.s * (last.c - avg) * pos.unit * n, base: pos.base,
+        upnl: pos.s * (last.c - avg) * pos.unit * n, base: pos.base, qty: pos.unit * n,
       };
     }
     // 다음 12시간봉 마감 때 진입1 이 나오려면 종가가 얼마를 넘어야 하나

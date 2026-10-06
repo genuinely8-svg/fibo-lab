@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006222042"></script>
-<title>Low Signals · Artha</title>
+<script src="theme.js?v=20261006223444"></script>
+<title>Artha Trend Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006222042">
+<link rel="stylesheet" href="common.css?v=20261006223444">
 <style>
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
@@ -57,7 +57,7 @@
   <nav id="nav"></nav>
 
   <div class="card">
-    <h2>Low Signals · 12시간봉 추세추종</h2>
+    <h2>Artha Trend Engine</h2>
     <p class="sub">신호는 <b>12시간봉</b>으로 계산하고(진입1은 봉 마감 때 확정), 진입2·진입3·익절·SL이 <b>정확히 언제·얼마에</b> 일어났는지 보고 싶으면 아래에서 분봉을 고르세요. 분봉은 처음 한 번 바이낸스에서 받아 오느라 시간이 걸리고, 그다음부터는 이 브라우저에 저장돼서 빨라요.</p>
     <div class="grid">
       <label>코인<input id="coin" value="BTC" placeholder="코인 검색 (예: 비트, SOL)"></label>
@@ -86,6 +86,7 @@
   <div class="card">
     <div class="state" id="state"></div>
     <div class="tiles" id="now"></div>
+    <p class="foot" style="margin:10px 0 0">실제로 거래한 기록이 아니라, 과거 차트에 같은 규칙을 적용해 계산한 결과예요. 수수료 0.05% 포함, 펀딩비 미포함.</p>
   </div>
 
   <div class="card">
@@ -112,11 +113,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006222042"></script>
-<script src="nav.js?v=20261006222042"></script>
-<script src="meta.js?v=20261006222042"></script>
-<script src="coinpicker.js?v=20261006222042"></script>
-<script src="lowsig-core.js?v=20261006222042"></script>
+<script src="common.js?v=20261006223444"></script>
+<script src="nav.js?v=20261006223444"></script>
+<script src="meta.js?v=20261006223444"></script>
+<script src="coinpicker.js?v=20261006223444"></script>
+<script src="lowsig-core.js?v=20261006223444"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -222,7 +223,7 @@ async function run() {
     if (my !== runId) return;
     if (bars12.length < LowSig.P.trendLen + 10) throw new Error(`${sym}는 12시간봉이 ${bars12.length}개뿐이라 400개 이평을 계산할 수 없어요 (최근 상장 코인)`);
     const lastT = bars12[bars12.length - 1].t;
-    const cKey = `lowsig-v3|${sym}|${fineTf}|${dir}|${lastT}`;
+    const cKey = `lowsig-v4|${sym}|${fineTf}|${dir}|${lastT}`;
     const hit = cacheGet(cKey, 13 * 3600e3);
     // 규칙: 진입2·3이 체결되는 순간 손절선을 바로 다시 계산 (자동매매 봇과 같음)
     let partial = false;
@@ -261,41 +262,30 @@ async function run() {
 // ── 그리기 ─────────────────────────────────────────────
 function paintAll() { paintNow(); paintEvents(); drawChart(null); }
 
+// 성적 카드: 같은 규칙을 2020년부터 과거 차트에 적용한 결과 (백테스트)
 function paintNow() {
   const r = result, s = r.stats, o = r.open, P = LowSig.P;
   const cur = isFinite(lastPrice) ? lastPrice : s.lastClose;
-  const dist = v => isFinite(v) && cur ? ` <small class="muted">(${pct((v - cur) / cur * 100)})</small>` : "";
-  let pill;
-  if (o) {
-    const nm = o.s === 1 ? "롱" : "숏";
-    pill = `<span class="pill ${o.s === 1 ? "long" : "short"}">${nm} 보유 중 · 진입${o.n}까지</span>`;
-  } else pill = `<span class="pill wait">대기 중 (포지션 없음)</span>`;
-  $("state").innerHTML = pill + `<span class="cd notranslate" translate="no" id="cd"></span>`;
-  const tiles = [];
-  tiles.push(["현재가", `<span class="notranslate" translate="no" id="curPx">${px(cur)}</span>`, `12시간봉 마지막 종가 ${px(s.lastClose)}`]);
-  tiles.push(["12시간봉 400개 이평", px(s.ma) + dist(s.ma), s.lastClose > s.ma ? "종가가 이평 위 → 롱만 찾는 구간" : "종가가 이평 아래 → 숏만 찾는 구간"]);
-  if (o) {
-    const nm = o.s === 1 ? "롱" : "숏";
-    tiles.push(["진입 가격", o.fills.map(f => `<span class="notranslate" translate="no">${px(f.px)}</span>`).join("<br>"), o.fills.map(f => `진입${f.n} ${kst(f.t, false)}`).join(" · ")]);
-    tiles.push(["평균 단가", px(o.avg), `${nm} ${o.n}번 진입`]);
-    tiles.push(["지금 손절선", `<span class="up">${px(o.stop)}</span>` + dist(o.stop), "닿는 순간 전량 청산 · 진입2·3 체결 즉시와 12시간봉 마감 때 갱신"]);
-    tiles.push(["다음 불타기", o.next ? px(o.next) + dist(o.next) : "-", o.next ? `진입${o.n + 1} 가격 (닿는 순간)` : "3번 다 들어감"]);
-    const upnlPct = o.upnl / o.base * 100;
-    tiles.push(["평가 손익 (계좌 대비)", `<span class="${cls(upnlPct)}">${pct(upnlPct)}</span>`, "12시간봉 마지막 종가 기준"]);
-  } else {
-    const L = Math.max(s.ma, s.nextHH), S = Math.min(s.ma, s.nextLL);
-    if (dir !== "short") tiles.push(["롱 진입1 조건", `종가 &gt; ${px(L)}` + dist(L), "다음 12시간봉 마감 때 이 가격 위로 닫히면"]);
-    if (dir !== "long") tiles.push(["숏 진입1 조건", `종가 &lt; ${px(S)}` + dist(S), "다음 12시간봉 마감 때 이 가격 아래로 닫히면"]);
-  }
+  const profit = o ? o.s * (cur - o.avg) * o.qty : 0;            // 지금 들고 있는 포지션의 평가 손익
+  const realized = s.equity - P.capital;                          // 끝난 매매들의 손익 합계
+  const nowEq = s.equity + profit;
+  const lose = s.trades - s.wins;
+  const n = v => `<span class="notranslate" translate="no">${v}</span>`;
+  const usdt = v => Math.round(v).toLocaleString("en-US") + " USDT";
+  const sgn = v => (v > 0 ? "+" : v < 0 ? "-" : "") + Math.abs(Math.round(v)).toLocaleString("en-US") + " USDT";
+  $("state").innerHTML = `<span class="pill wait">과거 검증 · 같은 규칙을 2020년부터 적용했다면</span>`;
+  const tiles = [
+    ["스타트", n(usdt(P.capital)), "2020년 1월 시작"],
+    ["현재", n(`<span class="${cls(nowEq - P.capital)}">${usdt(nowEq)}</span>`), n(pct((nowEq - P.capital) / P.capital * 100))],
+    ["총 트레이딩 횟수", n(s.trades + "번" + (o ? " + 진행 중 1" : "")), "진입부터 청산까지 1번으로 셈"],
+    ["WIN / LOSE", n(`<span class="up">${s.wins}</span> / <span class="down">${lose}</span>`), "승률 " + n((s.trades ? s.wins / s.trades * 100 : 0).toFixed(0) + "%")],
+    ["총 PNL", n(`<span class="${cls(realized)}">${sgn(realized)}</span>`), "끝난 매매의 손익 합계 (수수료 포함)"],
+    ["현재 포지션", o ? `<span class="${o.s === 1 ? "up" : "down"}">${o.s === 1 ? "롱" : "숏"}</span> ${n("진입" + o.n)}` : "—",
+      o ? "평단 " + n(px(o.avg)) + " · 손절 " + n(px(o.stop)) : "포지션 없음"],
+    ["현재 프로핏", o ? n(`<span class="${cls(profit)}" id="curProfit">${sgn(profit)}</span>`) : "—",
+      o ? "현재가 " + n(`<span id="curPx">${px(cur)}</span>`) + " 기준" : "포지션 없음"],
+  ];
   $("now").innerHTML = tiles.map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
-  tickCountdown();
-}
-function tickCountdown() {
-  const el = $("cd"); if (!el) return;
-  const next = Math.ceil((Date.now() + 1) / H12) * H12, left = next - Date.now();
-  const h = Math.floor(left / 3600e3), m = Math.floor(left % 3600e3 / 60e3), s = Math.floor(left % 60e3 / 1000), p = n => String(n).padStart(2, "0");
-  const KO = (window.ARTHA_LANG || "ko") === "ko";
-  el.innerHTML = KO ? `다음 12시간봉 마감까지 <b>${p(h)}:${p(m)}:${p(s)}</b> (${kst(next, false)})` : `Next 12h close in <b>${p(h)}:${p(m)}:${p(s)}</b> (${kst(next, false)} KST)`;
 }
 
 function accOf(e) {
@@ -412,7 +402,7 @@ async function tickPrice() {
   try {
     const j = await bnGet(`${F}/fapi/v1/ticker/price?symbol=${sym}USDT`);
     lastPrice = +j.price;
-    const el = $("curPx"); if (el) el.textContent = px(lastPrice);
+    if (result && result.open) paintNow();
   } catch (e) {}
 }
 
@@ -427,7 +417,6 @@ $("run").onclick = run;
 $("moreEv").onclick = () => { showN += 60; paintEvents(); };
 $("toLatest").onclick = () => { selEv = null; for (const x of $("evBody").querySelectorAll("tr.sel")) x.classList.remove("sel"); drawChart(null); };
 CoinPicker.attach($("coin"), { onPick: () => { lastPrice = NaN; run(); } });
-setInterval(tickCountdown, 1000);
 setInterval(() => { if (!document.hidden) tickPrice(); }, 10e3);
 // 12시간봉이 새로 마감되면(오전·오후 9시) 다시 계산
 let lastSeen = Math.floor(Date.now() / H12);
