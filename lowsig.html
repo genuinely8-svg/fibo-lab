@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261006203652"></script>
+<script src="theme.js?v=20261006212911"></script>
 <title>Low Signals · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261006203652">
+<link rel="stylesheet" href="common.css?v=20261006212911">
 <style>
-  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;grid-auto-flow:dense}
   .grid label{min-width:0}
   .grid input,.grid select{width:100%;min-width:0}
   .grid .seg{display:flex}
@@ -40,15 +40,11 @@
   .acc{font-size:11px;font-weight:600;padding:2px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
   .acc.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
   .acc.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--line))}
-  .cmp{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:0}
-  .cmp div{padding:9px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;text-align:right}
-  .cmp div:nth-child(3n+1){text-align:left;color:var(--muted);font-size:13px}
-  .cmp .h{font-size:12px;color:var(--muted);font-weight:600}
   .more{margin-top:10px}
   @media (max-width:700px){
     .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     #chart{height:360px}
-    table.ev th:nth-child(4),table.ev td:nth-child(4){display:none}        /* 휴대폰: 정확도 칸 숨김 */
+          table.ev th:nth-child(4),table.ev td:nth-child(4){display:none}        /* 휴대폰: 정확도 칸 숨김 */
     .lab{font-size:12px;padding:2px 6px}
     table.ev .yr{display:none}                                              /* 휴대폰: 연도 숨김 */
     .cp-list{width:min(320px,calc(100vw - 40px))!important}
@@ -110,24 +106,17 @@
     <button type="button" class="ghost more" id="moreEv" hidden>더 보기</button>
   </div>
 
-  <div class="card">
-    <h2>12시간봉만 볼 때 vs 짧은 봉으로 확인할 때</h2>
-    <p class="sub">같은 규칙을 2020년부터 계좌 50,000달러로 돌린 결과예요. 12시간봉만 보면 한 봉 안에서 불타기와 손절 중 무엇이 먼저였는지 몰라서 "손절이 먼저"라고 가정해요.</p>
-    <div class="cmp" id="cmp"></div>
-    <p class="note foot" id="cmpNote" style="margin:12px 0 0"></p>
-  </div>
-
   <p class="foot">규칙: 12시간봉 종가가 400개 이평 위 + 직전 40개 최고가 돌파 → 롱 진입1 (숏은 반대). ATR(28) 1·2배 유리하게 가면 진입2·3.
-    손절은 계좌 2%를 잃는 가격(롱 4배·숏 2배를 3번 나눠 진입 기준)과 추적 손절(최고/최저가 ∓ ATR x 3) 중 유리한 쪽, 12시간봉 종가가 400개 이평 반대편이면 청산.
+    손절은 계좌 2%를 잃는 가격(롱 4배·숏 2배를 3번 나눠 진입 기준, 진입2·3이 체결되는 순간 바로 다시 계산)과 추적 손절(최고/최저가 ∓ ATR x 3) 중 유리한 쪽, 12시간봉 종가가 400개 이평 반대편이면 청산.
     수수료 0.05% 반영, 펀딩비는 빠져 있어요. 참고용 도구이며 투자 조언이 아닙니다.</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261006203652"></script>
-<script src="nav.js?v=20261006203652"></script>
-<script src="meta.js?v=20261006203652"></script>
-<script src="coinpicker.js?v=20261006203652"></script>
-<script src="lowsig-core.js?v=20261006203652"></script>
+<script src="common.js?v=20261006212911"></script>
+<script src="nav.js?v=20261006212911"></script>
+<script src="meta.js?v=20261006212911"></script>
+<script src="coinpicker.js?v=20261006212911"></script>
+<script src="lowsig-core.js?v=20261006212911"></script>
 <script>
 const F = "https://fapi.binance.com";
 const H12 = 12 * 3600e3, KST = 9 * 3600;
@@ -144,7 +133,7 @@ const kst = (ms, withYear = true) => {
 };
 
 let dir = "both", sym = "BTC", fineTf = "1m";
-let bars12 = [], result = null, coarse = null, showN = 40, selEv = null, lastPrice = NaN, runId = 0;
+let bars12 = [], result = null, showN = 40, selEv = null, lastPrice = NaN, runId = 0;
 const fineCache = new Map();          // `${sym}|${tf}|${barT}` → 짧은 봉 배열
 
 // ── 데이터 ─────────────────────────────────────────────
@@ -197,14 +186,15 @@ async function run() {
     if (my !== runId) return;
     if (bars12.length < LowSig.P.trendLen + 10) throw new Error(`${sym}는 12시간봉이 ${bars12.length}개뿐이라 400개 이평을 계산할 수 없어요 (최근 상장 코인)`);
     const lastT = bars12[bars12.length - 1].t;
-    const cKey = `lowsig-v1|${sym}|${fineTf}|${dir}|${lastT}`;
+    const cKey = `lowsig-v3|${sym}|${fineTf}|${dir}|${lastT}`;
     const hit = cacheGet(cKey, 13 * 3600e3);
-    coarse = await LowSig.run(bars12, { dir, startT: START });
+    // 규칙: 진입2·3이 체결되는 순간 손절선을 바로 다시 계산 (자동매매 봇과 같음)
+    const coarse = await LowSig.run(bars12, { dir, startT: START, tight: true });
     if (hit) result = hit;
     else if (fineTf === "12h") result = coarse;
     else {
       // 12시간봉 결과에서 "봉 안을 확인해야 하는 봉"을 먼저 한꺼번에 받아 두고, 짧은 봉으로 다시 계산
-      const need = coarse.touchBars.map(t => bars12.find(b => b.t === t)).filter(Boolean);
+      const need = bars12.filter(b => coarse.touchBars.includes(b.t));
       bar.hidden = false;
       await prefetch(sym, fineTf, need, (d, n) => {
         if (my !== runId) return;
@@ -212,8 +202,10 @@ async function run() {
         bar.firstElementChild.style.width = (d / n * 100) + "%";
       });
       if (my !== runId) return;
-      result = await LowSig.run(bars12, { dir, startT: START, fine: async b => { try { return await fineBars(sym, fineTf, b); } catch (e) { return null; } } });
-      cacheSet(cKey, { events: result.events, trades: result.trades.map(t => ({ s: t.s, t0: t.t0, t1: t.t1, pnl: t.pnl, ret: t.ret })), open: result.open, stats: result.stats });
+      const fine = async b => { try { return await fineBars(sym, fineTf, b); } catch (e) { return null; } };
+      const r = await LowSig.run(bars12, { dir, startT: START, fine, tight: true });
+      result = { events: r.events, open: r.open, stats: r.stats };
+      cacheSet(cKey, result);
     }
     if (my !== runId) return;
     bar.hidden = true;
@@ -228,7 +220,7 @@ async function run() {
 }
 
 // ── 그리기 ─────────────────────────────────────────────
-function paintAll() { paintNow(); paintEvents(); paintCompare(); drawChart(null); }
+function paintAll() { paintNow(); paintEvents(); drawChart(null); }
 
 function paintNow() {
   const r = result, s = r.stats, o = r.open, P = LowSig.P;
@@ -247,7 +239,7 @@ function paintNow() {
     const nm = o.s === 1 ? "롱" : "숏";
     tiles.push(["진입 가격", o.fills.map(f => `<span class="notranslate" translate="no">${px(f.px)}</span>`).join("<br>"), o.fills.map(f => `진입${f.n} ${kst(f.t, false)}`).join(" · ")]);
     tiles.push(["평균 단가", px(o.avg), `${nm} ${o.n}번 진입`]);
-    tiles.push(["지금 손절선", `<span class="up">${px(o.stop)}</span>` + dist(o.stop), "닿는 순간 전량 청산 (12시간봉 마감 때 갱신)"]);
+    tiles.push(["지금 손절선", `<span class="up">${px(o.stop)}</span>` + dist(o.stop), "닿는 순간 전량 청산 · 진입2·3 체결 즉시와 12시간봉 마감 때 갱신"]);
     tiles.push(["다음 불타기", o.next ? px(o.next) + dist(o.next) : "-", o.next ? `진입${o.n + 1} 가격 (닿는 순간)` : "3번 다 들어감"]);
     const upnlPct = o.upnl / o.base * 100;
     tiles.push(["평가 손익 (계좌 대비)", `<span class="${cls(upnlPct)}">${pct(upnlPct)}</span>`, "12시간봉 마지막 종가 기준"]);
@@ -297,26 +289,6 @@ function paintEvents() {
     drawChart(selEv);
     $("chart").scrollIntoView({ behavior: "smooth", block: "center" });
   };
-}
-
-function paintCompare() {
-  const a = coarse.stats, b = result.stats, same = result === coarse;
-  const row = (k, f) => `<div>${k}</div><div class="notranslate" translate="no">${f(a)}</div><div class="notranslate" translate="no">${same ? "-" : f(b)}</div>`;
-  const posWin = s => `${s.trades ? (s.wins / s.trades * 100).toFixed(0) : 0}% <small class="muted">(${s.wins}/${s.trades})</small>`;
-  $("cmp").innerHTML = `<div class="h">2020년~ · 50,000달러</div><div class="h">12시간봉만</div><div class="h">${TF_KO[fineTf]}으로 확인</div>` +
-    row("총 수익률", s => `<span class="${cls(s.ret)}">${pct(s.ret * 100)}</span>`) +
-    row("최종 자금", s => "$" + Math.round(s.equity).toLocaleString("en-US")) +
-    row("최대 낙폭", s => (s.mdd * 100).toFixed(1) + "%") +
-    row("이긴 매매 / 전체", posWin) +
-    row("수익 팩터", s => isFinite(s.pf) ? s.pf.toFixed(2) : "∞");
-  if (same) { $("cmpNote").textContent = "12시간봉을 골라서 봉 안 시점은 확인하지 않았어요. 위에서 1분봉 등을 고르면 비교가 나와요."; return; }
-  const unknown = coarse.events.filter(e => !e.exact).length;
-  const guess = result.events.filter(e => e.same).length;
-  const diffTrades = Math.abs(result.trades.length - coarse.trades.length);
-  $("cmpNote").innerHTML = `12시간봉만 볼 때 시각을 알 수 없던 신호 <b>${unknown}개</b>를 ${TF_KO[fineTf]}으로 확인했어요.` +
-    (guess ? ` 그중 <b>${guess}개</b>는 ${TF_KO[fineTf]} 하나 안에서 불타기와 손절이 같이 일어나 순서를 추정했어요 (1분봉을 고르면 줄어요).` : "") +
-    (diffTrades ? ` 확인 결과 매매 횟수가 ${diffTrades}번 달라졌어요.` : "") +
-    ` 진입2·3이 들어간 뒤 같은 12시간봉 안에서 손절되면, 손절선이 아직 진입1 기준이라 손실이 계좌 2%보다 커질 수 있어요.`;
 }
 
 // ── 차트 ─────────────────────────────────────────────

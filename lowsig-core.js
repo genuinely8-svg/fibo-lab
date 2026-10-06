@@ -40,11 +40,12 @@
 
   /*
     B: 닫힌 12시간봉 [{t,o,h,l,c}] (오래된 것부터, t = 봉 시작 ms)
-    opts: { dir: "both"|"long"|"short", startT: 이 시각 이후 신호만, fine: async (bar) => 짧은 봉 배열 또는 null }
+    opts: { dir: "both"|"long"|"short", startT: 이 시각 이후 신호만, fine: async (bar) => 짧은 봉 배열 또는 null,
+            tight: true 면 진입2·3이 체결되는 순간 손절선을 바로 다시 계산 (전체 손실 계좌 2% 이내로) }
     반환 { events, trades, open, stats, touchBars }
   */
   async function run(B, opts = {}) {
-    const dir = opts.dir || "both", startT = opts.startT || 0, fine = opts.fine || null;
+    const dir = opts.dir || "both", startT = opts.startT || 0, fine = opts.fine || null, tight = !!opts.tight;
     const I = calc(B);
     const events = [], trades = [], touchBars = [];
     let eq = P.capital, peak = eq, mdd = 0;
@@ -55,6 +56,11 @@
       const n = pos.fills.length + 1;
       pos.fills.push({ px, t, n });
       events.push({ t, px, kind: "entry", s: pos.s, n, label: "진입" + n, exact, same: !!same, trade: trades.length });
+      // 체결 즉시 손절선 올리기: 지금까지 산 물량 전체가 손절돼도 계좌 2%(lossCap)만 잃는 가격으로 (유리한 쪽으로만)
+      if (tight && n > 1) {
+        const avg = pos.fills.reduce((a, f) => a + f.px, 0) / n, dist = pos.lossCap / (pos.unit * n);
+        pos.stop = pos.s === 1 ? Math.max(pos.stop, avg - dist) : Math.min(pos.stop, avg + dist);
+      }
     }
     function close(px, t, why, exact, same) {
       const s = pos.s, parts = [];
@@ -97,9 +103,17 @@
               exited = true;
               break;
             }
+            let added = false;
             while (hitAdd(c)) {
               const lvl = nextLvl();
               addFill(s === 1 ? Math.max(c.o, lvl) : Math.min(c.o, lvl), t, exact);
+              added = true;
+            }
+            // 손절선을 바로 올린 경우, 같은 봉 안에서 새 손절선에도 닿았으면 순서를 모르니 손절로 봄 (보수적)
+            if (added && tight && hitStop(c)) {
+              close(pos.stop, t, "stop", exact, true);
+              exited = true;
+              break;
             }
           }
         }
@@ -147,6 +161,7 @@
     const stats = {
       trades: trades.length, wins: wins.length, ret: (eq - P.capital) / P.capital, equity: eq, mdd,
       pf: gl > 0 ? gw / gl : (gw > 0 ? Infinity : 0),
+      worst: trades.length ? Math.min(...trades.map(t => t.ret)) : null,
       ma: I.ma[li], atr: I.atr[li], lastClose: last ? last.c : NaN, lastT: last ? last.t : NaN, nextHH, nextLL,
     };
     return { events, trades, open, stats, touchBars };
