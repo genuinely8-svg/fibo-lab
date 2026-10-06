@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script src="theme.js?v=20261007004002"></script>
+<script src="theme.js?v=20261007005010"></script>
 <title>Paper Trading · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261007004002">
+<link rel="stylesheet" href="common.css?v=20261007005010">
 <style>
   html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
   /* 아이폰: 입력칸 글자가 16px 보다 작으면 누를 때 화면이 확대돼서, 터치 기기에서는 입력칸을 16px 로 */
@@ -199,6 +199,22 @@
   .sheet .dots i{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--card);border:2px solid var(--muted);z-index:1;pointer-events:none}
   .sheet .dots i:nth-of-type(1){left:0} .sheet .dots i:nth-of-type(2){left:25%} .sheet .dots i:nth-of-type(3){left:50%} .sheet .dots i:nth-of-type(4){left:75%} .sheet .dots i:nth-of-type(5){left:100%}
   .sheet .confirm{width:100%;margin-top:14px;padding:14px;font-size:16px;border-radius:10px;background:var(--text);color:var(--bg)}
+  /* TP/SL 시트 (전체 / 부분 / 트레일링) */
+  .tpss .ttabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin:4px 0 10px;overflow-x:auto}
+  .tpss .ttabs button{background:none;border:0;border-radius:0;padding:8px 0;color:var(--muted);font-size:14px;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tpss .ttabs button.on{color:var(--text);font-weight:700;border-bottom-color:var(--text)}
+  .tpss .tpk{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:14px;font-weight:600}
+  .tpss .lastt{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-weight:400}
+  .tpss .tpr{margin:6px 0 4px}
+  .tpss .pin.roi{flex:0 0 110px} .tpss .pin.roi input{padding-right:28px}
+  .tpss .dots{margin:8px 8px 2px}
+  .tpss .dl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:0 0 6px}
+  .tpss .gap{height:6px;border-bottom:1px dashed var(--line);margin:8px 0 2px}
+  .tpss .chips5{display:flex;gap:6px;margin:2px 0 4px} .tpsl .chips5 button{flex:1;padding:6px 0;font-size:12.5px}
+  .tpss .pth{font-size:14px;margin:16px 0 4px}
+  .tpss .ptl{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums}
+  .tpss .ptl button{flex:none}
+  .x2{display:block;font-size:11.5px;color:var(--muted)} .x2.o{color:#f59e0b}
 
   .mobonly{display:none}
 
@@ -430,10 +446,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261007004002"></script>
-<script src="common.js?v=20261007004002"></script>
-<script src="meta.js?v=20261007004002"></script>
-<script src="paper-engine.js?v=20261007004002"></script>
-<script src="paper.js?v=20261007004002"></script>
+<script src="nav.js?v=20261007005010"></script>
+<script src="common.js?v=20261007005010"></script>
+<script src="meta.js?v=20261007005010"></script>
+<script src="paper-engine.js?v=20261007005010"></script>
+<script src="paper.js?v=20261007005010"></script>
 </body>
 </html>

@@ -8,6 +8,13 @@
   - 펀딩비는 계산하지 않아요 (화면에 보여주기만)
   - 청산·체결 소급 처리(replay): 1분봉을 시간순으로 훑으면서 지정가 체결 / SL / 청산 / TP / 지정가 청산 확인
     한 봉에서 TP와 SL(또는 청산)이 둘 다 닿으면 보수적으로 SL(청산)이 먼저 난 것으로 처리
+  - TP/SL 세 종류 (비트겟과 같은 구성)
+    · 전체 포지션 TP/SL: p.tp / p.sl → 닿으면 포지션 전부 정리
+    · 부분 포지션 TP/SL (분할 익절): p.pt = [{id, qty, tp, sl}] → 둘 중 먼저 닿는 쪽으로 qty 만큼 정리하고 그 주문은 사라짐 (OCO)
+    · 트레일링: p.trl = {qty, cb(되돌림 %), act(작동 가격, 없으면 바로 작동), ext(작동 뒤 가장 유리했던 가격)}
+      → 작동 뒤 가장 유리했던 가격에서 cb% 되돌아오면 qty 만큼 시장가로 정리
+    · 한 봉 안에서 손절 쪽(SL·부분 SL·트레일링·청산)은 지금 가격에 가까운 것부터 차례로 처리
+      트레일링의 "가장 유리했던 가격"은 봉이 끝난 뒤에 갱신 (같은 봉에서 올랐다 내렸다 한 건 순서를 몰라서 다음 봉부터 반영)
   - 교차 청산: 한 봉 안에서 교차 포지션 전부가 "가장 불리한 가격"(롱=저가, 숏=고가)에 동시에 있다고 보고
     계정 자산(잔고+증거금+미실현손익) <= 유지증거금 합계 이면 교차 포지션을 전부 청산 (보수적)
 */
@@ -114,6 +121,8 @@
         a.lev = Math.max(1, Math.min(MAX_LEV, Math.round(a.qty * a.entry / a.margin)));
         if (modeOf(a) === "isolated") a.liq = liqPrice(a.side, a.entry, a.qty * a.entry / a.margin);
         a.tp = a.tp || b.tp; a.sl = a.sl || b.sl; a.t = Math.min(a.t, b.t);
+        if (b.pt && b.pt.length) a.pt = (a.pt || []).concat(b.pt);
+        if (b.trl && !a.trl) a.trl = b.trl;
         for (const o of st.ord) if (o.ro === b.id) o.ro = a.id;
         st.pos.splice(j, 1); changed = true;
       }
@@ -233,6 +242,51 @@
     return { filled: false, ord: o };
   }
 
+
+  // ── 부분 포지션 TP/SL (분할 익절) ─────────────────────────────
+  const MAX_PT = 10;
+  // req: { pct(1~100) 또는 qty, tp, sl } — tp·sl 중 하나 이상. cur = 지금 가격
+  function addPartial(st, p, req, cur) {
+    if (!p) throw new Error("Position already closed or not found");
+    p.pt = p.pt || [];
+    if (p.pt.length >= MAX_PT) throw new Error(`Max ${MAX_PT} partial TP/SL orders per position`);
+    const { tp, sl } = checkTpSl(p.side, cur, req.tp, req.sl);
+    if (tp == null && sl == null) throw new Error("Enter a take-profit or stop-loss price");
+    let qty = num(req.qty);
+    if (!(qty > 0)) { const pct = num(req.pct); if (!(pct > 0 && pct <= 100)) throw new Error("Enter a quantity"); qty = p.qty * pct / 100; }
+    qty = r8(Math.min(qty, p.qty));
+    if (!(qty > 0) || qty * cur < MIN_NOTIONAL) throw new Error(`Quantity too small (min ${MIN_NOTIONAL} USDT)`);
+    const o = { id: st.seq++, qty, tp, sl };
+    p.pt.push(o);
+    return o;
+  }
+  function delPartial(p, oid) {
+    if (!p || !p.pt || !p.pt.some(o => o.id === oid)) throw new Error("Order not found");
+    p.pt = p.pt.filter(o => o.id !== oid);
+    if (!p.pt.length) delete p.pt;
+  }
+  // ── 트레일링 TP/SL ──────────────────────────────────────────
+  // req: { cb: 되돌림 % (0.1~20), act: 작동 가격(선택), pct: 정리할 비율 % }
+  function setTrail(p, req, cur) {
+    if (!p) throw new Error("Position already closed or not found");
+    const cb = num(req.cb);
+    if (!(cb >= 0.1 && cb <= 20)) throw new Error("Callback rate must be 0.1–20%");
+    const pct = isNaN(num(req.pct)) ? 100 : num(req.pct);
+    if (!(pct >= 1 && pct <= 100)) throw new Error("Quantity must be 1–100%");
+    let act = num(req.act);
+    if (isNaN(act)) act = null;
+    else {
+      if (!(act > 0)) throw new Error("Invalid activation price");
+      if (p.side === "long" ? act <= cur : act >= cur) throw new Error(`Activation price must be ${p.side === "long" ? "above" : "below"} the current price`);
+    }
+    const qty = pct >= 100 ? null : r8(p.qty * pct / 100);           // null = 그때 남아 있는 전부
+    if (qty != null && qty * cur < MIN_NOTIONAL) throw new Error(`Quantity too small (min ${MIN_NOTIONAL} USDT)`);
+    p.trl = { cb, act, qty, pct, ext: act == null ? cur : null };
+    return p.trl;
+  }
+  // 트레일링이 작동 중이면 지금 정리 가격 (아니면 null)
+  const trailStop = p => p.trl && p.trl.ext != null ? (p.side === "long" ? p.trl.ext * (1 - p.trl.cb / 100) : p.trl.ext * (1 + p.trl.cb / 100)) : null;
+
   function cancelOrder(st, id, now) {
     const o = st.ord.find(x => x.id === id);
     if (!o) throw new Error("Order already filled or not found");
@@ -260,16 +314,41 @@
         logOrder(st, { id: o.id, t, sym: o.sym, side: o.side, mode: modeOf(o), lev: o.lev, qty: o.qty, price: o.price, kind: "Limit", status: "Filled" });
         ev.push({ t, type: "fill", sym: o.sym, side: o.side, mode: modeOf(o), price: o.price, qty: o.qty });
       }
-      // 2) 손절 (격리는 청산과 함께, 교차는 손절만)
+      // 2) 손절 쪽: 전체 SL / 격리 청산 / 부분 SL / 트레일링 — 지금 가격에 가까운(먼저 닿는) 것부터
       for (const k of ks) for (const p of st.pos.slice()) {
         if (p.sym !== k.sym || !live(p)) continue;
         const long = p.side === "long", cross = modeOf(p) === "cross";
-        const liqHit = !cross && (long ? k.l <= p.liq : k.h >= p.liq);
-        const slHit = p.sl != null && (long ? k.l <= p.sl : k.h >= p.sl);
-        if (!liqHit && !slHit) continue;
-        const slFirst = slHit && (!liqHit || (long ? p.sl >= p.liq : p.sl <= p.liq));
-        const tr = slFirst ? closePosition(st, p, p.sl, "SL", t + MIN) : closePosition(st, p, p.liq, "Liquidation", t + MIN);
-        push(slFirst ? "sl" : "liq", p, tr);
+        const hit = x => (long ? k.l <= x : k.h >= x);
+        const list = [];
+        if (!cross && p.liq) list.push({ px: p.liq, kind: "liq", pri: 0 });
+        if (p.sl != null) list.push({ px: p.sl, kind: "sl", pri: 1 });
+        for (const o of p.pt || []) if (o.sl != null) list.push({ px: o.sl, kind: "psl", o, pri: 2 });
+        const ts = trailStop(p);
+        if (ts != null) list.push({ px: ts, kind: "trail", pri: 3 });
+        // 롱은 높은 가격부터(먼저 닿음), 숏은 낮은 가격부터. 같은 가격이면 부분 → 전체 → 청산 순
+        list.sort((a, b) => (long ? b.px - a.px : a.px - b.px) || b.pri - a.pri);
+        for (const x of list) {
+          if (!st.pos.includes(p)) break;
+          if (!hit(x.px)) continue;
+          if (x.kind === "liq") push("liq", p, closePosition(st, p, p.liq, "Liquidation", t + MIN));
+          else if (x.kind === "sl") push("sl", p, closePosition(st, p, p.sl, "SL", t + MIN));
+          else if (x.kind === "psl") {
+            if (!p.pt || !p.pt.includes(x.o)) continue;
+            p.pt = p.pt.filter(o => o !== x.o);
+            push("sl", p, closePosition(st, p, x.px, "SL", t + MIN, Math.min(p.qty, x.o.qty)));
+          } else if (x.kind === "trail" && p.trl) {
+            const q = p.trl.qty == null ? p.qty : Math.min(p.qty, p.trl.qty);
+            delete p.trl;
+            push("trail", p, closePosition(st, p, x.px, "Trailing", t + MIN, q));
+          }
+        }
+        if (st.pos.includes(p) && p.pt && !p.pt.length) delete p.pt;
+        // 트레일링: 작동 확인 + 가장 유리했던 가격 갱신 (봉이 끝난 뒤)
+        if (st.pos.includes(p) && p.trl) {
+          const fav = long ? k.h : k.l, tr = p.trl;
+          if (tr.ext == null) { if (tr.act == null || (long ? k.h >= tr.act : k.l <= tr.act)) tr.ext = fav; }
+          else tr.ext = long ? Math.max(tr.ext, fav) : Math.min(tr.ext, fav);
+        }
       }
       // 3) 교차 청산: 교차 포지션이 전부 가장 불리한 가격에 있다고 보고 계정 단위로 확인
       const cp = st.pos.filter(p => modeOf(p) === "cross" && live(p));
@@ -284,11 +363,25 @@
           if (st.bal < 0) st.bal = 0;
         }
       }
-      // 4) 익절 (체결된 바로 그 봉에서는 안 봄) → 지정가 청산 주문
+      // 4) 익절: 전체 TP / 부분 TP (체결된 바로 그 봉에서는 안 봄) — 먼저 닿는 것부터 → 그다음 지정가 청산 주문
       for (const k of ks) for (const p of st.pos.slice()) {
-        if (p.sym !== k.sym || !live(p) || p.tp == null || p.fillT === t) continue;
-        if (!(p.side === "long" ? k.h >= p.tp : k.l <= p.tp)) continue;
-        push("tp", p, closePosition(st, p, p.tp, "TP", t + MIN));
+        if (p.sym !== k.sym || !live(p) || p.fillT === t) continue;
+        const long = p.side === "long", hit = x => (long ? k.h >= x : k.l <= x);
+        const list = [];
+        if (p.tp != null) list.push({ px: p.tp, kind: "tp", pri: 0 });
+        for (const o of p.pt || []) if (o.tp != null) list.push({ px: o.tp, kind: "ptp", o, pri: 1 });
+        list.sort((a, b) => (long ? a.px - b.px : b.px - a.px) || b.pri - a.pri);
+        for (const x of list) {
+          if (!st.pos.includes(p)) break;
+          if (!hit(x.px)) continue;
+          if (x.kind === "tp") push("tp", p, closePosition(st, p, p.tp, "TP", t + MIN));
+          else {
+            if (!p.pt || !p.pt.includes(x.o)) continue;
+            p.pt = p.pt.filter(o => o !== x.o);
+            push("tp", p, closePosition(st, p, x.px, "TP", t + MIN, Math.min(p.qty, x.o.qty)));
+          }
+        }
+        if (st.pos.includes(p) && p.pt && !p.pt.length) delete p.pt;
       }
       for (const k of ks) for (const o of st.ord.slice()) {
         if (!o.ro || o.sym !== k.sym || t < ceilMin(o.t)) continue;
@@ -312,6 +405,6 @@
 
   return { mergeAll, START, FEE_TAKER, FEE_MAKER, MMR, MAX_LEV, MAX_POS, MAX_ORD, MIN_NOTIONAL,
            liqPrice, pnlOf, needOf, mmOf, modeOf, crossWallet, crossLiqPrice, crossAccount, liqOf, ratioOf,
-           newState, reserved, available, sumMargin, checkTpSl,
+           newState, reserved, available, sumMargin, checkTpSl, addPartial, delPartial, setTrail, trailStop, MAX_PT,
            placeOrder, placeCloseLimit, cancelOrder, closePosition, replay, summary, logTrade };
 });

@@ -148,7 +148,7 @@
   $("logout").onclick = () => { logout(); location.reload(); };
 
   // ── 서버 상태 ────────────────────────────────────────────────
-  const EV_TITLE = { fill: ["ok", "Limit filled · Position opened"], tp: ["ok", "Take-profit triggered"], sl: ["warn", "Stop-loss triggered"], liq: ["bad", "Liquidated"], rclose: ["ok", "Limit close filled"] };
+  const EV_TITLE = { fill: ["ok", "Limit filled · Position opened"], tp: ["ok", "Take-profit triggered"], sl: ["warn", "Stop-loss triggered"], liq: ["bad", "Liquidated"], rclose: ["ok", "Limit close filled"], trail: ["ok", "Trailing stop triggered"] };
   const evText = e => `${base(e.sym)} ${sideTxt(e.side)} @ ${fp(e.price)}${e.pnl != null ? ` · PnL ${sg(e.pnl)} USDT` : ""}`;
   function handleEvents(events) {
     if (!events || !events.length) return;
@@ -159,7 +159,7 @@
         + events.map(e => `<div class="lrow"><span class="${EV_TITLE[e.type][0] === "bad" ? "r" : EV_TITLE[e.type][0] === "warn" ? "o" : "g"}"><b>${EV_TITLE[e.type][1]}</b></span><span>${esc(evText(e))}</span><span class="m">${mdhm(e.t)}</span></div>`).join(""), null, "확인");
       return;
     }
-    for (const e of events) notify(EV_TITLE[e.type][0], EV_TITLE[e.type][1], evText(e), false, ["fill", "tp", "rclose"].includes(e.type) ? "ding" : undefined);
+    for (const e of events) notify(EV_TITLE[e.type][0], EV_TITLE[e.type][1], evText(e), false, ["fill", "tp", "rclose", "trail"].includes(e.type) ? "ding" : undefined);
   }
   function handleInfo(i) {
     if (!i) return;
@@ -170,6 +170,10 @@
     else if (i.kind === "close") notify(i.pnl >= 0 ? "ok" : "warn", i.pct >= 100 ? "Position closed" : `Partial close ${i.pct}%`, `${base(i.sym)} ${sideTxt(i.side)} @ ${fp(i.price)} · PnL ${sg(i.pnl)} USDT`, false, "ding");
     else if (i.kind === "closeLimit") notify("ok", "Limit close order placed", `${base(i.sym)} ${i.pct}% @ ${fp(i.price)}`);
     else if (i.kind === "edit") notify("ok", "TP/SL updated", base(i.sym));
+    else if (i.kind === "ptpAdd") notify("ok", "Partial TP/SL added", base(i.sym));
+    else if (i.kind === "ptpDel") notify("ok", "Partial TP/SL cancelled", base(i.sym));
+    else if (i.kind === "trailSet") notify("ok", "Trailing TP/SL set", base(i.sym));
+    else if (i.kind === "trailDel") notify("ok", "Trailing TP/SL cancelled", base(i.sym));
     else if (i.kind === "reset") notify("ok", "Reset", "Starting again with 10,000 USDT");
   }
   function checkDeposits() {
@@ -473,6 +477,8 @@
       const k = sideTxt(p.side);
       add(p.entry, css("--muted"), `${k} Entry`, 0); add(E.liqOf(S.st, p, pxOf), "#f59e0b", `${k} Liq.`, 2);
       add(p.tp, "#22b573", "TP", 2); add(p.sl, "#ef4b5f", "SL", 2);
+      for (const o of p.pt || []) { add(o.tp, "#22b573", "Partial TP", 3); add(o.sl, "#ef4b5f", "Partial SL", 3); }
+      add(E.trailStop(p), "#f59e0b", "Trailing", 3);
     }
     for (const o of S.st.ord) if (o.sym === S.sym) add(o.price, "#5b93f0", `${o.ro ? "Close" : sideTxt(o.side)} order`, 1);
   }
@@ -637,13 +643,15 @@
       mark2: fp(mk ? mk.p : px),
     };
   }
+  // 부분 TP/SL 개수 · 트레일링 요약 (없으면 빈 글자)
+  const extraTp = p => [(p.pt && p.pt.length) ? `<span class="two x2">+${p.pt.length} partial</span>` : "", p.trl ? `<span class="two x2 o">Trail ${p.trl.cb}%${p.trl.ext != null ? " ●" : ""}</span>` : ""].join("");
   function posRow(p) {
     const d = posDyn(p), id = p.id;
     return [
       `<b>${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}`,
       fq(p.qty), dyn("val:" + id, d.val), fp(p.entry), dyn("mark:" + id, d.mark), dyn("liq:" + id, d.liq),
       um(p.margin), dyn("ratio:" + id, d.ratio), dyn("pnl:" + id, d.pnl), `<span class="${pc(p.rp - p.fee)}">${sm(p.rp - p.fee)}</span>`,
-      `<span class="g">TP ${p.tp ? fp(p.tp) : "-"}</span><span class="two r">SL ${p.sl ? fp(p.sl) : "-"}</span><button class="ghost mini" data-act="edit" data-id="${id}">Edit</button>`,
+      `<span class="g">TP ${p.tp ? fp(p.tp) : "-"}</span><span class="two r">SL ${p.sl ? fp(p.sl) : "-"}</span>${extraTp(p)}<button class="ghost mini" data-act="edit" data-id="${id}">Edit</button>`,
       mdhm(p.t),
       `<div class="acts"><button class="ghost" data-act="close" data-pct="100" data-id="${id}">Market close</button><button class="ghost" data-act="limitclose" data-id="${id}">Limit close</button>
         <span class="pp">${[25, 50, 75, 100].map(x => `<button class="ghost" data-act="close" data-pct="${x}" data-id="${id}">${x}%</button>`).join("")}</span></div>`,
@@ -668,6 +676,7 @@
       <div class="sub2">
         <div><span>Realized PnL (USDT)</span><span class="${pc(rp)}">${sg(rp)}</span></div>
         <div><span>TP/SL</span><span class="ed" data-act="edit" data-id="${id}"><span class="g">${p.tp ? fp(p.tp) : "--"}</span> / <span class="r">${p.sl ? fp(p.sl) : "--"}</span> ✎</span></div>
+        ${extraTp(p) ? `<div><span>Partial / Trailing</span><span class="ed" data-act="edit" data-id="${id}">${extraTp(p)}</span></div>` : ""}
         <div><span>Opened</span><span>${mdhm(p.t)}</span></div>
       </div>
       <div class="btn3"><button data-act="edit" data-id="${id}">TP/SL</button><button data-act="limitclose" data-id="${id}">Limit close</button><button data-act="closesheet" data-id="${id}">Close</button></div>
@@ -701,7 +710,7 @@
     [...$("tabs").children].forEach(b => b.classList.toggle("on", b.dataset.t === S.tab));
     if (S.tab === "adm") { if (!adminRows) loadAdmin(); else renderAdmin(); return; }
     // 구조(포지션 목록·TP/SL 등)가 바뀔 때만 통째로 그리고, 가격으로 바뀌는 칸만 제자리에서 갱신 → 버튼 누르는 중에 사라지지 않음
-    const s = S.tab + JSON.stringify([st.pos.map(p => [p.id, p.qty, p.tp, p.sl, p.margin, p.rp]), st.ord.map(o => o.id), st.ol.length, st.th.length, st.th[0] && st.th[0].t, st.ol[0] && st.ol[0].status]);
+    const s = S.tab + JSON.stringify([st.pos.map(p => [p.id, p.qty, p.tp, p.sl, p.margin, p.rp, p.pt, p.trl]), st.ord.map(o => o.id), st.ol.length, st.th.length, st.th[0] && st.th[0].t, st.ol[0] && st.ol[0].status]);
     if (s !== sig) { sig = s; el.innerHTML = tabHtml(); }
     updateDyn();
   }
@@ -729,14 +738,158 @@
         <label><span class="lt">Close ratio (%)</span><input id="mpct" inputmode="numeric" value="100"></label>
         <p class="small muted">Last ${fp(S.px[p.sym])} · Place ${p.side === "long" ? "above" : "below"} the last price; fills when touched (fee 0.02%). Fills immediately if the price is already better.</p>`,
         () => sendAction({ action: "closeLimit", id, price: num($("mpx").value), pct: num($("mpct").value) }));
-    } else if (act === "edit" && p) {
-      modal(`<h2>${esc(base(p.sym))} ${sideTxt(p.side)} · TP/SL</h2>
-        <label><span class="lt">Take profit (TP)</span><input id="mtp" inputmode="decimal" value="${p.tp ?? ""}" placeholder="Empty = remove"></label>
-        <label><span class="lt">Stop loss (SL)</span><input id="msl" inputmode="decimal" value="${p.sl ?? ""}" placeholder="Empty = remove"></label>
-        <p class="small muted">Last ${fp(S.px[p.sym])} · Liq. ${fp(E.liqOf(S.st, p, pxOf))}</p>`, () =>
-        sendAction({ action: "edit", id, tp: $("mtp").value.trim() || undefined, sl: $("msl").value.trim() || undefined }));
-    }
+    } else if (act === "edit" && p) tpslSheet(p);
   };
+  // ── TP/SL 시트 (비트겟 스타일: 전체 포지션 / 부분 포지션(분할 익절) / 트레일링) ──
+  //   가격을 넣으면 ROI(증거금 대비 수익률)가, ROI를 넣으면 가격이 자동으로 계산돼요
+  //   ROI = 그 가격에서 정리했을 때 손익 ÷ 증거금 × 100 (수수료 제외, 비트겟과 같은 방식)
+  let tpTab = "all";
+  function tpslSheet(p0, tab) {
+    const m = $("modal"), id = p0.id, b = esc(base(p0.sym)), cl = E.modeOf(p0) === "cross" ? "Cross" : "Isolated";
+    if (tab) tpTab = tab;
+    const P = () => S.st.pos.find(x => x.id === id);
+    const long = p0.side === "long", dir = long ? 1 : -1;
+    const dec = Math.max(pdec(p0.entry), stepOf(p0.entry).dec), qdec = Math.max(stepOf(p0.entry).dec, (String(p0.qty).split(".")[1] || "").length);
+    const rnd = v => String(+v.toFixed(dec));
+    // ROI(%) ↔ 가격. 증거금 = 포지션 증거금 (수량 비율만큼)
+    const roiOf = (p, px) => E.pnlOf(p.side, p.entry, px, p.qty) / p.margin * 100;
+    const pxOf2 = (p, roi) => p.entry + dir * roi / 100 * p.margin / p.qty;
+    const tabs = [["all", "Entire position"], ["part", "Partial position"], ["trail", "Trailing TP/SL"]];
+    const pfield = (k, lbl, cls, v) => `<div class="tpk"><span class="${cls}">${lbl}</span><small class="lastt">Last</small></div>
+      <div class="prow tpr"><span class="pin"><input id="${k}px" inputmode="decimal" placeholder="Trigger price" value="${v != null ? rnd(v) : ""}"><small>USDT</small></span>
+        <span class="pin roi"><input id="${k}roi" inputmode="decimal" placeholder="ROI"><small>%</small></span></div>
+      <div class="dots sl5" data-k="${k}"><input id="${k}rng" type="range" min="0" max="${k.endsWith("sl") ? 100 : 200}" step="1" value="0"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="dl">${(k.endsWith("sl") ? [0, 25, 50, 75, 100] : [0, 50, 100, 150, 200]).map(x => `<span>${x}%</span>`).join("")}</div>
+      <div class="kv"><span>Est. PnL</span><b id="${k}est">-</b></div>`;
+    const qfield = (k, pct) => `<label class="qbox"><span class="lt">Quantity (${b})</span><input id="${k}q" inputmode="decimal"></label>
+      <div class="dots"><input id="${k}qr" type="range" min="1" max="100" step="1" value="${pct}"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="dl"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>`;
+    const draw = () => {
+      const p = P(); if (!p) { m.hidden = true; return; }
+      let body = "";
+      if (tpTab === "all") {
+        body = pfield("tp", "Take profit", "g", p.tp) + `<div class="gap"></div>` + pfield("sl", "Stop loss", "r", p.sl)
+          + `<p class="small muted">Closes the <b>entire position</b> when the last price reaches the trigger. Leave empty to remove.</p>
+             <button id="tok" class="confirm">Confirm</button>`;
+      } else if (tpTab === "part") {
+        const list = (p.pt || []).map(o => `<div class="ptl"><span><span class="g">TP ${o.tp ? fp(o.tp) : "--"}</span> / <span class="r">SL ${o.sl ? fp(o.sl) : "--"}</span></span>
+            <span class="muted">${fq(o.qty)} ${b}</span><button class="ghost mini" data-del="${o.id}">Cancel</button></div>`).join("");
+        body = pfield("ptp", "Take profit", "g") + `<div class="gap"></div>` + pfield("psl", "Stop loss", "r") + `<div class="gap"></div>` + qfield("p", 50)
+          + `<p class="small muted">Closes only this quantity at the trigger. Whichever of TP / SL hits first runs and the other is cancelled. Add several for scale-out take-profits.</p>
+             <button id="tok" class="confirm">Add partial TP/SL</button>`
+          + (list ? `<h3 class="pth">Partial orders (${p.pt.length})</h3>${list}` : "");
+      } else {
+        const tr = p.trl;
+        body = `<div class="tpk"><span>Callback rate</span></div>
+          <div class="prow tpr"><span class="pin"><input id="tcb" inputmode="decimal" value="${tr ? tr.cb : 1}"><small>%</small></span></div>
+          <div class="chips5">${[0.5, 1, 2, 3, 5].map(x => `<button class="ghost" data-cb="${x}">${x}%</button>`).join("")}</div>
+          <div class="tpk"><span>Activation price <small class="muted">(optional)</small></span><small class="lastt">Last</small></div>
+          <div class="prow tpr"><span class="pin"><input id="tact" inputmode="decimal" placeholder="Empty = start now" value="${tr && tr.act ? rnd(tr.act) : ""}"><small>USDT</small></span>
+            <span class="pin roi"><input id="tactroi" inputmode="decimal" placeholder="ROI"><small>%</small></span></div>
+          <div class="gap"></div>` + qfield("t", tr ? tr.pct || 100 : 100)
+          + `<div class="kv"><span>Trigger price now</span><b id="tnow">-</b></div>
+             <p class="small muted">After the price reaches the activation price (or right away if empty), the best price is tracked. When the price moves back by the callback rate from that best price, the quantity is closed at market (fee 0.05%).</p>
+             <button id="tok" class="confirm">${tr ? "Update trailing" : "Set trailing"}</button>`
+          + (tr ? `<h3 class="pth">Active trailing</h3><div class="ptl"><span>${tr.cb}% callback · ${tr.ext != null ? `<span class="g">Running</span> · best ${fp(tr.ext)}` : `Waits for ${fp(tr.act)}`}</span>
+               <span class="muted">${tr.qty == null ? "100%" : fq(tr.qty) + " " + b}</span><button class="ghost mini" data-deltr="1">Cancel</button></div>` : "");
+      }
+      m.className = "sheet";
+      m.innerHTML = `<div class="card tpss">
+        <div class="shh"><h2>TP/SL</h2><button class="ghost x" id="cx" aria-label="Close">✕</button></div>
+        <div class="h2l"><b>${b}USDT</b><span class="chip ${p.side}">${sideTxt(p.side)}</span><span class="chip ${p.side}">${p.lev}x</span><span class="chip">${cl}</span></div>
+        <div class="ttabs">${tabs.map(([k, t]) => `<button data-tt="${k}" class="${k === tpTab ? "on" : ""}">${t}</button>`).join("")}</div>
+        <div class="kv"><span>Entry price</span><b>${fp(p.entry)} USDT</b></div>
+        <div class="kv"><span>Last price</span><b id="tlast">-</b></div>
+        <div class="kv"><span>Est. liq. price</span><b class="o">${fp(E.liqOf(S.st, p, pxOf))}</b></div>
+        <div class="kv"><span>Size</span><b>${fq(p.qty)} ${b}</b></div>
+        ${body}</div>`;
+      m.hidden = false;
+      wire(p);
+    };
+    function wire(p) {
+      $("cx").onclick = () => { m.hidden = true; };
+      m.querySelectorAll("[data-tt]").forEach(x => x.onclick = () => { tpTab = x.dataset.tt; draw(); });
+      const setR = (el, v) => { el.value = v; el.style.setProperty("--v", (v - el.min) / (el.max - el.min) * 100 + "%"); };
+      const qtyOf = k => { const q = num($(k + "q").value); return q > 0 ? Math.min(q, p.qty) : 0; };
+      // 가격 칸 하나(+ROI 칸 + 슬라이더) 묶기. sign: 익절 +1, 손절 -1
+      const pair = (k, sign, qf) => {
+        const px = $(k + "px"), roi = $(k + "roi"), rng = $(k + "rng");
+        if (!px) return;
+        const est = () => {
+          const v = num(px.value), q = qf ? qf() : p.qty;
+          if (!(v > 0) || !(q > 0)) { $(k + "est").textContent = "-"; return; }
+          const g = E.pnlOf(p.side, p.entry, v, q);
+          $(k + "est").innerHTML = `<span class="${pc(g)}">${sg(g)} USDT</span>`;
+        };
+        const fromPx = () => { const v = num(px.value); if (v > 0) { const r = roiOf(p, v); roi.value = (+r.toFixed(2)).toString(); setR(rng, Math.max(0, Math.min(+rng.max, Math.round(r * sign)))); } else { roi.value = ""; setR(rng, 0); } est(); };
+        const fromRoi = r => { if (isFinite(r)) { const v = pxOf2(p, r); px.value = v > 0 ? rnd(v) : ""; } else px.value = ""; est(); };
+        px.oninput = fromPx;
+        roi.oninput = () => { const r = num(roi.value); if (isFinite(r)) { fromRoi(sign * Math.abs(r)); setR(rng, Math.min(+rng.max, Math.abs(r))); } else { px.value = ""; est(); } };
+        roi.onblur = () => { const r = num(roi.value); if (isFinite(r)) roi.value = (sign * Math.abs(r)).toString(); };
+        rng.oninput = () => { const r = +rng.value; setR(rng, r); if (r === 0) { px.value = roi.value = ""; est(); return; } roi.value = String(sign * r); fromRoi(sign * r); };
+        fromPx();
+        pair.est = pair.est || []; pair.est.push(est);
+      };
+      const qpair = k => {
+        const q = $(k + "q"), qr = $(k + "qr"), upd = () => (pair.est || []).forEach(f => f());
+        const fromPct = v => { setR(qr, v); q.value = v >= 100 ? String(p.qty) : String(+(p.qty * v / 100).toFixed(qdec)); upd(); };
+        qr.oninput = () => fromPct(+qr.value);
+        q.oninput = () => { const v = Math.max(1, Math.min(100, Math.round((num(q.value) || 0) / p.qty * 100))); setR(qr, v); upd(); };
+        fromPct(+qr.value);
+      };
+      pair.est = [];
+      const busy = async (fn) => { const bt = $("tok"); bt.disabled = true; try { await fn(); } catch (e) {} finally { const b2 = $("tok"); if (b2) b2.disabled = false; } };
+      if (tpTab === "all") {
+        pair("tp", 1); pair("sl", -1);
+        $("tok").onclick = () => busy(async () => {
+          await sendAction({ action: "edit", id, tp: $("tppx").value.trim() || undefined, sl: $("slpx").value.trim() || undefined });
+          m.hidden = true;
+        });
+      } else if (tpTab === "part") {
+        pair("ptp", 1, () => qtyOf("p")); pair("psl", -1, () => qtyOf("p")); qpair("p");
+        $("tok").onclick = () => busy(async () => {
+          const tp = $("ptppx").value.trim(), sl = $("pslpx").value.trim(), q = qtyOf("p");
+          if (!tp && !sl) return notify("warn", "Partial TP/SL", "Enter a take-profit or stop-loss price");
+          if (!(q > 0)) return notify("warn", "Partial TP/SL", "Enter a quantity");
+          await sendAction({ action: "ptpAdd", id, tp: tp || undefined, sl: sl || undefined, qty: q });
+          draw();
+        });
+        m.querySelectorAll("[data-del]").forEach(x => x.onclick = async () => { try { await sendAction({ action: "ptpDel", id, oid: +x.dataset.del }); draw(); } catch (e) {} });
+      } else {
+        qpair("t");
+        const actRoi = $("tactroi"), act = $("tact");
+        act.oninput = () => { const v = num(act.value); actRoi.value = v > 0 ? (+roiOf(p, v).toFixed(2)).toString() : ""; nowTrig(); };
+        actRoi.oninput = () => { const r = num(actRoi.value); act.value = isFinite(r) ? rnd(pxOf2(p, r)) : ""; nowTrig(); };
+        m.querySelectorAll("[data-cb]").forEach(x => x.onclick = () => { $("tcb").value = x.dataset.cb; nowTrig(); });
+        $("tcb").oninput = () => nowTrig();
+        act.oninput();
+        $("tok").onclick = () => busy(async () => {
+          const pct = +$("tqr").value;
+          await sendAction({ action: "trailSet", id, cb: num($("tcb").value), act: act.value.trim() || undefined, pct });
+          draw();
+        });
+        const d = m.querySelector("[data-deltr]");
+        if (d) d.onclick = async () => { try { await sendAction({ action: "trailDel", id }); draw(); } catch (e) {} };
+      }
+    }
+    // 트레일링: 지금 작동한다면 어디서 정리되나 (작동 중이면 실제 값)
+    function nowTrig() {
+      const el = $("tnow"), p = P(); if (!el || !p) return;
+      const cb = num($("tcb").value), act = num($("tact").value), last = S.px[p.sym];
+      const run = E.trailStop(p);
+      if (run != null && p.trl && p.trl.cb === cb) { el.innerHTML = `<span class="o">${fp(run)}</span> <small class="muted">(running)</small>`; return; }
+      const best = act > 0 ? act : last;
+      if (!(cb > 0) || !best) { el.textContent = "-"; return; }
+      el.textContent = fp(best * (1 - dir * cb / 100)) + (act > 0 ? " (after activation)" : "");
+    }
+    draw();
+    const tick = setInterval(() => {
+      if (m.hidden || !document.body.contains($("tlast"))) return clearInterval(tick);
+      $("tlast").textContent = fp(S.px[p0.sym]) + " USDT";
+      if (tpTab === "trail") nowTrig();
+    }, 1000);
+    $("tlast").textContent = fp(S.px[p0.sym]) + " USDT";
+  }
   // ── 포지션 닫기 시트 (거래소 앱 스타일: 가격 비우면 시장가, 넣으면 지정가 / 수량 바) ──
   function closeSheet(p) {
     const m = $("modal"), id = p.id, b = esc(base(p.sym)), cl = E.modeOf(p) === "cross" ? "Cross" : "Isolated";
@@ -895,7 +1048,9 @@
     const now = Date.now();
     if (now - S.lastSync > 20e3 && now - S.lastCross > 20e3) {
       const hit = S.st.pos.some(p => { const x = S.px[p.sym]; if (!x) return false; const L = p.side === "long", lq = E.modeOf(p) === "cross" ? null : p.liq;
-          return L ? ((lq && x <= lq) || (p.sl && x <= p.sl) || (p.tp && x >= p.tp)) : ((lq && x >= lq) || (p.sl && x >= p.sl) || (p.tp && x <= p.tp)); })
+          const ts = E.trailStop(p), pt = p.pt || [];
+          return L ? ((lq && x <= lq) || (p.sl && x <= p.sl) || (p.tp && x >= p.tp) || (ts && x <= ts) || pt.some(o => (o.sl && x <= o.sl) || (o.tp && x >= o.tp)))
+                   : ((lq && x >= lq) || (p.sl && x >= p.sl) || (p.tp && x <= p.tp) || (ts && x >= ts) || pt.some(o => (o.sl && x >= o.sl) || (o.tp && x <= o.tp))); })
         || S.st.ord.some(o => { const x = S.px[o.sym]; return x && (o.side === "long" ? (o.ro ? x >= o.price : x <= o.price) : (o.ro ? x <= o.price : x >= o.price)); });
       if (hit) { S.lastCross = now; refresh(true); }
     }

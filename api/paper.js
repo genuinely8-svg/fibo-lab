@@ -66,6 +66,15 @@ module.exports = async (req, res) => {
         const t = E.checkTpSl(p.side, await B.price(p.sym), b.tp, b.sl);
         p.tp = t.tp; p.sl = t.sl; info = { kind: "edit", sym: p.sym }; dirty = true; break;
       }
+      case "ptpAdd": case "ptpDel": case "trailSet": case "trailDel": {   // 부분 TP/SL (분할 익절) · 트레일링
+        const p = st.pos.find(x => x.id === id);
+        if (!p) throw A.fail(404, "Position already closed or not found");
+        if (b.action === "ptpAdd") E.addPartial(st, p, b, await B.price(p.sym));
+        else if (b.action === "ptpDel") E.delPartial(p, Number(b.oid));
+        else if (b.action === "trailSet") E.setTrail(p, b, await B.price(p.sym));
+        else delete p.trl;
+        info = { kind: b.action, sym: p.sym }; dirty = true; break;
+      }
       case "reset": user.st = E.newState(now); info = { kind: "reset" }; dirty = true; break;
       default: throw A.fail(400, "Unknown request");
     }
