@@ -196,7 +196,20 @@
   let t = null;
   new MutationObserver(() => { if (!t) t = setTimeout(() => { t = null; mark(); }, 200); }).observe(document.body, { childList: true, subtree: true });
   const holder = document.createElement("div"); holder.id = "gt_el"; document.body.appendChild(holder);
-  window.googleTranslateElementInit = () => new google.translate.TranslateElement({ pageLanguage: "ko", autoDisplay: false }, "gt_el");
+  // 탭 이름은 기계번역이 어색해서("청산히트맵" → "Cheongsan Heatmap") 다른 언어에서는 정해 둔 영어 이름으로
+  const EN = { "index.html": "Signals", "paper.html": "Paper Trading", "calc.html": "Calculator", "market.html": "Market Direction",
+               "liquidation.html": "Liquidation Map", "oi.html": "OI", "rank.html": "Rankings", "movers.html": "Top Movers", "news.html": "News" };
+  for (const a of nav.querySelectorAll(".navtabs a")) { const n = EN[a.getAttribute("href")]; if (n) { a.textContent = n; a.classList.add("notranslate"); a.translate = false; } }
+  // 위젯이 쿠키만으로는 번역을 시작하지 않을 때가 있어서, 숨겨 둔 언어 목록에 직접 골라 줌
+  window.googleTranslateElementInit = () => {
+    new google.translate.TranslateElement({ pageLanguage: "ko", autoDisplay: false }, "gt_el");
+    let n = 0;
+    const kick = setInterval(() => {
+      const c = document.querySelector(".goog-te-combo");
+      if (document.documentElement.classList.contains("translated-ltr") || document.documentElement.classList.contains("translated-rtl") || ++n > 40) return clearInterval(kick);
+      if (c && [...c.options].some(o => o.value === cur)) { c.value = cur; c.dispatchEvent(new Event("change")); }
+    }, 250);
+  };
   const s = document.createElement("script");
   s.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
   document.body.appendChild(s);
