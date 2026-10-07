@@ -27,7 +27,7 @@
   const FEE_TAKER = 0.0005, FEE_MAKER = 0.0002;
   const MMR = 0.005;                     // 유지증거금률
   const MAX_LEV = 100;
-  const MAX_POS = 20, MAX_ORD = 20, LOG_MAX = 200, MIN_NOTIONAL = 5;
+  const MAX_POS = 20, MAX_ORD = 30, LOG_MAX = 200, MIN_NOTIONAL = 5;
   const MIN = 60000;
 
   const num = v => (v === "" || v == null ? NaN : Number(v));

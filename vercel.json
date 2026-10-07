@@ -5,6 +5,9 @@
   "functions": {
     "api/lowsig.js": {
       "maxDuration": 60
+    },
+    "api/sigbot.js": {
+      "maxDuration": 60
     }
   }
 }
