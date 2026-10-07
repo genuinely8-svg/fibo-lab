@@ -18,7 +18,7 @@
   - 목표 익절 (복리, 시간 상관없음): 기준 자산 대비
       자산(잔고 + 증거금 + 미실현 손익)이 +3.2% 이상이면 → 모든 포지션 시장가 정리 + 대기 주문 취소
       → 정리 후 자산을 새 기준으로 잡고 바로 다시 신호대로 진입 (쉬지 않음, 5분마다 확인)
-      손절로 자산이 줄어도 기준은 그대로 (목표 달성 때만 기준이 올라감)
+      손절(손실)로 끝난 코인은 그 손실만큼 기준도 같이 내림 → 손실을 메울 필요 없이 다음 목표는 줄어든 자산 기준 +3.2%
 */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(require("./fib-core.js"));
@@ -73,6 +73,10 @@
           (mine.length ? ` · 남은 분할 주문 ${mine.length}개 취소` : ""));
       b.done[m] = { key: a.key, t: now };
       delete b.act[m];
+      if (tr && tr.pnl < 0 && b.base > 0) {                         // 손실로 끝난 건 기준 자산에서 빼서 그냥 두고 넘어감 (손실을 메울 필요 없이 다음 목표는 지금 자산 기준 +3.2%)
+        b.base += tr.pnl;
+        say(`손실 반영 → 새 기준 ${b.base.toFixed(2)}, 목표 ${(b.base * (1 + P.dayTarget / 100)).toFixed(2)}`);
+      }
     }
 
     // 1-2) 목표 (+3.2%) 확인: 넘었으면 전부 정리하고 지금 자산을 새 기준으로 바로 다시 시작
