@@ -311,6 +311,7 @@
       renderPicker();
     } catch (e) { $("plist").innerHTML = '<div class="muted">Could not load coin list</div>'; }
   }
+  CoinMeta.load().then(() => renderHd()).catch(() => {});        // 처음 열 때 로고(코인게코) 받아서 위쪽 코인 버튼에 표시
   const logoImg = b => CoinMeta.logo(b) ? `<img src="${esc(CoinMeta.logo(b))}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="ph"></span>`;
   function renderPicker() {
     const q = $("psearch").value.trim().toUpperCase();
@@ -336,7 +337,8 @@
   let lastPx = 0;
   function renderHd() {
     const b = base(S.sym), p = S.px[S.sym], t = S.t24[S.sym], m = S.mark[S.sym];
-    if ($("coinbtn").dataset.k !== S.sym) { $("coinbtn").innerHTML = `${logoImg(b)}<span>${esc(b)}<small> USDT Perp</small></span> ▾`; $("coinbtn").dataset.k = S.sym; }
+    const ck = S.sym + (CoinMeta.logo(b) ? "|logo" : "");          // 로고 정보가 늦게 도착해도 다시 그림
+    if ($("coinbtn").dataset.k !== ck) { $("coinbtn").innerHTML = `${logoImg(b)}<span>${esc(b)}<small> USDT Perp</small></span> ▾`; $("coinbtn").dataset.k = ck; }
     $("qunit").textContent = b;
     const el = $("price");
     el.textContent = fp(p);
