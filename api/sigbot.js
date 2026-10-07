@@ -95,12 +95,12 @@ async function scanAll(now) {
 
 module.exports = async (req, res) => {
   try {
-    const sec = process.env.BOT_SECRET;
-    if (!sec) throw A.fail(503, "Bot is not set up (BOT_SECRET missing)");
+    // BOT_SECRET(GitHub Actions) 또는 TICK_SECRET(Upstash QStash 5분 타이머) 둘 중 하나와 맞으면 통과
+    const secs = [process.env.BOT_SECRET, process.env.TICK_SECRET].filter(Boolean);
+    if (!secs.length) throw A.fail(503, "Bot is not set up (BOT_SECRET missing)");
     const h = String(req.headers.authorization || "");
-    const got = h.startsWith("Bearer ") ? h.slice(7) : "";
-    const a = crypto.createHash("sha256").update(got).digest(), b = crypto.createHash("sha256").update(sec).digest();
-    if (!crypto.timingSafeEqual(a, b)) throw A.fail(401, "Unauthorized");
+    const got = crypto.createHash("sha256").update(h.startsWith("Bearer ") ? h.slice(7) : "").digest();
+    if (!secs.some(s => crypto.timingSafeEqual(got, crypto.createHash("sha256").update(s).digest()))) throw A.fail(401, "Unauthorized");
 
     const key = A.userKey(process.env.SIGBOT_NICKNAME || "test");
     if (req.method === "GET") {
