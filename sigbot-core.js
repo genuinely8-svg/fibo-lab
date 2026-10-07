@@ -15,9 +15,10 @@
   - 포지션이 끝나면 남은 분할 지정가 주문은 취소. 같은 진입가로는 다시 들어가지 않음
   - 동시에 최대 10개 코인. 자리가 모자라면 기대값 높은 코인부터
   - Signals 목록에서 빠져도(거래량 순위 변동 등) 이미 잡은 포지션은 끝까지 관리
-  - 하루 목표 (복리): 한국시간 0시의 계좌 자산을 그날 기준으로 잡고,
-      자산(잔고 + 증거금 + 미실현 손익)이 기준 +3.2% 이상이면 → 모든 포지션 시장가 정리 + 대기 주문 취소
-      → 그날은 새로 진입하지 않고, 다음 날 0시 자산을 새 기준으로 다시 시작 (5분마다 확인)
+  - 목표 익절 (복리, 시간 상관없음): 기준 자산 대비
+      자산(잔고 + 증거금 + 미실현 손익)이 +3.2% 이상이면 → 모든 포지션 시장가 정리 + 대기 주문 취소
+      → 정리 후 자산을 새 기준으로 잡고 바로 다시 신호대로 진입 (쉬지 않음, 5분마다 확인)
+      손절로 자산이 줄어도 기준은 그대로 (목표 달성 때만 기준이 올라감)
 */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(require("./fib-core.js"));
@@ -30,8 +31,7 @@
     // 매매
     lev: 10, mode: "cross", maxCoins: 10, pct: 5, splits: 3, w: [1, 2, 3], slFrac: 1.5,   // w = 분할 비중 (아래로 갈수록 크게 1:2:3)
     minTouches: 3,              // 과거 터치가 너무 적은 코인은 통계가 의미 없어서 제외
-    dayTarget: 3.2,             // 하루 목표 (%): 계좌 자산(미실현 포함)이 그날 시작 자산 대비 +3.2% 되면 전부 정리하고 그날은 쉼
-    dayStartH: 0,               // 하루 시작 시각 (한국시간 0시)
+    dayTarget: 3.2,             // 목표 (%): 계좌 자산(미실현 포함)이 기준 자산 대비 +3.2% 되면 전부 정리 → 지금 자산을 새 기준으로 바로 다시 시작
   };
   const LOG_MAX = 150;
   const keyOf = level => Number(level).toPrecision(8);
@@ -75,32 +75,29 @@
       delete b.act[m];
     }
 
-    // 1-2) 하루 목표 (+3.2%) 확인: 넘었으면 전부 정리하고 그날은 쉼
+    // 1-2) 목표 (+3.2%) 확인: 넘었으면 전부 정리하고 지금 자산을 새 기준으로 바로 다시 시작
     const pxOf = m => prices[m];
     const equity = () => st.bal + st.pos.reduce((s, p) => s + p.margin + E.pnlOf(p.side, p.entry, pxOf(p.sym) || p.entry, p.qty), 0);
-    const day = Math.floor((now + (9 - P.dayStartH) * 3600e3) / 86400e3);       // 한국시간 기준 날짜 번호
-    if (b.day !== day) {
-      b.day = day; b.base = equity(); b.hit = false;
-      say(`새 하루 시작 · 기준 자산 ${b.base.toFixed(2)} USDT · 목표 ${(b.base * (1 + P.dayTarget / 100)).toFixed(2)} (+${P.dayTarget}%)`);
+    if (!(b.base > 0)) {
+      b.base = equity();
+      say(`목표 기준 설정 · 기준 자산 ${b.base.toFixed(2)} USDT · 목표 ${(b.base * (1 + P.dayTarget / 100)).toFixed(2)} (+${P.dayTarget}%)`);
     }
-    if (!b.hit && st.pos.length) {
+    if (st.pos.length) {
       const eq = equity(), goal = b.base * (1 + P.dayTarget / 100);
       if (eq >= goal) {
         for (const o of st.ord.slice()) { try { E.cancelOrder(st, o.id, now); } catch (e) {} }
         let sum = 0;
         for (const p of st.pos.slice()) {
-          const px = pxOf(p.sym) || p.entry;
-          const tr = E.closePosition(st, p, px, "Daily target", now);
+          const tr = E.closePosition(st, p, pxOf(p.sym) || p.entry, "Target", now);
           sum += tr.pnl;
-          const m = p.sym;
-          if (b.act[m]) { b.done[m] = { key: b.act[m].key, t: now }; delete b.act[m]; }
+          if (b.act[p.sym]) { b.done[p.sym] = { key: b.act[p.sym].key, t: now }; delete b.act[p.sym]; }
         }
-        b.hit = true;
-        const after = st.bal + st.pos.reduce((s, p) => s + p.margin, 0);
-        say(`🎯 하루 목표 달성 → 전량 정리 · 정리 손익 ${sum.toFixed(2)} USDT · 자산 ${after.toFixed(2)} (기준 대비 +${((after / b.base - 1) * 100).toFixed(2)}%) · 오늘은 쉼`);
+        const after = st.bal;
+        say(`🎯 목표 달성 → 전량 정리 · 정리 손익 ${sum.toFixed(2)} USDT · 자산 ${after.toFixed(2)} (기준 대비 +${((after / b.base - 1) * 100).toFixed(2)}%) · 새 기준 ${after.toFixed(2)}, 목표 ${(after * (1 + P.dayTarget / 100)).toFixed(2)}`);
+        b.base = after; b.wins = (b.wins || 0) + 1;
+        return { dirty, log };                                        // 이번 차례는 정리만, 다음 5분부터 다시 진입
       }
     }
-    if (b.hit) return { dirty, log };                                 // 목표 달성한 날은 새로 진입 안 함
 
     // 2) 새 진입 후보: 지금 "진입 구간"인 코인
     const cands = [];
