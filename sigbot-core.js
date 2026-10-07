@@ -5,7 +5,7 @@
                                    · 시총 150위 안에서 거래량 상위 50개 · 진입가는 1시간봉 마감 때 다시 계산
   규칙
   - 상태가 "진입 구간"(진입가에 닿았고 아직 이탈 전)이 되면 진입 시작 (롱만)
-  - 코인 하나 = (계좌 자산 × 레버리지 10배)의 2%, 3번에 나눠 매수 (교차 10배 — 남은 잔고 전체가 증거금으로 같이 버팀)
+  - 코인 하나 = (계좌 자산 × 레버리지 10배)의 2%, 3번에 나눠 매수 — 비중 1:2:3 (아래로 갈수록 크게) (교차 10배 — 남은 잔고 전체가 증거금으로 같이 버팀)
       손절폭 d = 평균 반등 × 1.5  (예: 평균 반등 2% → 손절 -3%)
       1차 = 진입가, 2차 = 진입가 -d/3, 3차 = 진입가 -2d/3, 손절 = 진입가 -d
       익절 = 예상 반등가 (진입가 + 평균 반등)
@@ -25,7 +25,7 @@
     // 신호 계산 (Signals 탭 기본값)
     interval: "1h", count: 2000, n: 5, k: 20, ratio: 1, top: 50, mcap: 150,
     // 매매
-    lev: 10, mode: "cross", maxCoins: 10, pct: 2, splits: 3, slFrac: 1.5,
+    lev: 10, mode: "cross", maxCoins: 10, pct: 2, splits: 3, w: [1, 2, 3], slFrac: 1.5,   // w = 분할 비중 (아래로 갈수록 크게 1:2:3)
     minTouches: 3,              // 과거 터치가 너무 적은 코인은 통계가 의미 없어서 제외
   };
   const LOG_MAX = 150;
@@ -96,18 +96,19 @@
         continue;
       }
       const eq = E.summary(st).equity;
-      const per = eq * P.lev * P.pct / 100 / P.splits;              // 분할 1번 금액 (USDT, 포지션 크기)
+      const tot = eq * P.lev * P.pct / 100, wsum = P.w.reduce((s, v) => s + v, 0);
+      const per = P.w.map(v => tot * v / wsum);                     // 분할별 금액 (USDT, 포지션 크기) 1:2:3
       const a = { key: x.key, level: x.lvl, tp: pl.tp, sl: pl.sl, lv: pl.lv, per, t: now, oids: [] };
       // 이미 지나간 분할(가격 ≥ 현재가)은 시장가로 한꺼번에
       const now1 = pl.lv.filter(v => v >= px).length || 1;
       try {
-        const r = E.placeOrder(st, { sym: m, side: "long", lev: P.lev, mode: P.mode, qty: per * now1 / px, type: "market", tp: pl.tp, sl: pl.sl }, px, now);
+        const r = E.placeOrder(st, { sym: m, side: "long", lev: P.lev, mode: P.mode, qty: per.slice(0, now1).reduce((s, v) => s + v, 0) / px, type: "market", tp: pl.tp, sl: pl.sl }, px, now);
         a.pid = r.pos.id;
       } catch (e) { say(`${name} 진입 실패: ${e.message}`); b.done[m] = { key: x.key, t: now }; continue; }
       const waits = [];
       for (let i = now1; i < pl.lv.length; i++) {
         try {
-          const r = E.placeOrder(st, { sym: m, side: "long", lev: P.lev, mode: P.mode, qty: per / pl.lv[i], type: "limit", price: pl.lv[i], tp: pl.tp, sl: pl.sl }, px, now);
+          const r = E.placeOrder(st, { sym: m, side: "long", lev: P.lev, mode: P.mode, qty: per[i] / pl.lv[i], type: "limit", price: pl.lv[i], tp: pl.tp, sl: pl.sl }, px, now);
           if (r.ord) a.oids.push(r.ord.id);
           waits.push(fx(pl.lv[i]));
         } catch (e) { say(`${name} ${i + 1}차 지정가 실패: ${e.message}`); }
