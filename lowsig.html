@@ -87,10 +87,13 @@
 
   <div class="card">
     <h2>Artha Trading Engine</h2>
-    <p class="sub"><b>비트코인(BTCUSDT 무기한)</b> 전용 · 신호는 <b>12시간봉</b>으로 계산해요(진입1은 봉 마감 때 확정). 진입2·진입3·익절·SL은 <b>1분봉</b>으로 확인한 정확한 시각·가격이에요.</p>
+    <p class="sub"><b>비트코인(BTCUSDT)·이더리움(ETHUSDT) 무기한</b> 전용 · 신호는 <b>12시간봉</b>으로 계산해요(진입1은 봉 마감 때 확정). 진입2·진입3·익절·SL은 <b>1분봉</b>으로 확인한 정확한 시각·가격이에요.</p>
     <div class="grid">
       <label>방향
         <span class="seg" id="dir"><button data-v="both" class="on">롱+숏</button><button data-v="long">롱만</button><button data-v="short">숏만</button></span>
+      </label>
+      <label>코인
+        <span class="seg notranslate" id="coin" translate="no"><button data-v="BTC" class="on">BTC</button><button data-v="ETH">ETH</button></span>
       </label>
     </div>
   </div>
@@ -148,7 +151,12 @@ const kst = (ms, withYear = true) => {
   return `${withYear ? d.getUTCFullYear() + "-" : ""}${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
 };
 
-const sym = "BTC";                                     // 비트코인 전용 (알트에는 잘 안 맞아서)
+// 비트코인·이더리움만 (알트에는 잘 안 맞아서). 주소 끝 #eth 또는 마지막에 고른 코인
+let sym = (() => {
+  const h = location.hash.slice(1).toUpperCase();
+  if (h === "BTC" || h === "ETH") return h;
+  try { return localStorage.getItem("lowsig-coin-v1") === "ETH" ? "ETH" : "BTC"; } catch (e) { return "BTC"; }
+})();
 let dir = "both", fineTf = "12h";
 let bars12 = [], result = null, showN = 40, selEv = null, lastPrice = NaN, runId = 0;
 
@@ -196,7 +204,7 @@ async function run() {
     st.textContent = "불러오는 중…";
     const [bars, j] = await Promise.all([
       load12h(sym),
-      fetch("api/lowsig").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`api/lowsig?sym=${sym}`).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     if (my !== runId) return;
     bars12 = bars;
@@ -213,7 +221,7 @@ async function run() {
     }
     showN = 40; selEv = null;
     paintAll();
-    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 BTCUSDT 무기한 · ` +
+    st.textContent = `마지막 12시간봉 마감 ${kst(lastT + H12)} · 바이낸스 ${sym}USDT 무기한 · ` +
       (fromServer ? "1분봉 기준 계산" : "12시간봉 기준 추정 (서버 결과를 못 받아서)");
   } catch (e) {
     st.textContent = e.message === "BN_LIMIT" ? "바이낸스 요청 한도에 걸렸어요. 몇 분 뒤 새로고침해 주세요" : e.message;
@@ -309,7 +317,7 @@ async function drawChart(focus) {
   // 차트에 쓸 봉: 12시간봉이면 이미 받아 둔 전체 기간을 그대로 (추가 요청 없음),
   // 분봉이면 한 번에 받을 수 있는 최대 1,500개 (특정 신호를 눌렀으면 그 주변, 아니면 최근)
   const tf = fineTf, step = TF_MS[tf], N = 1500;
-  $("chartTitle").innerHTML = `BTCUSDT · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
+  $("chartTitle").innerHTML = `${sym}USDT · ${TF_KO[tf]}` + (focus ? ` · <span class="muted small">${kst(focus.t)} 주변</span>` : "");
   let cs;
   if (tf === "12h") cs = bars12;
   else {
@@ -405,6 +413,21 @@ for (const b of $("dir").querySelectorAll("button")) b.onclick = () => {
   for (const x of $("dir").querySelectorAll("button")) x.classList.toggle("on", x === b);
   if (api) { result = api[dir]; showN = 40; selEv = null; paintAll(); } else run();
 };
+// 코인 바꾸기 (BTC ↔ ETH): 처음부터 다시 불러옴
+function setCoin(c) {
+  sym = c === "ETH" ? "ETH" : "BTC";
+  for (const x of $("coin").querySelectorAll("button")) x.classList.toggle("on", x.dataset.v === sym);
+  try { localStorage.setItem("lowsig-coin-v1", sym); } catch (e) {}
+}
+for (const b of $("coin").querySelectorAll("button")) b.onclick = () => {
+  if (b.dataset.v === sym) return;
+  setCoin(b.dataset.v);
+  history.replaceState(null, "", "#" + sym.toLowerCase());
+  api = null; result = null; bars12 = []; lastPrice = NaN; selEv = null;
+  liveClose();
+  run();
+};
+setCoin(sym);
 // 차트 위 시간 단위 버튼: 차트만 그 봉으로 바뀜 (신호 시각은 서버가 1분봉으로 계산해 둠)
 for (const b of $("tfbar").querySelectorAll("button")) b.onclick = () => {
   if (fineTf === b.dataset.tf) return;

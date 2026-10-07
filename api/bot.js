@@ -1,4 +1,4 @@
-/* POST /api/bot — 양방향 추세추종 v4(12시간봉) 자동매매. 관리자 계정(ADMIN_NICKNAME, 또는 BOT_NICKNAME)의 모의투자에만 주문해요.
+/* POST /api/bot — 양방향 추세추종 v4(12시간봉) 자동매매 (비트코인 + 이더리움, 코인마다 따로 같은 규칙). 관리자 계정(ADMIN_NICKNAME, 또는 BOT_NICKNAME)의 모의투자에만 주문해요.
    GitHub Actions(.github/workflows/bot.yml)가 15분마다 불러요.
    - 헤더 Authorization: Bearer <BOT_SECRET>  (Vercel 환경변수 BOT_SECRET 과 같아야 함 — 코드·저장소에는 없음)
    - BOT_SECRET 이 없으면 아무것도 하지 않아요. BOT_PAUSED=1 이면 잠시 멈춤
@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
     const user = await db.getJSON(key);
     if (!user) throw A.fail(404, "Bot account not found");
 
-    if (req.method === "GET") return res.status(200).json({ ok: true, bot: user.bot || null });
+    if (req.method === "GET") return res.status(200).json({ ok: true, bot: user.bot || null, bots: user.bots || null });
     if (req.method !== "POST") throw A.fail(405, "GET or POST only");
     if (process.env.BOT_PAUSED === "1") return res.status(200).json({ ok: true, paused: true });
 
@@ -37,10 +37,19 @@ module.exports = async (req, res) => {
       await db.setJSON(key, user);
       return res.status(202).json({ ok: true, catchingUp: true });
     }
-    const [bars, cur] = await Promise.all([B.candles(C.P.sym, "12h", 1500), B.price(C.P.sym)]);
-    const out = C.step(user, bars, cur, now, E);
-    if (out.dirty || sy.dirty) await db.setJSON(key, user);
-    res.status(200).json({ ok: true, did: out.log, events: sy.events, side: user.bot.side, stop: user.bot.stop || null });
+    const data = await Promise.all(C.P.syms.map(s => Promise.all([B.candles(s, "12h", 1500), B.price(s)])));
+    let dirty = sy.dirty;
+    const did = [], state = {};
+    C.P.syms.forEach((s, i) => {                          // 같은 계정이라 차례대로 (잔고를 같이 씀)
+      const [bars, cur] = data[i];
+      const out = C.step(user, bars, cur, now, E, s);
+      if (out.dirty) dirty = true;
+      did.push(...out.log);
+      const b = C.stateOf(user, s);
+      state[s] = { side: b.side, stop: b.stop || null };
+    });
+    if (dirty) await db.setJSON(key, user);
+    res.status(200).json({ ok: true, did, events: sy.events, state, side: user.bot.side, stop: user.bot.stop || null });
   } catch (e) {
     res.status(e.status || 400).json({ error: e.message });
   }

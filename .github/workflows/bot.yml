@@ -22,4 +22,6 @@ jobs:
           curl -sS --fail-with-body -X POST -H "Authorization: Bearer $BOT_SECRET" \
             https://fibo-lab-kappa.vercel.app/api/bot
       - name: Trading Engine 결과 미리 계산 (/api/lowsig)
-        run: curl -sS -o /dev/null -w "lowsig %{http_code} %{time_total}s\n" https://fibo-lab-kappa.vercel.app/api/lowsig || true
+        run: |
+          curl -sS -o /dev/null -w "lowsig BTC %{http_code} %{time_total}s\n" "https://fibo-lab-kappa.vercel.app/api/lowsig?sym=BTC" || true
+          curl -sS -o /dev/null -w "lowsig ETH %{http_code} %{time_total}s\n" "https://fibo-lab-kappa.vercel.app/api/lowsig?sym=ETH" || true
