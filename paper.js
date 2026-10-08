@@ -23,7 +23,7 @@
 
   let adminView = null;                                     // 관리자: 상세 보기 중인 사용자 정보 (실시간 포지션)
   const S = { token: ls.get(K.token), nick: ls.get(K.nick), admin: false, st: null, sym: ls.get(K.sym) || "BTCUSDT", iv: "15m", ctab: ls.get(K.ctab) === "mine" ? "mine" : "tv",
-              otype: "limit", mode: ls.get(K.mode) === "cross" ? "cross" : "isolated", tab: "pos", px: {}, t24: {}, mark: {}, book: null, trades: [], coins: [],
+              otype: ls.get("paper-otype-v1") === "limit" ? "limit" : "market", mode: ls.get(K.mode) === "cross" ? "cross" : "isolated", tab: "pos", px: {}, t24: {}, mark: {}, book: null, trades: [], coins: [],
               lastSync: 0, syncing: false, lastCross: 0, first: true, notes: [], unread: 0, sound: ls.get(K.sound) !== "0", warned: {} };
   const base = s => CoinMeta.base(s.replace(/USDT$/, ""));
   const pxOf = s => S.px[s];
@@ -341,13 +341,14 @@
     $("picker").hidden = true;
     S.sym = sym; ls.set(K.sym, sym); lastMid = 0; midDir = "";
     S.book = null; S.trades = []; renderBook(); renderTrades();
-    $("oprice").value = ""; $("qty").value = ""; $("pct").value = 0;
+    $("oprice").value = ""; $("qty").value = ""; $("pct").value = 0; showMktPrice();
     renderHd(); subscribe(); loadTicker(); renderTV(); loadChart(); renderOrderInfo();
   }
 
   // ── 상단 시세 ────────────────────────────────────────────────
   let lastPx = 0;
   function renderHd() {
+    showMktPrice();
     const b = base(S.sym), p = S.px[S.sym], t = S.t24[S.sym], m = S.mark[S.sym];
     const ck = S.sym + (CoinMeta.logo(b) ? "|logo" : "");          // 로고 정보가 늦게 도착해도 다시 그림
     if ($("coinbtn").dataset.k !== ck) { $("coinbtn").innerHTML = `${logoImg(b)}<span>${esc(b)}<small> USDT Perp</small></span> ▾`; $("coinbtn").dataset.k = ck; }
@@ -529,10 +530,20 @@
     return +q.toFixed(dec);
   }
   function setType(t) {
-    S.otype = t;
+    const was = S.otype;
+    S.otype = t; ls.set("paper-otype-v1", t);
     [...$("otype").children].forEach(b => b.classList.toggle("on", b.dataset.t === t));
-    $("prow").hidden = t !== "limit";
+    const inp = $("oprice"), mkt = t === "market";
+    inp.readOnly = mkt; inp.classList.toggle("mkt", mkt); $("usecur").hidden = mkt;
+    if (mkt) showMktPrice();
+    else if (was === "market") inp.value = S.px[S.sym] ? S.px[S.sym].toFixed(pdec(S.px[S.sym])) : "";   // 지정가로 바꾸면 지금 가격에서 시작
     renderOrderInfo();
+  }
+  // 시장가: 가격 칸에 지금 가격을 실시간으로 (입력은 안 됨, 체결은 주문 순간 가격)
+  function showMktPrice() {
+    if (S.otype !== "market") return;
+    const p = S.px[S.sym];
+    $("oprice").value = p ? `${p.toFixed(pdec(p))}  (Market)` : "Market";
   }
   $("otype").onclick = e => { const b = e.target.closest("button"); if (b) setType(b.dataset.t); };
   function setMode(m, say) {
@@ -1078,7 +1089,7 @@
     started = true;
     $("login").hidden = true; $("app").hidden = false;
     loadNotes();
-    setMode(S.mode); setLev(ls.get(K.lev) || 10); setType("limit");
+    setMode(S.mode); setLev(ls.get(K.lev) || 10); setType(S.otype);
     setCtab(S.ctab);
     setCollapsed(isMob() ? ls.get(K.collapsedM) !== "0" : ls.get(K.collapsed) === "1");   // 모바일은 기본 접힘
     renderHd(); renderBook(); renderTrades(); renderDot();
