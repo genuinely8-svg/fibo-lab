@@ -327,6 +327,16 @@
   $("plist").onclick = e => { const d = e.target.closest("[data-s]"); if (d) setSym(d.dataset.s); };
   document.addEventListener("click", () => { $("picker").hidden = true; });
 
+  // 어느 화면에서든 코인 이름(data-sym)을 누르면 그 코인 차트로 바꾸고 차트로 이동
+  document.addEventListener("click", e => {
+    const el = e.target.closest("[data-sym]");
+    if (!el) return;
+    const sym = String(el.dataset.sym || "").toUpperCase();
+    if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (S.sym !== sym) setSym(sym);
+    const cb = $("chartbox"); if (cb) cb.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, true);
   function setSym(sym) {
     $("picker").hidden = true;
     S.sym = sym; ls.set(K.sym, sym); lastMid = 0; midDir = "";
@@ -652,7 +662,7 @@
   function posRow(p) {
     const d = posDyn(p), id = p.id;
     return [
-      `<b>${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}`,
+      `<b class="cl" data-sym="${p.sym}" title="Open chart">${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}`,
       fq(p.qty), dyn("val:" + id, d.val), fp(p.entry), dyn("mark:" + id, d.mark), dyn("liq:" + id, d.liq),
       um(p.margin), dyn("ratio:" + id, d.ratio), dyn("pnl:" + id, d.pnl), `<span class="${pc(p.rp - p.fee)}">${sm(p.rp - p.fee)}</span>`,
       `<span class="g">TP ${p.tp ? fp(p.tp) : "-"}</span><span class="two r">SL ${p.sl ? fp(p.sl) : "-"}</span>${extraTp(p)}<button class="ghost mini" data-act="edit" data-id="${id}">Edit</button>`,
@@ -666,7 +676,7 @@
     const d = posDyn(p), id = p.id, b = esc(base(p.sym)), cl = E.modeOf(p) === "cross" ? "Cross" : "Isolated";
     const rp = p.rp - p.fee;
     return `<div class="pcd">
-      <div class="h"><b>${b}USDT</b><span class="chip ${p.side}">${sideTxt(p.side)}</span><span class="chip ${p.side}">${p.lev}x</span><span class="chip">${cl}</span><span class="chip">USDT</span></div>
+      <div class="h"><b class="cl" data-sym="${p.sym}" title="Open chart">${b}USDT</b><span class="chip ${p.side}">${sideTxt(p.side)}</span><span class="chip ${p.side}">${p.lev}x</span><span class="chip">${cl}</span><span class="chip">USDT</span></div>
       <div class="pnl"><div><span class="k">Unrealized PnL (USDT)</span>${dyn("cpnl:" + id, d.cpnl)}</div>
         <div class="rt"><span class="k">ROE</span>${dyn("croe:" + id, d.croe)}</div></div>
       <div class="grid">
@@ -690,7 +700,7 @@
                      { h: "Unrealized PnL (ROE)" }, { h: "Realized PnL" }, { h: "TP / SL" }, { h: "Opened" }, { h: "Close", c: "full" }];
   function ordRow(o) {
     const cur = S.px[o.sym], val = o.qty * o.price;
-    return [`<b>${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, o.ro ? `Limit close (${o.pct}%)` : "Limit", fp(o.price), fq(o.qty), um(val),
+    return [`<b class="cl" data-sym="${o.sym}" title="Open chart">${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, o.ro ? `Limit close (${o.pct}%)` : "Limit", fp(o.price), fq(o.qty), um(val),
       o.ro ? "-" : um(val / o.lev), dyn("cur:" + o.id, fp(cur)), o.ro ? "-" : `<span class="g">${o.tp ? fp(o.tp) : "-"}</span> / <span class="r">${o.sl ? fp(o.sl) : "-"}</span>`, mdhm(o.t),
       `<button class="ghost mini" data-act="cancel" data-id="${o.id}">Cancel</button>`];
   }
@@ -704,8 +714,8 @@
     const st = S.st;
     if (S.tab === "pos") return st.pos.length ? `<div class="ptable">${tbl(POS_HEADS, st.pos.map(posRow))}</div><div class="pcards">${st.pos.map(posCard).join("")}</div>` : '<div class="empty">No open positions</div>';
     if (S.tab === "ord") return st.ord.length ? tbl(ORD_HEADS, st.ord.map(ordRow)) : '<div class="empty">No open orders</div>';
-    if (S.tab === "ol") return st.ol.length ? tbl(OL_HEADS, st.ol.map(o => [`<b>${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, esc(L(o.kind)), fp(o.price), fq(o.qty), um(o.qty * o.price), `<b>${esc(L(o.status))}</b>`, mdhm(o.t)])) : '<div class="empty">No order history</div>';
-    if (S.tab === "th") return st.th.length ? tbl(TH_HEADS, st.th.map(t => t.kind === "deposit" ? depRow(t) : [`<b>${esc(base(t.sym))}</b> ${tagSide(t.side, E.modeOf(t), t.lev)}`, fq(t.qty), fp(t.entry), fp(t.exit), um(t.qty * t.exit),
+    if (S.tab === "ol") return st.ol.length ? tbl(OL_HEADS, st.ol.map(o => [`<b class="cl" data-sym="${o.sym}" title="Open chart">${esc(base(o.sym))}</b> ${tagSide(o.side, E.modeOf(o), o.lev)}`, esc(L(o.kind)), fp(o.price), fq(o.qty), um(o.qty * o.price), `<b>${esc(L(o.status))}</b>`, mdhm(o.t)])) : '<div class="empty">No order history</div>';
+    if (S.tab === "th") return st.th.length ? tbl(TH_HEADS, st.th.map(t => t.kind === "deposit" ? depRow(t) : [`<b class="cl" data-sym="${t.sym}" title="Open chart">${esc(base(t.sym))}</b> ${tagSide(t.side, E.modeOf(t), t.lev)}`, fq(t.qty), fp(t.entry), fp(t.exit), um(t.qty * t.exit),
         `<b class="${pc(t.pnl)}">${sm(t.pnl)}</b><span class="two ${pc(t.roe)}">${sg(t.roe)}%</span>`, um(t.fee), esc(L(t.reason)), t.ot ? mdhm(t.ot) : "-", mdhm(t.t)])) : '<div class="empty">No trade history</div>';
     return "";
   }
@@ -987,11 +997,11 @@
   }
   function renderAdminDetail() {
     const d = adminView;
-    const ord = d.ol.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${esc(L(o.kind))}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${esc(L(o.status))}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
+    const ord = d.ol.map(o => `<div class="lrow"><span><b class="cl" data-sym="${o.sym}" title="Open chart">${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${esc(L(o.kind))}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${esc(L(o.status))}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
     const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">Admin deposit +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
-      : `<div class="lrow"><span><b>${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(L(t.reason))}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
+      : `<div class="lrow"><span><b class="cl" data-sym="${t.sym}" title="Open chart">${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(L(t.reason))}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
         <span class="m">${admTradeInfo(t)}</span></div>`).join("") || '<div class="empty">None</div>';
-    const open = d.ord.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${o.ro ? "Limit close" : "Limit"}</span><span>${fq(o.qty)} @ ${fp(o.price)}</span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
+    const open = d.ord.map(o => `<div class="lrow"><span><b class="cl" data-sym="${o.sym}" title="Open chart">${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${o.ro ? "Limit close" : "Limit"}</span><span>${fq(o.qty)} @ ${fp(o.price)}</span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
     $("tabbody").innerHTML = `<button class="ghost mini" data-adm="back">← Back</button>
       <h2 style="margin:10px 0 4px">${esc(d.nick)} ${d.bl ? '<span class="tag short">Blocked</span>' : ""}</h2>
       <p class="sub">Joined ${dt(d.c)} · Last seen ${dt(d.la)} · Principal ${ut(d.dep)} · ${d.stats.w}W ${d.stats.n - d.stats.w}L</p>
@@ -1010,7 +1020,7 @@
       const px = S.px[p.sym] || p.entry, u = E.pnlOf(p.side, p.entry, px, p.qty), roe = u / p.margin * 100;
       up += u;
       const liq = E.liqOf(st, p, pxOf);
-      return `<div class="lrow"><span><b>${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}</span>
+      return `<div class="lrow"><span><b class="cl" data-sym="${p.sym}" title="Open chart">${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}</span>
         <span class="${pc(u)}"><b>${sg(u)} USDT</b> (${sg(roe)}%)</span>
         <span class="m">Size ${fq(p.qty)} (${fu(p.qty * px)} USDT) · Entry ${fp(p.entry)} → Now <b>${fp(px)}</b> · Margin ${fu(p.margin)}
           · Liq. <span class="o">${liq ? fp(liq) : "None"}</span> · TP ${p.tp ? fp(p.tp) : "-"} / SL ${p.sl ? fp(p.sl) : "-"} · ${mdhm(p.t)}</span></div>`;
