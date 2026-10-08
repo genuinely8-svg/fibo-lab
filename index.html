@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261009025237"></script>
+<script src="theme.js?v=20261009030347"></script>
 <title>Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -134,9 +134,10 @@
   #chartPanel{position:sticky;left:0}
   .ncell{display:flex;align-items:center}
   /* more 버튼: 상세 페이지로 */
-  a.more{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:99px;background:var(--accent);color:#fff;
-         font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.2px;vertical-align:middle}
-  a.more:hover{filter:brightness(1.12)}
+  /* more: 회색 테두리 알약 (초록 "진입 구간" 배지와 겹쳐 보이지 않게 색을 뺌) */
+  a.more{display:inline-block;margin-left:8px;padding:2px 10px;border-radius:99px;background:transparent;border:1px solid var(--line);color:var(--muted);
+         font-size:12px;font-weight:600;text-decoration:none;letter-spacing:.2px;vertical-align:middle;white-space:nowrap;transition:color .15s,border-color .15s}
+  a.more:hover{color:var(--text);border-color:var(--muted)}
   .mc,.tf{font-size:11px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px;white-space:nowrap}
   .mc{color:var(--muted);background:var(--bg);border:1px solid var(--line)}
   .tf{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
@@ -353,10 +354,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261009025237"></script>
-<script src="chart.js?v=20261009025237"></script>
-<script src="nav.js?v=20261009025237"></script>
-<script src="meta.js?v=20261009025237"></script>
+<script src="fib-core.js?v=20261009030347"></script>
+<script src="chart.js?v=20261009030347"></script>
+<script src="nav.js?v=20261009030347"></script>
+<script src="meta.js?v=20261009030347"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -702,7 +703,7 @@ function renderTable() {
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
     const logo = logoHtml(r.market);
     const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
-      + `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a></div>`;
+      + `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a></div>`;
     if (r.error) return `<tr${NT}><td class="rk">-</td><td>${name}</td><td colspan="10" style="text-align:left;color:var(--muted)">${r.error}</td></tr>`;
     const row = `<tr${NT} data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}${isLow(r) ? " lowsample" : ""}" title="${isLow(r) ? LOW_TIP : ROW_TIP}">${rowTds(r, ++rank, name)}</tr>`;
     // 펼친 코인이면 바로 아래에 차트 줄을 하나 더
@@ -724,7 +725,7 @@ mq.addEventListener("change", () => { chartPanel.style.width = ""; renderTable()
 function cardParts(r) {
   const s = r.stats, c = r.current;
   const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
-  const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
+  const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a>`;
   const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
   return {
     st: badge(c),
@@ -742,7 +743,7 @@ function renderCards(rows) {
   let rank = 0;
   $("cards").innerHTML = rows.filter(r => !r.error || mode === "watch").map(r => {
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
-    const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more</a>`;
+    const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a>`;
     if (r.error) return `<div class="ccard"${NT}><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
       <div class="c3">${r.error}${more}</div></div>`;
     const open = r.market === openCoin, p = cardParts(r);
