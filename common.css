@@ -12,6 +12,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;font-size:14px}
+html{scrollbar-gutter:stable}   /* 스크롤바 유무로 가운데 위치가 바뀌지 않게 */
 .wrap{max-width:1320px;margin:0 auto;padding:20px 16px 60px}   /* 모든 탭 같은 폭 (로고·탭 위치가 탭마다 안 바뀌게) */
 h1{font-size:22px;margin:0 0 4px}
 h2{font-size:16px;margin:0 0 12px}

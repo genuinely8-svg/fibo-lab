@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261009025102"></script>
+<script src="theme.js?v=20261009025237"></script>
 <title>Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -26,6 +26,7 @@
   }
   :root[data-theme="dark"]{ --accent:#22c55e; --pos:#22c55e; --neg:#f0625a }
   :root[data-theme="dark"][data-dir="short"]{ --accent:#ef4444 }
+  html{scrollbar-gutter:stable}   /* 스크롤바가 있는 긴 페이지와 없는 짧은 페이지에서 가운데 위치가 안 바뀌게 */
   *{box-sizing:border-box}
   .wrap{max-width:1320px;margin:0 auto;padding:20px 16px 60px}   /* 다른 탭(common.css)과 같은 폭 */
   body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;font-size:14px}
@@ -352,10 +353,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261009025102"></script>
-<script src="chart.js?v=20261009025102"></script>
-<script src="nav.js?v=20261009025102"></script>
-<script src="meta.js?v=20261009025102"></script>
+<script src="fib-core.js?v=20261009025237"></script>
+<script src="chart.js?v=20261009025237"></script>
+<script src="nav.js?v=20261009025237"></script>
+<script src="meta.js?v=20261009025237"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
