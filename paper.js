@@ -21,6 +21,7 @@
     del: k => { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
+  let adminView = null;                                     // 관리자: 상세 보기 중인 사용자 정보 (실시간 포지션)
   const S = { token: ls.get(K.token), nick: ls.get(K.nick), admin: false, st: null, sym: ls.get(K.sym) || "BTCUSDT", iv: "15m", ctab: ls.get(K.ctab) === "mine" ? "mine" : "tv",
               otype: "limit", mode: ls.get(K.mode) === "cross" ? "cross" : "isolated", tab: "pos", px: {}, t24: {}, mark: {}, book: null, trades: [], coins: [],
               lastSync: 0, syncing: false, lastCross: 0, first: true, notes: [], unread: 0, sound: ls.get(K.sound) !== "0", warned: {} };
@@ -242,6 +243,7 @@
     const s = S.sym.toLowerCase(), set = new Set([`${s}@aggTrade`, `${s}@ticker`, `${s}@markPrice@1s`]);
     if (S.ctab === "mine") set.add(`${s}@kline_${S.iv}`);
     if (S.st) for (const x of S.st.pos.concat(S.st.ord)) if (x.sym !== S.sym) { set.add(x.sym.toLowerCase() + "@miniTicker"); }
+    if (adminView) for (const x of adminView.pos.concat(adminView.ord)) if (x.sym !== S.sym) set.add(x.sym.toLowerCase() + "@miniTicker");   // 관리자: 보고 있는 사용자의 코인
     return set;
   });
   const pub = new Sock("/public/ws", () => new Set([`${S.sym.toLowerCase()}@depth20@500ms`]));
@@ -955,7 +957,7 @@
   $("reset").onclick = () => { if (confirm("This clears your balance, positions and history and restarts with 10,000 USDT. Continue?")) sendAction({ action: "reset" }).catch(() => {}); };
 
   // ── 관리자 ───────────────────────────────────────────────────
-  let adminRows = null, adminLog = [], adminView = null;     // adminView: 상세 보기 중인 사용자 정보
+  let adminRows = null, adminLog = [];
   const dt = t => t ? mdhm(t) : "-";
   async function loadAdmin() {
     $("tabbody").innerHTML = '<div class="empty">Loading…</div>';
@@ -981,17 +983,53 @@
     const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">Admin deposit +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
       : `<div class="lrow"><span><b>${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(L(t.reason))}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
         <span class="m">${fq(t.qty)} · ${fp(t.entry)} → ${fp(t.exit)} · ${mdhm(t.t)}</span></div>`).join("") || '<div class="empty">None</div>';
+    const open = d.ord.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${o.ro ? "Limit close" : "Limit"}</span><span>${fq(o.qty)} @ ${fp(o.price)}</span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
     $("tabbody").innerHTML = `<button class="ghost mini" data-adm="back">← Back</button>
       <h2 style="margin:10px 0 4px">${esc(d.nick)} ${d.bl ? '<span class="tag short">Blocked</span>' : ""}</h2>
-      <p class="sub">Joined ${dt(d.c)} · Last seen ${dt(d.la)} · Balance ${ut(d.bal)} · Principal ${ut(d.dep)} · ${d.stats.w}W ${d.stats.n - d.stats.w}L · ${d.pos.length} positions · ${d.ord.length} open orders</p>
-      <h2>Recent trades</h2>${th}<h2 style="margin-top:16px">Recent orders</h2>${ord}`;
+      <p class="sub">Joined ${dt(d.c)} · Last seen ${dt(d.la)} · Principal ${ut(d.dep)} · ${d.stats.w}W ${d.stats.n - d.stats.w}L</p>
+      <div id="admlive"></div>
+      <h2 style="margin-top:16px">Open orders (${d.ord.length})</h2>${open}
+      <h2 style="margin-top:16px">Recent trades</h2>${th}<h2 style="margin-top:16px">Recent orders</h2>${ord}`;
+    paintAdminLive();
   }
+  // 관리자: 보고 있는 사용자의 포지션을 실시간 가격으로 (1초마다 다시 그림, 10초마다 서버에서 새로 받음)
+  function paintAdminLive() {
+    const d = adminView, el = $("admlive");
+    if (!d || !el) return;
+    const st = { bal: d.bal, pos: d.pos };
+    let up = 0;
+    const rows = d.pos.map(p => {
+      const px = S.px[p.sym] || p.entry, u = E.pnlOf(p.side, p.entry, px, p.qty), roe = u / p.margin * 100;
+      up += u;
+      const liq = E.liqOf(st, p, pxOf);
+      return `<div class="lrow"><span><b>${esc(base(p.sym))}</b> ${tagSide(p.side, E.modeOf(p), p.lev)}</span>
+        <span class="${pc(u)}"><b>${sg(u)} USDT</b> (${sg(roe)}%)</span>
+        <span class="m">Size ${fq(p.qty)} (${fu(p.qty * px)} USDT) · Entry ${fp(p.entry)} → Now <b>${fp(px)}</b> · Margin ${fu(p.margin)}
+          · Liq. <span class="o">${liq ? fp(liq) : "None"}</span> · TP ${p.tp ? fp(p.tp) : "-"} / SL ${p.sl ? fp(p.sl) : "-"} · ${mdhm(p.t)}</span></div>`;
+    }).join("") || '<div class="empty">No open positions</div>';
+    const eq = d.bal + d.pos.reduce((a, p) => a + p.margin, 0) + up, ret = (eq - d.dep) / d.dep * 100;
+    el.innerHTML = `<div class="lrow" style="font-size:13.5px"><span>Equity <b>${ut(eq)}</b> <span class="${pc(ret)}">(${sg(ret)}%)</span></span>
+        <span>Unrealized <b class="${pc(up)}">${sg(up)} USDT</b></span>
+        <span class="m">Available ${ut(d.bal)} · updated ${new Date(d.at || Date.now()).toLocaleTimeString("en-GB")} · <span class="g">● live prices</span></span></div>
+      <h2 style="margin-top:12px">Open positions (${d.pos.length})</h2>${rows}`;
+  }
+  let admBusy = false;
+  async function reloadAdminView() {
+    if (admBusy || !adminView || S.tab !== "adm" || document.hidden) return;
+    admBusy = true;
+    try {
+      const nick = adminView.nick, r = await post("/api/admin", { action: "detail", nick });
+      if (adminView && adminView.nick === nick) { adminView = r; renderAdminDetail(); mkt.sync(); }
+    } catch (e) {} finally { admBusy = false; }
+  }
+  setInterval(() => { if (adminView && S.tab === "adm" && !document.hidden) paintAdminLive(); }, 1000);
+  setInterval(reloadAdminView, 10000);
   $("tabbody").addEventListener("click", async e => {
     const b = e.target.closest("[data-adm]"); if (!b) return;
     const act = b.dataset.adm, nick = b.dataset.n;
     try {
-      if (act === "back") { adminView = null; return renderAdmin(); }
-      if (act === "detail") { adminView = await post("/api/admin", { action: "detail", nick }); return renderAdmin(); }
+      if (act === "back") { adminView = null; mkt.sync(); return renderAdmin(); }
+      if (act === "detail") { adminView = await post("/api/admin", { action: "detail", nick }); mkt.sync(); return renderAdmin(); }
       let r;
       if (act === "charge") {
         const amt = num(b.parentElement.querySelector("input").value);

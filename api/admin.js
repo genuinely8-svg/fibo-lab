@@ -4,6 +4,7 @@
 const db = require("./_lib/db");
 const A = require("./_lib/auth");
 const E = require("../paper-engine");
+const { sync } = require("./_lib/sync");
 
 const LOG_KEEP = 200;
 
@@ -39,7 +40,9 @@ module.exports = async (req, res) => {
 
     if (b.action === "detail") {
       const s = target.st;
-      return res.status(200).json({ nick: target.nick, c: target.c, la: target.la || null, bl: !!target.bl, pos: s.pos, ord: s.ord, ol: s.ol.slice(0, 50), th: s.th.slice(0, 50), stats: s.st, bal: s.bal, dep: s.dep });
+      // 보는 순간까지의 TP/SL·청산·지정가 체결을 1분봉으로 반영해서 보여줌 (화면용 — 저장은 안 함, 그 사용자가 접속하면 똑같이 처리됨)
+      try { await sync(s, now); E.mergeAll(s); } catch (e) {}
+      return res.status(200).json({ nick: target.nick, c: target.c, la: target.la || null, bl: !!target.bl, pos: s.pos, ord: s.ord, ol: s.ol.slice(0, 50), th: s.th.slice(0, 50), stats: s.st, bal: s.bal, dep: s.dep, at: now });
     }
     if (b.action === "charge") {
       const amt = Math.round(Number(b.amount) * 100) / 100;
