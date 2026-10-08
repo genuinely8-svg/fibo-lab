@@ -11,6 +11,7 @@
   - TP/SL 세 종류 (비트겟과 같은 구성)
     · 전체 포지션 TP/SL: p.tp / p.sl → 닿으면 포지션 전부 정리
     · 부분 포지션 TP/SL (분할 익절): p.pt = [{id, qty, tp, sl}] → 둘 중 먼저 닿는 쪽으로 qty 만큼 정리하고 그 주문은 사라짐 (OCO)
+      (frac 이 있으면 qty 대신 "체결 순간 물량 × frac" 만큼 — 분할 매수가 늘어나도 비율 유지, 자동매매 봇만 씀)
     · 트레일링: p.trl = {qty, cb(되돌림 %), act(작동 가격, 없으면 바로 작동), ext(작동 뒤 가장 유리했던 가격)}
       → 작동 뒤 가장 유리했던 가격에서 cb% 되돌아오면 qty 만큼 시장가로 정리
     · 한 봉 안에서 손절 쪽(SL·부분 SL·트레일링·청산)은 지금 가격에 가까운 것부터 차례로 처리
@@ -378,7 +379,7 @@
           else {
             if (!p.pt || !p.pt.includes(x.o)) continue;
             p.pt = p.pt.filter(o => o !== x.o);
-            push("tp", p, closePosition(st, p, x.px, "TP", t + MIN, Math.min(p.qty, x.o.qty)));
+            push("tp", p, closePosition(st, p, x.px, "TP", t + MIN, x.o.frac ? r8(p.qty * x.o.frac) : Math.min(p.qty, x.o.qty)));   // frac: 그때 물량의 비율 (자동매매 봇용)
           }
         }
         if (st.pos.includes(p) && p.pt && !p.pt.length) delete p.pt;

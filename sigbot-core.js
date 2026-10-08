@@ -8,7 +8,9 @@
   - 코인 하나 = (계좌 자산 × 레버리지 10배)의 5%, 3번에 나눠 매수 — 비중 1:2:3 (아래로 갈수록 크게) (교차 10배 — 남은 잔고 전체가 증거금으로 같이 버팀)
       손절폭 d = 평균 반등 × 1.5  (예: 평균 반등 2% → 손절 -3%)
       1차 = 진입가, 2차 = 진입가 -d/3, 3차 = 진입가 -2d/3, 손절 = 진입가 -d
-      익절 = 예상 반등가 (진입가 + 평균 반등)
+      1차 익절 = 진입가 + 평균 반등 × 50% 에서 포지션 50% 익절 (부분 TP)
+        → 체결되면 남은 분할 지정가 주문 취소 + 남은 물량 손절을 본전(평단 +0.1%)으로 올림 (5분 안에)
+      최종 익절 = 예상 반등가 (진입가 + 평균 반등) 에서 남은 물량 전부
       → 손절·익절은 첫 진입가 기준으로 고정 (추가 매수해도 안 바뀜)
   - 봇이 볼 때 이미 지나간 분할 가격은 시장가로 한꺼번에, 아직 안 온 분할은 지정가 주문으로 걸어 둠
   - 익절·손절은 모의투자 TP/SL 로 걸어 두어서 1분봉 기준으로 닿는 순간 처리됨
@@ -29,7 +31,9 @@
     // 신호 계산 (Signals 탭 기본값)
     interval: "1h", count: 2000, n: 5, k: 20, ratio: 1, top: 50, mcap: 150,
     // 매매
-    lev: 10, mode: "cross", maxCoins: 10, pct: 5, splits: 3, w: [1, 2, 3], slFrac: 1.5,   // w = 분할 비중 (아래로 갈수록 크게 1:2:3)
+    lev: 10, mode: "cross", maxCoins: 10, pct: 5, splits: 3, w: [1, 2, 3], slFrac: 1.5,
+    half: 0.5, halfQty: 0.5,    // 분할 익절: 반등치의 50% 지점에서 50% 익절 → 남은 물량 손절은 본전(수수료 포함)으로
+    beBuf: 0.1,                 // 본전 손절 = 평단 +0.1% (왕복 수수료)   // w = 분할 비중 (아래로 갈수록 크게 1:2:3)
     minTouches: 3,              // 과거 터치가 너무 적은 코인은 통계가 의미 없어서 제외
     dayTarget: 3.2,             // 목표 (%): 계좌 자산(미실현 포함)이 기준 자산 대비 +3.2% 되면 전부 정리 → 지금 자산을 새 기준으로 바로 다시 시작
   };
@@ -41,7 +45,7 @@
     const d = rebound * P.slFrac;                                  // 손절폭 (%)
     const lv = [];
     for (let i = 0; i < P.splits; i++) lv.push(level * (1 - d * i / P.splits / 100));
-    return { lv, sl: level * (1 - d / 100), tp: level * (1 + rebound / 100), d };
+    return { lv, sl: level * (1 - d / 100), tp: level * (1 + rebound / 100), tp1: level * (1 + rebound * P.half / 100), d };
   }
 
   /*
@@ -131,7 +135,7 @@
       const eq = E.summary(st).equity;
       const tot = eq * P.lev * P.pct / 100, wsum = P.w.reduce((s, v) => s + v, 0);
       const per = P.w.map(v => tot * v / wsum);                     // 분할별 금액 (USDT, 포지션 크기) 1:2:3
-      const a = { key: x.key, level: x.lvl, tp: pl.tp, sl: pl.sl, lv: pl.lv, per, t: now, oids: [] };
+      const a = { key: x.key, level: x.lvl, tp: pl.tp, tp1: pl.tp1, sl: pl.sl, lv: pl.lv, per, t: now, oids: [] };
       // 이미 지나간 분할(가격 ≥ 현재가)은 시장가로 한꺼번에
       const now1 = pl.lv.filter(v => v >= px).length || 1;
       try {
@@ -148,7 +152,37 @@
       }
       b.act[m] = a;
       say(`${name} 진입 ${now1}/${P.splits}차 시장가 @ ${fx(px)} (진입가 ${fx(x.lvl)})` +
-          (waits.length ? ` · 대기 ${waits.join(", ")}` : "") + ` · 익절 ${fx(pl.tp)} · 손절 ${fx(pl.sl)} (-${pl.d.toFixed(2)}%)`);
+          (waits.length ? ` · 대기 ${waits.join(", ")}` : "") + ` · 1차 익절 ${fx(pl.tp1)}(50%) · 최종 익절 ${fx(pl.tp)} · 손절 ${fx(pl.sl)} (-${pl.d.toFixed(2)}%)`);
+    }
+
+    // 3) 분할 익절 관리: 1차 익절(부분 TP) 주문을 지금 물량의 50%로 맞춰 두고, 체결됐으면 본전 손절로
+    for (const m of Object.keys(b.act)) {
+      const a = b.act[m], p = posOf(m), name = m.replace(/USDT$/, "");
+      if (!p) continue;
+      if (a.half) continue;
+      const tp1 = a.tp1 || a.level * (1 + (a.tp / a.level - 1) * P.half);
+      const mine = (p.pt || []).find(o => o.id === a.ptId);
+      if (a.ptId && !mine) {                                        // 1차 익절 체결됨
+        a.half = true;
+        for (const o of st.ord.filter(o => !o.ro && o.sym === m && a.oids.includes(o.id))) { try { E.cancelOrder(st, o.id, now); } catch (e) {} }
+        const be = p.entry * (1 + P.beBuf / 100), px = prices[m] || p.entry;
+        if (px <= be) { const tr = E.closePosition(st, p, px, "Breakeven", now); say(`${name} 1차 익절 후 이미 본전 아래 → 남은 물량 정리 · 손익 ${tr.pnl.toFixed(2)} USDT`); }
+        else { p.sl = Math.max(p.sl || 0, be); say(`${name} 1차 익절(50%) 체결 → 남은 분할 주문 취소 · 손절을 본전 ${fx(p.sl)}으로`); }
+        dirty = true;
+        continue;
+      }
+      const want = Math.floor(p.qty * P.halfQty * 1e8) / 1e8, px = prices[m] || p.entry;
+      if (mine) { if (mine.frac !== P.halfQty || Math.abs(mine.qty - want) > want * 1e-6) { mine.qty = want; mine.frac = P.halfQty; dirty = true; } continue; }   // 체결 순간 물량의 50% (분할 매수로 늘어나도)
+      if (px >= tp1) {                                              // 이미 1차 익절가 위면 바로 50% 정리
+        const tr = E.closePosition(st, p, px, "TP", now, want);
+        a.ptId = -1; a.half = true;
+        for (const o of st.ord.filter(o => !o.ro && o.sym === m && a.oids.includes(o.id))) { try { E.cancelOrder(st, o.id, now); } catch (e) {} }
+        p.sl = Math.max(p.sl || 0, p.entry * (1 + P.beBuf / 100));
+        say(`${name} 이미 1차 익절가 위 → 50% 정리 (${tr.pnl.toFixed(2)} USDT) · 손절을 본전 ${fx(p.sl)}으로`);
+        continue;
+      }
+      try { const o = E.addPartial(st, p, { qty: want, tp: tp1 }, px); o.frac = P.halfQty; a.ptId = o.id; dirty = true; }
+      catch (e) { say(`${name} 1차 익절 주문 실패: ${e.message}`); a.half = true; }
     }
 
     // 끝난 기록은 7일 지나면 지움 (너무 커지지 않게)
