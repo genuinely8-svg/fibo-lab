@@ -341,7 +341,7 @@
     $("picker").hidden = true;
     S.sym = sym; ls.set(K.sym, sym); lastMid = 0; midDir = "";
     S.book = null; S.trades = []; renderBook(); renderTrades();
-    $("oprice").value = ""; $("qty").value = ""; $("pct").value = 0; showMktPrice();
+    $("oprice").value = ""; $("qty").value = ""; $("pct").value = 0; S.mktManual = false; $("oprice").classList.toggle("mkt", S.otype === "market"); showMktPrice();
     renderHd(); subscribe(); loadTicker(); renderTV(); loadChart(); renderOrderInfo();
   }
 
@@ -402,7 +402,7 @@
     if (isMob() && !fitting) { fitting = true; requestAnimationFrame(() => { fitting = false; fitBook(); }); }
   }
   let fitting = false;
-  $("book").onclick = e => { const r = e.target.closest("[data-p]"); if (r) { setType("limit"); $("oprice").value = r.dataset.p; renderOrderInfo(); } };
+  $("book").onclick = e => { const r = e.target.closest("[data-p]"); if (r) { $("oprice").value = r.dataset.p; if (S.otype === "market") { S.mktManual = true; $("oprice").classList.remove("mkt"); } renderOrderInfo(); } };   // 호가를 누르면 지금 주문 방식 그대로 가격만 넣음
   function renderTrades() {
     $("trades").innerHTML = `<div class="bhead"><span>Time</span><span>Price</span><span>Size</span></div>` + S.trades.map(t =>
       `<div class="trow"><span class="muted">${hms(t.T)}</span><span class="${t.m ? "r" : "g"}">${fp(t.p)}</span><span>${fq(t.q)}</span></div>`).join("");
@@ -520,7 +520,7 @@
 
   // ── 주문 패널: 마진 모드 · 레버리지 · 수량 ────────────────────
   const lev = () => Math.min(100, Math.max(1, Math.floor(+$("levn").value) || 1));
-  const refPrice = () => S.otype === "limit" && num($("oprice").value) > 0 ? num($("oprice").value) : S.px[S.sym];
+  const refPrice = () => num($("oprice").value) > 0 ? num($("oprice").value) : S.px[S.sym];   // 시장가도 입력한 가격이 있으면 그 가격으로 계산
   const rateNow = () => S.otype === "limit" ? E.FEE_MAKER : E.FEE_TAKER;
   const avail = () => S.st ? E.available(S.st) : 0;
   const stepOf = p => { const e = Math.ceil(Math.log10(p)); return { step: Math.pow(10, -e), dec: Math.max(0, e) }; };
@@ -533,18 +533,20 @@
     const was = S.otype;
     S.otype = t; ls.set("paper-otype-v1", t);
     [...$("otype").children].forEach(b => b.classList.toggle("on", b.dataset.t === t));
-    const inp = $("oprice"), mkt = t === "market";
-    inp.readOnly = mkt; inp.classList.toggle("mkt", mkt); $("usecur").hidden = mkt;
-    if (mkt) showMktPrice();
-    else if (was === "market") inp.value = S.px[S.sym] ? S.px[S.sym].toFixed(pdec(S.px[S.sym])) : "";   // 지정가로 바꾸면 지금 가격에서 시작
+    const mkt = t === "market";
+    $("oprice").classList.toggle("mkt", mkt && !S.mktManual);
+    $("prow").querySelector(".lt").textContent = mkt ? "Price (USDT) · Market" : "Price (USDT)";
+    if (mkt && was !== "market") { S.mktManual = false; showMktPrice(); }
+    else if (!mkt && was === "market" && !S.mktManual) $("oprice").value = S.px[S.sym] ? S.px[S.sym].toFixed(pdec(S.px[S.sym])) : "";
     renderOrderInfo();
   }
-  // 시장가: 가격 칸에 지금 가격을 실시간으로 (입력은 안 됨, 체결은 주문 순간 가격)
+  // 시장가: 직접 입력하거나 호가를 누르기 전까지는 가격 칸에 지금 가격을 실시간으로 (입력한 가격은 수량·비용·청산가 계산에 쓰고, 체결은 주문 순간 시장가)
   function showMktPrice() {
-    if (S.otype !== "market") return;
+    if (S.otype !== "market" || S.mktManual) return;
     const p = S.px[S.sym];
-    $("oprice").value = p ? `${p.toFixed(pdec(p))}  (Market)` : "Market";
+    $("oprice").value = p ? p.toFixed(pdec(p)) : "";
   }
+  $("oprice").addEventListener("input", () => { if (S.otype === "market") { S.mktManual = $("oprice").value.trim() !== ""; $("oprice").classList.toggle("mkt", !S.mktManual); } });
   $("otype").onclick = e => { const b = e.target.closest("button"); if (b) setType(b.dataset.t); };
   function setMode(m, say) {
     S.mode = m; ls.set(K.mode, m);
@@ -566,7 +568,7 @@
   $("levn").oninput = () => { if ($("levn").value !== "") setLev($("levn").value); };
   $("levn").onchange = () => setLev($("levn").value, true);
   $("lquick").onclick = e => { const b = e.target.closest("button"); if (b) setLev(b.dataset.l, true); };
-  $("usecur").onclick = () => { if (S.px[S.sym]) { $("oprice").value = S.px[S.sym].toFixed(pdec(S.px[S.sym])); renderOrderInfo(); } };
+  $("usecur").onclick = () => { if (S.px[S.sym]) { $("oprice").value = S.px[S.sym].toFixed(pdec(S.px[S.sym])); if (S.otype === "market") { S.mktManual = false; $("oprice").classList.add("mkt"); } renderOrderInfo(); } };   // 시장가에서 Last = 다시 실시간 가격 따라가기
   function pctToQty(p) {
     const ref = refPrice(); if (!ref) return;
     const { step, dec } = stepOf(ref), q = Math.floor(maxQty() * p / 100 / step) * step;
