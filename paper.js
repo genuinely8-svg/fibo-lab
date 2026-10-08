@@ -131,7 +131,7 @@
     try {
       let r = await post("/api/auth", { nick, pin });
       if (r.needCreate) {
-        if (!confirm(`'${nick}' is a new nickname.\nCreate a new account with this nickname and PIN?`)) return;
+        if (!(await ask(`'${nick}' is a new nickname.\nCreate a new account with this nickname and PIN?`, "Create"))) return;
         r = await post("/api/auth", { nick, pin, create: true });
       }
       S.token = r.token; S.nick = r.nick; ls.set(K.token, r.token); ls.set(K.nick, r.nick);
@@ -756,7 +756,7 @@
     const id = +b.dataset.id, act = b.dataset.act, p = S.st.pos.find(x => x.id === id);
     if (act === "close") {
       const pct = +b.dataset.pct;
-      if (p && confirm(`Market close ${pct}% of ${base(p.sym)} position?`)) sendAction({ action: "close", id, pct }).catch(() => {});
+      if (p) ask(`Market close ${pct}% of ${base(p.sym)} position?`, "Close").then(ok => { if (ok) sendAction({ action: "close", id, pct }).catch(() => {}); });
     } else if (act === "closesheet" && p) closeSheet(p);
     else if (act === "cancel") sendAction({ action: "cancel", id }).catch(() => {});
     else if (act === "limitclose" && p) {
@@ -976,7 +976,23 @@
     if (onOk) $("mno").onclick = () => { m.hidden = true; };
     $("myes").onclick = async () => { if (!onOk) { m.hidden = true; return; } try { await onOk(); m.hidden = true; } catch (e) {} };
   }
-  $("modal").onclick = e => { if (e.target === $("modal")) $("modal").hidden = true; };
+  const backdrop = e => { if (e.target === $("modal")) $("modal").hidden = true; };
+  $("modal").onclick = backdrop;
+  // 확인 창 (브라우저 기본 confirm 대신): 화면을 멈추지 않아서 뒤의 가격·차트·호가가 계속 실시간으로 움직임
+  function ask(msg, okText) {
+    return new Promise(res => {
+      const m = $("modal"); m.className = "";
+      m.innerHTML = `<div class="card"><p style="white-space:pre-line;margin:0 0 6px;font-size:14px">${esc(msg)}</p><div class="btns"><button class="ghost" id="mno">Cancel</button><button id="myes">${esc(okText || "Confirm")}</button></div></div>`;
+      m.hidden = false;
+      const done = v => { m.hidden = true; m.onclick = backdrop; document.removeEventListener("keydown", key); res(v); };
+      const key = e => { if (e.key === "Escape") done(false); else if (e.key === "Enter") { e.preventDefault(); done(true); } };
+      $("mno").onclick = () => done(false);
+      $("myes").onclick = () => done(true);
+      m.onclick = e => { if (e.target === m) done(false); };
+      document.addEventListener("keydown", key);
+      $("myes").focus();
+    });
+  }
 
   // ── 관리자 ───────────────────────────────────────────────────
   let adminRows = null, adminLog = [];
@@ -1065,17 +1081,17 @@
       if (act === "charge") {
         const amt = num(b.parentElement.querySelector("input").value);
         if (!(amt > 0)) return notify("warn", "Deposit", "Enter an amount");
-        if (!confirm(`Deposit ${fu(amt)} USDT to ${nick}?`)) return;
+        if (!(await ask(`Deposit ${fu(amt)} USDT to ${nick}?`))) return;
         r = await post("/api/admin", { action: "charge", nick, amount: amt });
       } else if (act === "reset") {
-        if (!confirm(`Clear all of ${nick}'s balance, positions and history and reset to 10,000 USDT?`)) return;
+        if (!(await ask(`Clear all of ${nick}'s balance, positions and history and reset to 10,000 USDT?`))) return;
         r = await post("/api/admin", { action: "reset", nick });
       } else if (act === "block" || act === "unblock") {
-        if (!confirm(`${act === "block" ? "Block" : "Unblock"} ${nick}?`)) return;
+        if (!(await ask(`${act === "block" ? "Block" : "Unblock"} ${nick}?`))) return;
         r = await post("/api/admin", { action: act, nick });
       } else if (act === "delete") {
-        if (!confirm(`Delete ${nick}'s account? All data will be lost and cannot be undone.`)) return;
-        if (!confirm(`Really delete '${nick}'? (final confirmation)`)) return;
+        if (!(await ask(`Delete ${nick}'s account? All data will be lost and cannot be undone.`))) return;
+        if (!(await ask(`Really delete '${nick}'? (final confirmation)`))) return;
         r = await post("/api/admin", { action: "delete", nick });
       } else return;
       notify("ok", "Admin", r.msg);
