@@ -1,4 +1,6 @@
-/* POST /api/sigbot — Signals 탭(LONG) 진입 신호 자동매매. 모의투자 계정 SIGBOT_NICKNAME(기본 "test")에만 주문해요.
+/* POST /api/sigbot — Signals 탭(LONG) 진입 신호 자동매매. 계정 두 개를 같은 매매 규칙(sigbot-core.js)으로:
+     · 코인  → 모의투자 계정 SIGBOT_NICKNAME(기본 "test"),     Signals 탭과 같은 스캔 (깊이 -1, 시총 150위 안 거래량 상위 100개)
+     · RWA   → 모의투자 계정 SIGBOT_RWA_NICKNAME(기본 "jina"), Signals RWA 탭과 같은 스캔 (깊이 -0.618, 토큰화 주식·원자재 등 거래량 상위 100개)
    GitHub Actions(.github/workflows/sigbot.yml)가 5분마다 불러요. 규칙은 sigbot-core.js
    - 헤더 Authorization: Bearer <BOT_SECRET>  (추세추종 봇과 같은 비밀값)
    - SIGBOT_PAUSED=1 이면 잠시 멈춤 (이미 걸린 TP/SL 은 사이트에 들어가면 그대로 처리됨)
@@ -17,7 +19,11 @@ const C = require("../sigbot-core");
 
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const HOUR = 3600e3;
-const SCAN_KEY = "sigbot:scan", RANK_KEY = "sigbot:rank";
+const RANK_KEY = "sigbot:rank";
+const ACCTS = [
+  { id: "crypto", nick: process.env.SIGBOT_NICKNAME || "test", rwa: false, ratio: 1, scanKey: "sigbot:scan" },
+  { id: "rwa", nick: process.env.SIGBOT_RWA_NICKNAME || "jina", rwa: true, ratio: 0.618, scanKey: "sigbot:scan:rwa" },
+];
 const STABLES = new Set(["USDC", "FDUSD", "TUSD", "BUSD", "USDP", "DAI", "EUR", "AEUR", "USDE", "XUSD", "BFUSD", "RLUSD", "USD1", "PYUSD", "EURI"]);
 const COMMODITY_TOKENS = new Set(["PAXG", "XAUT", "XAUM", "KAU", "KAG", "DGX", "PMGT", "XAU", "XAG", "XPT", "XPD"]);
 const base = s => s.replace(/^(1000000|10000|1000|1M)(?=[A-Z])/, "");
@@ -41,8 +47,8 @@ async function ranks(now) {
   return old ? old.R : null;
 }
 
-// Signals 자동 스캔과 같은 코인 고르기: 코인만 · 시총 150위 안 · 24시간 거래량 상위 50개
-async function universe(R) {
+// Signals 자동 스캔과 같은 고르기 — 코인: 코인만 · 시총 150위 안 · 거래량 상위 / RWA: 코인이 아닌 상품(주식·원자재 등)만 · 거래량 상위
+async function universe(R, rwa) {
   const [info, rows] = await Promise.all([jget(`${FAPI}/exchangeInfo`), jget(`${FAPI}/ticker/24hr`)]);
   const notCoin = new Set();
   for (const x of info.symbols) if (x.quoteAsset === "USDT" && x.underlyingType && x.underlyingType !== "COIN") notCoin.add(x.baseAsset);
@@ -50,8 +56,9 @@ async function universe(R) {
   return rows
     .filter(x => x.symbol.endsWith("USDT") && !x.symbol.includes("_") && +x.quoteVolume > 0 && x.closeTime > dayAgo)
     .map(x => ({ sym: x.symbol.slice(0, -4), vol: +x.quoteVolume }))
-    .filter(x => !STABLES.has(x.sym) && !notCoin.has(x.sym) && !COMMODITY_TOKENS.has(base(x.sym)))
-    .filter(x => { const r = R[base(x.sym)]; return r && r <= C.P.mcap; })
+    .filter(x => rwa ? (notCoin.has(x.sym) || COMMODITY_TOKENS.has(base(x.sym)))
+                     : (!STABLES.has(x.sym) && !notCoin.has(x.sym) && !COMMODITY_TOKENS.has(base(x.sym))))
+    .filter(x => { if (rwa) return true; const r = R[base(x.sym)]; return r && r <= C.P.mcap; })
     .sort((a, b) => b.vol - a.vol)
     .slice(0, C.P.top)
     .map(x => x.sym);
@@ -71,10 +78,10 @@ async function candles(sym) {
   return all;
 }
 
-async function scanAll(now) {
-  const R = await ranks(now);
-  if (!R) throw new Error("시가총액 순위(코인게코)를 못 받아서 이번 스캔은 건너뜀");
-  const syms = await universe(R);
+async function scanAll(now, acct) {
+  const R = acct.rwa ? null : await ranks(now);
+  if (!acct.rwa && !R) throw new Error("시가총액 순위(코인게코)를 못 받아서 이번 스캔은 건너뜀");
+  const syms = await universe(R, acct.rwa);
   const coins = [];
   let next = 0;
   async function worker() {
@@ -83,7 +90,7 @@ async function scanAll(now) {
       try {
         const cs = await candles(sym);
         if (cs.length < 100) continue;
-        const r = F.analyze(cs, { n: C.P.n, k: C.P.k, ratio: C.P.ratio, direction: "long" });
+        const r = F.analyze(cs, { n: C.P.n, k: C.P.k, ratio: acct.ratio, direction: "long" });
         coins.push({ sym, stats: r.stats, current: r.current });
       } catch (e) {}
     }
@@ -102,42 +109,53 @@ module.exports = async (req, res) => {
     const got = crypto.createHash("sha256").update(h.startsWith("Bearer ") ? h.slice(7) : "").digest();
     if (!secs.some(s => crypto.timingSafeEqual(got, crypto.createHash("sha256").update(s).digest()))) throw A.fail(401, "Unauthorized");
 
-    const key = A.userKey(process.env.SIGBOT_NICKNAME || "test");
     if (req.method === "GET") {
-      const user = await db.getJSON(key);
-      if (!user) throw A.fail(404, "Sigbot account not found");
-      return res.status(200).json({ ok: true, sbot: user.sbot || null });
+      const q = String((req.query && req.query.acct) || "crypto");
+      const acct = ACCTS.find(a => a.id === q || a.nick === q) || ACCTS[0];
+      const user = await db.getJSON(A.userKey(acct.nick));
+      if (!user) throw A.fail(404, `Sigbot account not found (${acct.nick})`);
+      return res.status(200).json({ ok: true, acct: acct.id, nick: acct.nick, sbot: user.sbot || null });
     }
     if (req.method !== "POST") throw A.fail(405, "GET or POST only");
     if (process.env.SIGBOT_PAUSED === "1") return res.status(200).json({ ok: true, paused: true });
 
-    const now = Date.now();
-    // 1) 1시간봉이 새로 시작됐으면 다시 계산 (계정은 아직 안 읽음 → 그동안 사용자가 주문해도 덮어쓰지 않음)
-    let scan = await db.getJSON(SCAN_KEY), scanned = false, scanErr = null;
-    if (!scan || scan.bar < Math.floor(now / HOUR) * HOUR) {
-      try { scan = await scanAll(now); scanned = true; } catch (e) { scanErr = e.message; }
+    const now = Date.now(), hourBar = Math.floor(now / HOUR) * HOUR;
+    // 1) 스캔: 1시간봉이 새로 시작된 계정만, 한 번 호출에 하나씩 (60초 안에 끝나게 — 다른 하나는 다음 5분 호출 때)
+    const scans = {};
+    for (const a of ACCTS) scans[a.id] = await db.getJSON(a.scanKey);
+    let scannedId = null;
+    const stale = ACCTS.filter(a => !scans[a.id] || scans[a.id].bar < hourBar).sort((x, y) => ((scans[x.id] || {}).bar || 0) - ((scans[y.id] || {}).bar || 0));
+    const scanErr = {};
+    if (stale.length) {
+      const a = stale[0];
+      try { scans[a.id] = await scanAll(now, a); scannedId = a.id; } catch (e) { scanErr[a.id] = e.message; }
     }
-    if (!scan) throw A.fail(503, scanErr || "No scan yet");
 
-    // 2) 현재가 → 계정 소급 처리 → 규칙 실행
+    // 2) 현재가 한 번 → 계정마다: TP/SL·체결 소급 처리 → 규칙 실행
     const prices = {};
     for (const x of await jget(`${FAPI}/ticker/price`)) prices[x.symbol] = +x.price;
-    const user = await db.getJSON(key);
-    if (!user) throw A.fail(404, "Sigbot account not found (SIGBOT_NICKNAME)");
-    const sy = await sync(user.st, now);
-    if (E.mergeAll(user.st)) sy.dirty = true;
-    if (sy.behind) {                                       // 밀린 1분봉이 많으면 이번엔 따라잡기만
-      await db.setJSON(key, user);
-      await db.setJSON(SCAN_KEY, scan);
-      return res.status(202).json({ ok: true, catchingUp: true });
+    const out = {};
+    for (const a of ACCTS) {
+      const scan = scans[a.id];
+      try {
+        if (!scan) throw new Error(scanErr[a.id] || "No scan yet");
+        const key = A.userKey(a.nick), user = await db.getJSON(key);
+        if (!user) throw new Error(`account not found (${a.nick})`);
+        const sy = await sync(user.st, now);
+        if (E.mergeAll(user.st)) sy.dirty = true;
+        if (sy.behind) {                                   // 밀린 1분봉이 많으면 이번엔 따라잡기만
+          await db.setJSON(key, user); await db.setJSON(a.scanKey, scan);
+          out[a.id] = { nick: a.nick, catchingUp: true }; continue;
+        }
+        const r = C.step(user, scan, prices, now, E);
+        if (r.dirty || sy.dirty) await db.setJSON(key, user);
+        await db.setJSON(a.scanKey, scan);                 // 실시간으로 갱신된 도달 여부도 저장
+        out[a.id] = { nick: a.nick, scanned: scannedId === a.id, coins: scan.coins.length,
+                      inZone: scan.coins.filter(c => F.label(c.current) === "진입 구간").map(c => c.sym),
+                      active: Object.keys(user.sbot.act), did: r.log, events: sy.events.length };
+      } catch (e) { out[a.id] = { nick: a.nick, error: e.message, scanErr: scanErr[a.id] || null }; }
     }
-    const out = C.step(user, scan, prices, now, E);
-    if (out.dirty || sy.dirty) await db.setJSON(key, user);
-    await db.setJSON(SCAN_KEY, scan);                      // 실시간으로 갱신된 도달 여부도 저장
-
-    const hit = scan.coins.filter(c => F.label(c.current) === "진입 구간").map(c => c.sym);
-    res.status(200).json({ ok: true, scanned, scanErr, coins: scan.coins.length, inZone: hit,
-                           active: Object.keys(user.sbot.act), did: out.log, events: sy.events.length });
+    res.status(200).json({ ok: true, ...out });
   } catch (e) {
     res.status(e.status || 400).json({ error: e.message });
   }

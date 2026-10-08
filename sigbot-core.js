@@ -87,8 +87,15 @@
     const pxOf = m => prices[m];
     const equity = () => st.bal + st.pos.reduce((s, p) => s + p.margin + E.pnlOf(p.side, p.entry, pxOf(p.sym) || p.entry, p.qty), 0);
     if (!(b.base > 0)) {
-      b.base = equity();
+      b.base = equity(); b.dep0 = st.dep;
       say(`목표 기준 설정 · 기준 자산 ${b.base.toFixed(2)} USDT · 목표 ${(b.base * (1 + P.dayTarget / 100)).toFixed(2)} (+${P.dayTarget}%)`);
+    }
+    // 관리자 입금(원금 증가)은 수익이 아니니까 기준 자산에도 같이 더함. 원금이 줄었으면(초기화) 지금 자산으로 다시 시작
+    if (b.dep0 == null) b.dep0 = st.dep;
+    if (st.dep !== b.dep0) {
+      if (st.dep > b.dep0) b.base += st.dep - b.dep0; else b.base = equity();
+      b.dep0 = st.dep;
+      say(`원금 변경(입금/초기화) 반영 → 기준 ${b.base.toFixed(2)}, 목표 ${(b.base * (1 + P.dayTarget / 100)).toFixed(2)}`);
     }
     if (st.pos.length) {
       const eq = equity(), goal = b.base * (1 + P.dayTarget / 100);

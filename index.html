@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261009021502"></script>
+<script src="theme.js?v=20261009022246"></script>
 <title>Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -285,7 +285,7 @@
         <button data-v="watch">관심목록</button>
       </span>
       <span id="scanOpts" style="display:contents">
-        <label class="inl">시총
+        <label class="inl" id="mcapLbl">시총
           <select id="mcap">
             <option value="100">100위까지</option>
             <option value="150" selected>150위까지</option>
@@ -352,14 +352,18 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261009021502"></script>
-<script src="chart.js?v=20261009021502"></script>
-<script src="nav.js?v=20261009021502"></script>
-<script src="meta.js?v=20261009021502"></script>
+<script src="fib-core.js?v=20261009022246"></script>
+<script src="chart.js?v=20261009022246"></script>
+<script src="nav.js?v=20261009022246"></script>
+<script src="meta.js?v=20261009022246"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
 // 바이낸스는 브라우저에서 직접 요청 (서버 필요 없음)
+// ── Signals RWA: signals-rwa.html 로 열면 같은 화면이 바이낸스 선물의 토큰화 주식·원자재 등(코인이 아닌 상품)을 스캔
+//    계산 규칙은 코인과 똑같고, 기본 진입 깊이만 B(-0.618). 설정·관심목록은 코인 Signals 와 따로 저장
+const RWA = /signals-rwa(\.html)?$/i.test(location.pathname);
+const LSK = k => (RWA ? k + "-rwa" : k);
 const EX = {
   // 바이낸스는 브라우저 직접 요청을 허용하고 제한도 넉넉해서 서버를 거치지 않음
   binance: { name: "바이낸스 현물", cur: "USDT", base: "https://api.binance.com/api/v3" },
@@ -467,14 +471,14 @@ async function universe(ex) {
   const list = rows
     .filter(x => x.symbol.endsWith("USDT") && !x.symbol.includes("_") && +x.quoteVolume > 0 && x.closeTime > dayAgo)
     .map(x => ({ sym: x.symbol.slice(0, -4), vol: +x.quoteVolume, chg: +x.priceChangePercent }))
-    .filter(x => !STABLES.has(x.sym) && CoinMeta.isCrypto(x.sym))   // 코인만 (금·은·원유·주식 상품은 뺌)
+    .filter(x => RWA ? !CoinMeta.isCrypto(x.sym) : (!STABLES.has(x.sym) && CoinMeta.isCrypto(x.sym)))   // 코인 탭: 코인만 / RWA 탭: 주식·원자재 등만
     .sort((a, b) => b.vol - a.vol);
   uniCache[ex] = { at: Date.now(), list };
   return list;
 }
 
 // ── 설정 기억하기 (새로고침해도 유지) ────────────────────────────────
-const DEFAULT_WATCH = ["BTC", "ETH", "SOL", "XRP", "ARB", "HYPE", "UNI", "ZEC", "ONDO"];
+const DEFAULT_WATCH = RWA ? ["XAU", "XAG", "CL", "TSLA", "NVDA", "MSTR", "MU"] : ["BTC", "ETH", "SOL", "XRP", "ARB", "HYPE", "UNI", "ZEC", "ONDO"];
 let mode = "scan";
 let dir = "long";                  // "long" | "short"
 const hashDir = () => { const h = location.hash.slice(1).toLowerCase(); return h === "long" || h === "short" ? h : null; };
@@ -483,13 +487,13 @@ let shared = null;                 // 링크로 공유받은 목록 (저장 전)
 const SETTINGS = ["ex", "unit", "n", "k", "ratio", "count", "auto", "topN", "mcap", "fee", "sort"];
 function saveSettings() {
   const o = { mode, dir, autoV: 2 }; for (const id of SETTINGS) o[id] = $(id).value;
-  try { localStorage.setItem("main-settings-v1", JSON.stringify(o)); } catch (e) {}
+  try { localStorage.setItem(LSK("main-settings-v1"), JSON.stringify(o)); } catch (e) {}
 }
 function loadSettings() {
   try {
-    const o = JSON.parse(localStorage.getItem("main-settings-v1") || "null");
+    const o = JSON.parse(localStorage.getItem(LSK("main-settings-v1")) || "null");
     if (o) { for (const id of SETTINGS) if (o[id] != null) $(id).value = o[id]; if (o.mode) mode = o.mode; if (o.dir === "long" || o.dir === "short") dir = o.dir; if (o.autoV !== 2) $("auto").value = "close"; }   // 예전에 저장된 재계산 주기는 새 기본값(봉 마감 시)으로
-    const w = JSON.parse(localStorage.getItem("watch-v1") || "null");
+    const w = JSON.parse(localStorage.getItem(LSK("watch-v1")) || "null");
     if (Array.isArray(w) && w.length) watch = w;
   } catch (e) {}
   const hd = hashDir(); if (hd) dir = hd;                          // 주소의 #long / #short 가 저장값보다 우선
@@ -499,7 +503,7 @@ function loadSettings() {
     if (shared.length) mode = "watch"; else shared = null;
   }
 }
-function saveWatch() { try { localStorage.setItem("watch-v1", JSON.stringify(watch)); } catch (e) {} }
+function saveWatch() { try { localStorage.setItem(LSK("watch-v1"), JSON.stringify(watch)); } catch (e) {} }
 const activeWatch = () => shared || watch;
 
 
@@ -525,7 +529,7 @@ async function runOnce() {
       $("status").textContent = "거래량 상위 코인 고르는 중…";
       let list = await universe(ex);
       const maxRank = +$("mcap").value;
-      if (maxRank) {
+      if (maxRank && !RWA) {
         await logosReady;                                  // 시가총액 순위 (코인게코) 받을 때까지
         // 순위를 한 번도 못 받았으면 필터 없이 잡코인까지 섞이지 않게 여기서 멈춤 (표는 이전 결과 그대로)
         if (!CoinMeta.hasTop()) throw new Error("시가총액 순위(코인게코)를 아직 못 받아왔어요 (요청 제한). 몇 분 뒤 자동으로 다시 시도해요");
@@ -570,7 +574,7 @@ async function runOnce() {
   if (openCoin && !results.find(r => r.market === openCoin && !r.error)) { openCoin = null; renderTable(); }
   if (openCoin && view === "lw") drawChart();            // 펼쳐 둔 차트도 새 데이터로 (트레이딩뷰는 스스로 실시간 갱신)
   $("status").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")} · ${EX[ex].name} · 봉 ${$("unit").selectedOptions[0].text} · 캔들 ${count}개 · `
-    + (mode === "scan" ? (+$("mcap").value ? `시총 ${$("mcap").value}위 안에서 ` : "") + `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`)
+    + (mode === "scan" ? (+$("mcap").value && !RWA ? `시총 ${$("mcap").value}위 안에서 ` : "") + `거래량 상위 ${coins.length}개 자동 스캔` + (lastSkipped ? ` (데이터 부족 ${lastSkipped}개 제외)` : "") : `관심목록 ${coins.length}개`)
     + (CoinMeta.staleHours() ? ` · 시총 순위는 ${CoinMeta.staleHours()}시간 전 저장값 (코인게코 요청 제한)` : "");
   $("run").disabled = false;
 }
@@ -883,7 +887,7 @@ $("saveShared").onclick = () => {
 // ── 휴대폰: 설정 한 줄 요약 (누르면 펼치기/접기) ─────────────────────────
 function updateSetSum() {
   const t = id => $(id).selectedOptions[0].text;
-  $("setSum").textContent = `${dir.toUpperCase()} · ${t("ex")} · ${t("unit")}봉 · 깊이 ${t("ratio").slice(0, 1)} · 캔들 ${t("count")}` + (mode === "scan" ? ` · 시총 ${t("mcap")} · 거래량 상위 ${t("topN")}` : " · 관심목록");
+  $("setSum").textContent = `${dir.toUpperCase()} · ${t("ex")} · ${t("unit")}봉 · 깊이 ${t("ratio").slice(0, 1)} · 캔들 ${t("count")}` + (mode === "scan" ? (RWA ? "" : ` · 시총 ${t("mcap")}`) + ` · 거래량 상위 ${t("topN")}` : " · 관심목록");
 }
 $("setBar").onclick = () => $("setCard").classList.toggle("collapsed");
 
@@ -1107,7 +1111,14 @@ const Live = (() => {
 })();
 
 // ── 시작: 설정 불러오고 바로 분석 ─────────────────────────────────
+if (RWA) {                                   // RWA 탭 기본값: 바이낸스 선물만(현물엔 없음), 진입 깊이 -0.618, 시총 필터 없음
+  document.title = "Signals RWA · Artha";
+  $("ex").value = "futures"; $("ex").querySelector('option[value="binance"]').remove();
+  $("ratio").value = "0.618";
+  $("mcapLbl").style.display = "none";
+}
 loadSettings();
+if (RWA) $("ex").value = "futures";
 applyDirUI();
 setMode(mode);
 logosReady.then(() => { if (mode === "watch") renderChips(); });

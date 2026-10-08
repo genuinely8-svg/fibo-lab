@@ -9,5 +9,15 @@
     "api/sigbot.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/signals-rwa.html",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/signals-rwa",
+      "destination": "/index.html"
+    }
+  ]
 }
