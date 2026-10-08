@@ -42,19 +42,20 @@
     .navtabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
              border-bottom:1px solid var(--line);scrollbar-width:none}
     /* 다크/라이트 전환 버튼: 탭 오른쪽 끝에 고정 (탭이 옆으로 밀려도 안 가려짐) */
-    /* 다크/라이트 전환: 아이폰 설정 스위치 모양 (동그라미가 옆으로 미끄러짐, 안에 해·달) */
-    .navwrap button.themebtn{flex:none;display:flex;align-items:center;justify-content:center;width:62px;padding:0;border:0;border-bottom:1px solid var(--line);
-                             border-radius:0;background:transparent;cursor:pointer}
-    .tsw{position:relative;width:51px;height:31px;border-radius:999px;background:#e5e5ea;transition:background .3s ease;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
-    .tsw i{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);
-           display:grid;place-items:center;font-style:normal;font-size:14px;line-height:1;transition:transform .3s cubic-bezier(.3,1.4,.6,1)}
-    .tsw i::before{content:"☀️"}
+    /* 다크/라이트 전환: 아이폰 설정 스위치 모양 (작게) — 언어 버튼 옆 */
+    button.themebtn{flex:none;display:inline-flex;align-items:center;padding:0;border:0;background:transparent;cursor:pointer;border-radius:999px}
+    .tsw{position:relative;width:42px;height:24px;border-radius:999px;background:#d1d1d6;transition:background .3s ease}
+    .tsw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.2);
+           display:grid;place-items:center;transition:transform .3s cubic-bezier(.3,1.4,.6,1),width .15s}
+    .tsw svg{width:12px;height:12px;fill:none;stroke:#8e8e93;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .tsw .mo{display:none} .tsw.dark .su{display:none} .tsw.dark .mo{display:block}
     .tsw.dark{background:#34c759}
-    .tsw.dark i{transform:translateX(20px)}
-    .tsw.dark i::before{content:"🌙"}
-    .navwrap button.themebtn:active .tsw i{width:31px}
-    .navwrap button.themebtn:active .tsw.dark i{transform:translateX(16px)}
-    .navwrap button.themebtn:focus-visible .tsw{outline:2px solid var(--accent);outline-offset:2px}
+    .tsw.dark i{transform:translateX(18px)}
+    button.themebtn:active .tsw i{width:24px}
+    button.themebtn:active .tsw.dark i{transform:translateX(14px)}
+    button.themebtn:focus-visible .tsw{outline:2px solid var(--accent);outline-offset:2px}
+    /* 로고 Artha 누르면 홈 */
+    h1.brand a{color:inherit;text-decoration:none}
     .navtabs::-webkit-scrollbar{display:none}
     .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;
                border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
@@ -111,6 +112,9 @@
     '</div><button type="button" class="themebtn"></button>' +
     `<div class="navpanel" role="menu"><div class="ttl notranslate" translate="no">${grpName}</div>${INSIGHTS.map(item).join("")}</div>`;
   const el = wrap.querySelector(".navtabs");
+  // 로고 "Artha" 누르면 홈(Signals)으로
+  const brand = document.querySelector("h1.brand");
+  if (brand && !brand.querySelector("a")) brand.innerHTML = `<a href="index.html" title="Home">${brand.innerHTML}</a>`;
   // ── 인사이트: PC(마우스)는 올리면 펼침, 휴대폰(터치)은 누르면 시트 ──
   (function () {
     const grp = wrap.querySelector(".navgrp"), panel = wrap.querySelector(".navpanel");
@@ -158,7 +162,8 @@
   const tbtn = wrap.querySelector(".themebtn");
   const paintTheme = () => {
     const dark = (window.Theme ? Theme.get() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
-    if (!tbtn.firstChild) tbtn.innerHTML = '<span class="tsw"><i></i></span>';
+    if (!tbtn.firstChild) tbtn.innerHTML = '<span class="tsw"><i><svg class="su" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' +
+      '<svg class="mo" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></i></span>';
     tbtn.firstChild.classList.toggle("dark", dark);
     tbtn.setAttribute("role", "switch"); tbtn.setAttribute("aria-checked", String(dark));
     tbtn.title = tbtn.ariaLabel = dark ? "라이트 모드로 바꾸기" : "다크 모드로 바꾸기";
@@ -274,12 +279,16 @@
   box.innerHTML = `<button type="button" class="langbtn" aria-haspopup="listbox" aria-expanded="false" title="Language">🌐 <span>${label}</span><span class="cv">▾</span></button>
     <div class="langlist" role="listbox" hidden>${LANGS.map(([c, n]) => `<button type="button" role="option" data-c="${c}"${c === cur ? ' class="on" aria-selected="true"' : ""}>${n}</button>`).join("")}</div>`;
   const prev = nav.previousElementSibling;
+  // 다크/라이트 스위치를 언어 버튼 오른쪽에 붙임
+  const tb = nav.querySelector("button.themebtn");
+  const ctl = document.createElement("div"); ctl.style.cssText = "display:flex;align-items:center;gap:10px;flex:none";
+  ctl.append(box); if (tb) ctl.append(tb);
   if (prev && prev.tagName === "H1") {
     const row = document.createElement("div"); row.className = "toprow";
-    prev.before(row); row.append(prev, box);
+    prev.before(row); row.append(prev, ctl);
   } else {
     const row = document.createElement("div"); row.className = "langrow";
-    row.append(box); nav.before(row);
+    row.append(ctl); nav.before(row);
   }
   const btn = box.querySelector(".langbtn"), list = box.querySelector(".langlist");
   const open = v => { list.hidden = !v; btn.setAttribute("aria-expanded", String(v)); };

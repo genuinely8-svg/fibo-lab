@@ -3,15 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script src="theme.js?v=20261009024138"></script>
+<script src="theme.js?v=20261009024647"></script>
 <title>Paper Trading · Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261009024138">
+<link rel="stylesheet" href="common.css?v=20261009024647">
 <style>
   html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
   /* 아이폰: 입력칸 글자가 16px 보다 작으면 누를 때 화면이 확대돼서, 터치 기기에서는 입력칸을 16px 로 */
   @media (pointer:coarse){ input,select,textarea{font-size:16px!important} }
-  .wrap{max-width:1500px}
   body,.term{--buy:#22b573;--sell:#ef4b5f;--warn2:#f59e0b}
   .g{color:var(--buy)} .r{color:var(--sell)} .o{color:var(--warn2)}
   button.buy{background:var(--buy)} button.sell{background:var(--sell)}
@@ -275,8 +274,6 @@
   /* 모바일 (선물 거래 앱 배치): 가격 → 차트(기본 접힘, 얇은 줄) → [주문 | 호가] 좌우 → 포지션 */
   @media (max-width:900px){
     .term{gap:8px;grid-template-columns:minmax(0,58fr) minmax(0,42fr);grid-template-areas:"hd hd" "chart chart" "order book" "lower lower"}
-    .wrap{padding:10px 8px 50px}
-    .wrap>h1{display:none}
     .topbar{margin:0 0 8px;font-size:12px}
     .topbar .long{display:none}
     .box{border-radius:10px}
@@ -347,7 +344,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Paper Trading</h1>
+  <h1 class="brand">Artha</h1>
   <nav id="nav"></nav>
 
   <!-- 로그인 -->
@@ -457,10 +454,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261009024138"></script>
-<script src="common.js?v=20261009024138"></script>
-<script src="meta.js?v=20261009024138"></script>
-<script src="paper-engine.js?v=20261009024138"></script>
-<script src="paper.js?v=20261009024138"></script>
+<script src="nav.js?v=20261009024647"></script>
+<script src="common.js?v=20261009024647"></script>
+<script src="meta.js?v=20261009024647"></script>
+<script src="paper-engine.js?v=20261009024647"></script>
+<script src="paper.js?v=20261009024647"></script>
 </body>
 </html>
