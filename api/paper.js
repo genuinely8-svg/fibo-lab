@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
         else delete p.trl;
         info = { kind: b.action, sym: p.sym }; dirty = true; break;
       }
-      case "reset": user.st = E.newState(now); info = { kind: "reset" }; dirty = true; break;
+      case "reset": throw A.fail(403, "Only the admin can reset or deposit");     // 사용자는 스스로 초기화할 수 없음 (입금·초기화는 관리자 화면에서만)
       default: throw A.fail(400, "Unknown request");
     }
 

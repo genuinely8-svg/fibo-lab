@@ -954,7 +954,6 @@
     $("myes").onclick = async () => { if (!onOk) { m.hidden = true; return; } try { await onOk(); m.hidden = true; } catch (e) {} };
   }
   $("modal").onclick = e => { if (e.target === $("modal")) $("modal").hidden = true; };
-  $("reset").onclick = () => { if (confirm("This clears your balance, positions and history and restarts with 10,000 USDT. Continue?")) sendAction({ action: "reset" }).catch(() => {}); };
 
   // ── 관리자 ───────────────────────────────────────────────────
   let adminRows = null, adminLog = [];
