@@ -301,27 +301,41 @@
   setInterval(() => { if (started && !document.hidden) loadTicker(); }, 15000);
 
   // ── 코인 선택 ────────────────────────────────────────────────
+  // 코인 목록 (Crypto: 시총 100위 안 코인) + 토큰화 주식·원자재 등 (Stocks · RWA: 바이낸스 선물이 코인이 아니라고 분류한 상품, 모의투자 탭에서만)
+  const RWA_LABEL = { EQUITY: "US stock", KR_EQUITY: "KR stock", HK_EQUITY: "HK stock", CN_EQUITY: "CN stock", PREMARKET: "Pre-IPO", COMMODITY: "Commodity",
+                      COMMODITY_TOKEN: "Gold/silver token", INDEX: "Index", ETF: "ETF", FX: "FX" };
+  S.ptab = ls.get("paper-ptab-v1") === "rwa" ? "rwa" : "crypto";
   async function loadCoins() {
     try {
       const [arr] = await Promise.all([fetch("https://fapi.binance.com/fapi/v1/ticker/24hr").then(r => r.json()), CoinMeta.load().catch(() => {})]);
-      let list = arr.filter(x => /^[A-Z0-9]+USDT$/.test(x.symbol)).map(x => ({ sym: x.symbol, b: base(x.symbol), last: +x.lastPrice, chg: +x.priceChangePercent, vol: +x.quoteVolume }))
-        .filter(x => CoinMeta.isCrypto(x.sym.replace(/USDT$/, "")) && !STABLES.has(x.b));
+      const dayAgo = Date.now() - 86400e3;
+      const all = arr.filter(x => /^[A-Z0-9]+USDT$/.test(x.symbol) && +x.closeTime > dayAgo).map(x => ({ sym: x.symbol, b: base(x.symbol), last: +x.lastPrice, chg: +x.priceChangePercent, vol: +x.quoteVolume }));
+      let list = all.filter(x => CoinMeta.isCrypto(x.sym.replace(/USDT$/, "")) && !STABLES.has(x.b));
       if (CoinMeta.hasTop()) { list = list.filter(x => CoinMeta.rank(x.b) && CoinMeta.rank(x.b) <= 100).sort((a, b) => CoinMeta.rank(a.b) - CoinMeta.rank(b.b)); }
       else { list = list.sort((a, b) => b.vol - a.vol).slice(0, 100); }   // 코인게코가 막혔을 때: 거래대금 상위 100
       S.coins = list;
-      for (const c of list) if (!S.px[c.sym]) S.px[c.sym] = c.last;      // 처음 한 번만 채움 (실시간 값을 덮어쓰지 않음)
+      S.rwa = all.filter(x => !CoinMeta.isCrypto(x.sym.replace(/USDT$/, ""))).map(x => ({ ...x, ty: CoinMeta.type(x.sym.replace(/USDT$/, "")) })).sort((a, b) => b.vol - a.vol);
+      for (const c of list.concat(S.rwa)) if (!S.px[c.sym]) S.px[c.sym] = c.last;      // 처음 한 번만 채움 (실시간 값을 덮어쓰지 않음)
       renderPicker();
     } catch (e) { $("plist").innerHTML = '<div class="muted">Could not load coin list</div>'; }
   }
+  function setPtab(t) {
+    S.ptab = t === "rwa" ? "rwa" : "crypto"; ls.set("paper-ptab-v1", S.ptab);
+    [...$("ptabs").children].forEach(b => b.classList.toggle("on", b.dataset.p === S.ptab));
+    $("psearch").placeholder = S.ptab === "rwa" ? "Search stocks · RWA (Binance Futures)" : "Search coins (top 100)";
+    renderPicker();
+  }
+  $("ptabs").onclick = e => { const b = e.target.closest("button"); if (b) setPtab(b.dataset.p); };
   CoinMeta.load().then(() => renderHd()).catch(() => {});        // 처음 열 때 로고(코인게코) 받아서 위쪽 코인 버튼에 표시
   const logoImg = b => CoinMeta.logo(b) ? `<img src="${esc(CoinMeta.logo(b))}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="ph"></span>`;
   function renderPicker() {
     const q = $("psearch").value.trim().toUpperCase();
-    const rows = S.coins.filter(c => !q || c.b.includes(q) || (CoinMeta.ko(c.b) || "").includes(q)).map(c =>
-      `<div data-s="${c.sym}">${logoImg(c.b)}<span class="s">${esc(c.b)} <span class="n">${esc(CoinMeta.ko(c.b) || "")}</span></span><span>${fp(c.last)}</span><span class="${pc(c.chg)}">${sg(c.chg)}%</span></div>`);
-    $("plist").innerHTML = rows.join("") || '<div class="muted">No results</div>';
+    const src = S.ptab === "rwa" ? (S.rwa || []) : S.coins;
+    const rows = src.filter(c => !q || c.b.includes(q) || (CoinMeta.ko(c.b) || "").includes(q)).map(c =>
+      `<div data-s="${c.sym}">${logoImg(c.b)}<span class="s">${esc(c.b)} <span class="n">${esc(c.ty ? (RWA_LABEL[c.ty] || c.ty) : (CoinMeta.ko(c.b) || ""))}</span></span><span>${fp(c.last)}</span><span class="${pc(c.chg)}">${sg(c.chg)}%</span></div>`);
+    $("plist").innerHTML = rows.join("") || `<div class="muted">${S.ptab === "rwa" && !S.rwa ? "Loading…" : "No results"}</div>`;
   }
-  $("coinbtn").onclick = e => { e.stopPropagation(); const p = $("picker"); p.hidden = !p.hidden; if (!p.hidden) { $("psearch").value = ""; renderPicker(); loadCoins(); $("psearch").focus(); } };
+  $("coinbtn").onclick = e => { e.stopPropagation(); const p = $("picker"); p.hidden = !p.hidden; if (!p.hidden) { $("psearch").value = ""; setPtab(S.ptab); loadCoins(); $("psearch").focus(); } };
   $("psearch").oninput = renderPicker;
   $("picker").onclick = e => e.stopPropagation();
   $("plist").onclick = e => { const d = e.target.closest("[data-s]"); if (d) setSym(d.dataset.s); };
