@@ -10,13 +10,27 @@
     ["lowsig.html", "Trading Engine"],
     ["paper.html", "모의투자"],
     ["calc.html", "계산기"],
-    ["market.html", "시장 방향"],
-    ["liquidation.html", "청산히트맵"],
-    ["oi.html", "OI"],
-    ["rank.html", "코인순위"],
-    ["movers.html", "24시간변동률"],
-    ["news.html", "주요뉴스"],
   ];
+  // "인사이트" 묶음: PC는 마우스를 올리면 아래로 펼쳐지는 패널, 휴대폰은 누르면 아래에서 올라오는 시트
+  // [주소, 한글 이름, 영어 이름, 한글 설명, 영어 설명, 아이콘, 색]
+  const INSIGHTS = [
+    ["market.html", "시장 방향", "Market Direction", "롱·숏 신호로 보는 상승장 / 하락장", "Bull or bear market at a glance", "trend", "#2563eb"],
+    ["liquidation.html", "청산히트맵", "Liquidation Map", "청산이 몰려 있는 가격대", "Where liquidations cluster", "heat", "#ef4444"],
+    ["oi.html", "OI", "OI", "미결제약정 · 펀딩비 · 롱숏 비율", "Open interest, funding, long/short", "bars", "#8b5cf6"],
+    ["rank.html", "코인순위", "Rankings", "시가총액 순위", "Market cap ranking", "list", "#f59e0b"],
+    ["movers.html", "24시간변동률", "Top Movers", "24시간 상승 · 하락 순위", "24h gainers & losers", "move", "#10b981"],
+    ["news.html", "주요뉴스", "News", "코인 뉴스 · 거래소 공지", "Crypto news & exchange notices", "news", "#64748b"],
+  ];
+  const ICON = {
+    trend: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+    heat: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    bars: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
+    move: '<path d="M7 17V5l-4 4M7 5l4 4"/><path d="M17 7v12l4-4M17 19l-4-4"/>',
+    news: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/>',
+  };
+  const LANG = (() => { try { const v = localStorage.getItem("artha-lang"); if (v) return v; } catch (e) {} const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : "en"; })();
+  const KO = LANG === "ko";
   const style = document.createElement("style");
   style.textContent = `
     /* 글꼴: 본문은 Pretendard(한글·숫자 깔끔), 로고 "Artha"는 Cinzel */
@@ -40,17 +54,96 @@
     .navtabs.more-r{-webkit-mask-image:linear-gradient(90deg,#000 80%,transparent);mask-image:linear-gradient(90deg,#000 80%,transparent)}
     .navtabs.more-l{-webkit-mask-image:linear-gradient(90deg,transparent,#000 20%);mask-image:linear-gradient(90deg,transparent,#000 20%)}
     .navtabs.more-l.more-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
-    @media (max-width:700px){ .navtabs a{padding:9px 11px;font-size:13px} }`;
+    @media (max-width:700px){ .navtabs a{padding:9px 11px;font-size:13px} }
+    /* ── 인사이트 묶음 ── */
+    .navwrap{position:relative}
+    .navtabs a.navgrp{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+    .navgrp .chev{font-size:10px;transition:transform .2s}
+    .navwrap.open .navgrp .chev{transform:rotate(180deg)}
+    .navpanel{position:absolute;top:calc(100% + 6px);z-index:60;width:min(640px,calc(100vw - 32px));padding:14px;border-radius:14px;
+              background:var(--card);border:1px solid var(--line);box-shadow:0 18px 40px rgba(0,0,0,.28);
+              display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;
+              opacity:0;visibility:hidden;transform:translateY(-8px);transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s}
+    .navwrap.open .navpanel{opacity:1;visibility:visible;transform:none;transition:opacity .18s ease,transform .18s ease}
+    .navpanel .ttl{grid-column:1/-1;font-size:12px;color:var(--muted);font-weight:600;padding:2px 8px 8px;letter-spacing:.02em}
+    .insi{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;text-decoration:none;color:var(--text)}
+    .insi:hover,.insi.on{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+    .insi .ic{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff}
+    .insi .ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .insi b{display:block;font-size:14px;font-weight:700}
+    .insi small{display:block;font-size:12px;color:var(--muted);margin-top:2px;line-height:1.3}
+    /* 휴대폰: 아래에서 올라오는 시트 */
+    .navsheet-bg{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);opacity:0;visibility:hidden;transition:opacity .22s,visibility 0s linear .22s}
+    .navsheet{position:fixed;left:0;right:0;bottom:0;z-index:91;background:var(--card);border-radius:18px 18px 0 0;border-top:1px solid var(--line);
+              padding:8px 14px calc(16px + env(safe-area-inset-bottom));max-height:75vh;overflow-y:auto;transform:translateY(105%);transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+    .navsheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 10px}
+    .navsheet .ttl{font-size:15px;font-weight:700;margin:0 4px 10px}
+    .navsheet .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .navsheet .insi{flex-direction:column;align-items:flex-start;gap:8px;border:1px solid var(--line);padding:12px}
+    .navsheet .insi small{font-size:11.5px}
+    body.navsheet-on{overflow:hidden}
+    body.navsheet-on .navsheet-bg{opacity:1;visibility:visible;transition:opacity .22s}
+    body.navsheet-on .navsheet{transform:none}`;
   document.head.appendChild(style);
 
   const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
   const wrap = document.getElementById("nav");
   if (!wrap) return;
   wrap.className = "navwrap";
+  const inHere = INSIGHTS.some(x => x[0] === here);
+  const grpName = KO ? "인사이트" : "Insights";
+  const item = x => `<a class="insi notranslate${x[0] === here ? " on" : ""}" translate="no" href="${x[0]}"${x[0] === here ? ' aria-current="page"' : ""}>
+      <span class="ic" style="background:${x[6]}"><svg viewBox="0 0 24 24">${ICON[x[5]]}</svg></span>
+      <span><b>${KO ? x[1] : x[2]}</b><small>${KO ? x[3] : x[4]}</small></span></a>`;
   wrap.innerHTML = '<div class="navtabs">' + TABS.map(([href, label]) =>
     `<a href="${href}"${href === here ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("") +
-    '</div><button type="button" class="themebtn"></button>';
+    `<a class="navgrp notranslate${inHere ? " on" : ""}" translate="no" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">${grpName} <span class="chev">▾</span></a>` +
+    '</div><button type="button" class="themebtn"></button>' +
+    `<div class="navpanel" role="menu"><div class="ttl notranslate" translate="no">${grpName}</div>${INSIGHTS.map(item).join("")}</div>`;
   const el = wrap.querySelector(".navtabs");
+  // ── 인사이트: PC(마우스)는 올리면 펼침, 휴대폰(터치)은 누르면 시트 ──
+  (function () {
+    const grp = wrap.querySelector(".navgrp"), panel = wrap.querySelector(".navpanel");
+    const touch = () => matchMedia("(hover: none), (max-width: 700px)").matches;
+    let shut = null;
+    const place = () => {                                   // 패널을 버튼 아래에 (화면 밖으로 안 나가게)
+      const w = wrap.getBoundingClientRect(), b = grp.getBoundingClientRect(), pw = panel.offsetWidth;
+      panel.style.left = Math.max(0, Math.min(b.left - w.left - 12, w.width - pw)) + "px";
+    };
+    const open = () => { clearTimeout(shut); place(); wrap.classList.add("open"); grp.setAttribute("aria-expanded", "true"); };
+    const close = () => { clearTimeout(shut); wrap.classList.remove("open"); grp.setAttribute("aria-expanded", "false"); };
+    const later = () => { clearTimeout(shut); shut = setTimeout(close, 180); };   // 패널로 마우스를 옮기는 사이 닫히지 않게
+    grp.addEventListener("mouseenter", () => { if (!touch()) open(); });
+    grp.addEventListener("mouseleave", () => { if (!touch()) later(); });
+    panel.addEventListener("mouseenter", () => { if (!touch()) clearTimeout(shut); });
+    panel.addEventListener("mouseleave", () => { if (!touch()) later(); });
+    // 휴대폰 시트 (처음 열 때 만듦)
+    let sheet = null;
+    const sheetOpen = () => {
+      if (!sheet) {
+        const bg = document.createElement("div"); bg.className = "navsheet-bg";
+        sheet = document.createElement("div"); sheet.className = "navsheet"; sheet.setAttribute("role", "dialog");
+        sheet.innerHTML = `<div class="grab"></div><div class="ttl notranslate" translate="no">${grpName}</div><div class="grid">${INSIGHTS.map(item).join("")}</div>`;
+        document.body.append(bg, sheet);
+        bg.onclick = sheetClose;
+        let y0 = null, dy = 0;                                // 아래로 끌어내리면 닫힘
+        sheet.addEventListener("touchstart", e => { if (sheet.scrollTop <= 0) { y0 = e.touches[0].clientY; dy = 0; sheet.style.transition = "none"; } }, { passive: true });
+        sheet.addEventListener("touchmove", e => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); sheet.style.transform = `translateY(${dy}px)`; }, { passive: true });
+        sheet.addEventListener("touchend", () => { if (y0 == null) return; sheet.style.transition = ""; sheet.style.transform = ""; if (dy > 80) sheetClose(); y0 = null; });
+      }
+      requestAnimationFrame(() => document.body.classList.add("navsheet-on"));
+    };
+    function sheetClose() { document.body.classList.remove("navsheet-on"); }
+    grp.addEventListener("click", e => {
+      e.preventDefault();
+      if (touch()) return sheetOpen();
+      wrap.classList.contains("open") ? close() : open();     // 마우스로 눌러도 열고 닫힘 (키보드 포함)
+    });
+    grp.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); grp.click(); } });
+    document.addEventListener("click", e => { if (!wrap.contains(e.target)) close(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") { close(); sheetClose(); } });
+    addEventListener("resize", () => { if (wrap.classList.contains("open")) place(); });
+  })();
   // 다크 ↔ 라이트 전환 (theme.js): 다크일 때 ☀️, 라이트일 때 🌙
   const tbtn = wrap.querySelector(".themebtn");
   const paintTheme = () => {
