@@ -976,12 +976,21 @@
     const log = adminLog.map(l => `<div class="lrow"><span><b>${esc(l.to)}</b> · ${esc(LA(l.act))}</span><span class="m">${mdhm(l.t)} · ${esc(l.by)}</span></div>`).join("") || '<div class="empty">No activity yet</div>';
     $("tabbody").innerHTML = rows + '<h2 style="margin-top:18px">Admin activity (last 50)</h2>' + log;
   }
+  // 관리자: 끝난 매매 한 줄 상세 (평단·청산가·수량·금액·증거금·모드·보유 시간·수수료)
+  function admTradeInfo(t) {
+    const mg = t.roe ? Math.abs(t.pnl / t.roe * 100) : null;          // 증거금 = 손익 ÷ ROE
+    const held = t.ot && t.t > t.ot ? t.t - t.ot : null;
+    const dur = held == null ? "" : held < 3600e3 ? Math.round(held / 60e3) + "m" : held < 86400e3 ? (held / 3600e3).toFixed(1) + "h" : (held / 86400e3).toFixed(1) + "d";
+    return `Avg entry <b>${fp(t.entry)}</b> → Exit <b>${fp(t.exit)}</b> · Size ${fq(t.qty)} ${esc(base(t.sym))} (${fu(t.qty * t.entry)} USDT)` +
+      (mg ? ` · Margin ${fu(mg)}` : "") + ` · ${modeTxt(t.mode)} ${t.lev}x` + (t.fee ? ` · Fee ${fu(t.fee)}` : "") +
+      `<br>${t.ot ? "Opened " + mdhm(t.ot) + " → " : ""}Closed ${mdhm(t.t)}${dur ? " (" + dur + ")" : ""}`;
+  }
   function renderAdminDetail() {
     const d = adminView;
     const ord = d.ol.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${esc(L(o.kind))}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${esc(L(o.status))}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
     const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">Admin deposit +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
       : `<div class="lrow"><span><b>${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(L(t.reason))}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
-        <span class="m">${fq(t.qty)} · ${fp(t.entry)} → ${fp(t.exit)} · ${mdhm(t.t)}</span></div>`).join("") || '<div class="empty">None</div>';
+        <span class="m">${admTradeInfo(t)}</span></div>`).join("") || '<div class="empty">None</div>';
     const open = d.ord.map(o => `<div class="lrow"><span><b>${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${o.ro ? "Limit close" : "Limit"}</span><span>${fq(o.qty)} @ ${fp(o.price)}</span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
     $("tabbody").innerHTML = `<button class="ghost mini" data-adm="back">← Back</button>
       <h2 style="margin:10px 0 4px">${esc(d.nick)} ${d.bl ? '<span class="tag short">Blocked</span>' : ""}</h2>
