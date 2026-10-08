@@ -88,7 +88,7 @@ async function scanAll(now) {
       } catch (e) {}
     }
   }
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await Promise.all(Array.from({ length: 8 }, worker));
   coins.sort((a, b) => syms.indexOf(a.sym) - syms.indexOf(b.sym));
   return { bar: Math.floor(now / HOUR) * HOUR, at: now, coins };
 }
