@@ -271,7 +271,7 @@
       case "depthUpdate": if (sym === S.sym) { S.book = { a: d.a, b: d.b }; dirtyBook = true; } break;
       case "kline":
         if (sym === S.sym && d.k.i === S.iv && series) {
-          const k = d.k; series.update({ time: Math.floor(k.t / 1000) + KST, open: +k.o, high: +k.h, low: +k.l, close: +k.c });
+          const k = d.k, kt = Math.floor(k.t / 1000) + KST; series.update({ time: kt, open: +k.o, high: +k.h, low: +k.l, close: +k.c }); if (barTimes && !barTimes.has(kt)) { barTimes.add(kt); drawMarks(); }
         }
         break;
     }
@@ -483,11 +483,13 @@
     if (S.ctab !== "mine") return;
     initChart(); if (!series) return;
     const id = ++loadId, sym = S.sym, iv = S.iv;
-    series.setData([]);
+    series.setData([]); barTimes = null;
     try {
       const rows = await (await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=500`)).json();
       if (id !== loadId) return;
-      series.setData(rows.map(r => ({ time: Math.floor(r[0] / 1000) + KST, open: +r[1], high: +r[2], low: +r[3], close: +r[4] })));
+      const data = rows.map(r => ({ time: Math.floor(r[0] / 1000) + KST, open: +r[1], high: +r[2], low: +r[3], close: +r[4] }));
+      series.setData(data);
+      barTimes = new Set(data.map(d => d.time));
       const last = +rows[rows.length - 1][4];
       series.applyOptions({ priceFormat: { type: "price", precision: pdec(last), minMove: Math.pow(10, -pdec(last)) } });
       chart.timeScale().scrollToRealTime();
@@ -510,6 +512,33 @@
       add(E.trailStop(p), "#f59e0b", "Trailing", 3);
     }
     for (const o of S.st.ord) if (o.sym === S.sym) add(o.price, "#5b93f0", `${o.ro ? "Close" : sideTxt(o.side)} order`, 1);
+    drawMarks();
+  }
+  // 차트에 내 매매 표시: 진입(▲ 롱 / ▼ 숏)과 청산(●) — 지금 포지션과 지난 매매 기록 (이 코인만, 화면에 있는 기간만)
+  let barTimes = null;
+  function drawMarks() {
+    if (!series || !S.st) return;
+    const ivMs = ({ m: 60e3, h: 3600e3, d: 86400e3 })[S.iv.slice(-1)] * parseInt(S.iv, 10);
+    const bt = ms => Math.floor(ms / ivMs) * ivMs / 1000 + KST;
+    const ok = t => barTimes && barTimes.has(t);
+    const mk = [], seen = new Set();
+    const entry = (t, side, price, now) => {
+      const k = t + side + price; if (seen.has(k)) return; seen.add(k);
+      const time = bt(t); if (!ok(time)) return;
+      const L = side === "long";
+      mk.push({ time, position: L ? "belowBar" : "aboveBar", shape: L ? "arrowUp" : "arrowDown", color: L ? "#22b573" : "#ef4b5f",
+                text: `${now ? "▶ " : ""}${sideTxt(side)} ${fp(price)}` });
+    };
+    for (const p of S.st.pos) if (p.sym === S.sym) entry(p.t, p.side, p.entry, true);
+    for (const t of S.st.th) {
+      if (t.sym !== S.sym || t.kind === "deposit") continue;
+      if (t.ot) entry(t.ot, t.side, t.entry);
+      const time = bt(t.t); if (!ok(time)) continue;
+      mk.push({ time, position: t.side === "long" ? "aboveBar" : "belowBar", shape: "circle", color: t.pnl >= 0 ? "#22b573" : "#ef4b5f",
+                text: `${L(t.reason).replace(/ \(partial.*\)/, "")} ${fp(t.exit)} (${sg(t.pnl)})` });
+    }
+    mk.sort((a, b) => a.time - b.time);
+    try { series.setMarkers(mk); } catch (e) {}
   }
   IVS.forEach(v => { const b = document.createElement("button"); b.textContent = v; b.dataset.v = v; if (v === S.iv) b.className = "on"; $("iv").appendChild(b); });
   $("iv").onclick = e => {
