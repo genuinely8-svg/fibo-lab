@@ -22,6 +22,10 @@
 | 24시간변동률 | `movers.html` | 비트겟 24시간 상승/하락 순위 |
 | 주요뉴스 | `news.html` | 블록미디어·토큰포스트·CoinDesk RSS, 비트겟 공지 |
 
+## 화면 기준 (모든 탭 공통 — 탭을 옮겨도 로고·메뉴 위치가 절대 안 움직이게)
+- `<h1 class="brand">Artha</h1>` + `<nav id="nav"></nav>` 로 시작, 페이지 폭 `.wrap` 최대 1320px (common.css, Signals 는 index.html 안에 같은 값)
+- `html{scrollbar-gutter:stable}` 로 스크롤바 자리 항상 확보. 새 탭을 만들면 이 기준 그대로
+
 ## 공통 파일
 - `nav.js` — 위쪽 탭 메뉴 (탭 추가는 TABS, "인사이트" 묶음은 INSIGHTS 목록에 한 줄. PC는 마우스를 올리면 펼침, 휴대폰은 아래 시트)
 - `common.css`, `common.js` — 새 페이지들이 같이 쓰는 모양·도구
