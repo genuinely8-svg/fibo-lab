@@ -42,9 +42,19 @@
     .navtabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
              border-bottom:1px solid var(--line);scrollbar-width:none}
     /* 다크/라이트 전환 버튼: 탭 오른쪽 끝에 고정 (탭이 옆으로 밀려도 안 가려짐) */
-    .navwrap button.themebtn{flex:none;width:44px;padding:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;
-                             color:var(--text);font-size:17px;line-height:1;cursor:pointer}
-    .navwrap button.themebtn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+    /* 다크/라이트 전환: 아이폰 설정 스위치 모양 (동그라미가 옆으로 미끄러짐, 안에 해·달) */
+    .navwrap button.themebtn{flex:none;display:flex;align-items:center;justify-content:center;width:62px;padding:0;border:0;border-bottom:1px solid var(--line);
+                             border-radius:0;background:transparent;cursor:pointer}
+    .tsw{position:relative;width:51px;height:31px;border-radius:999px;background:#e5e5ea;transition:background .3s ease;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+    .tsw i{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);
+           display:grid;place-items:center;font-style:normal;font-size:14px;line-height:1;transition:transform .3s cubic-bezier(.3,1.4,.6,1)}
+    .tsw i::before{content:"☀️"}
+    .tsw.dark{background:#34c759}
+    .tsw.dark i{transform:translateX(20px)}
+    .tsw.dark i::before{content:"🌙"}
+    .navwrap button.themebtn:active .tsw i{width:31px}
+    .navwrap button.themebtn:active .tsw.dark i{transform:translateX(16px)}
+    .navwrap button.themebtn:focus-visible .tsw{outline:2px solid var(--accent);outline-offset:2px}
     .navtabs::-webkit-scrollbar{display:none}
     .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;
                border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
@@ -148,7 +158,9 @@
   const tbtn = wrap.querySelector(".themebtn");
   const paintTheme = () => {
     const dark = (window.Theme ? Theme.get() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
-    tbtn.textContent = dark ? "☀️" : "🌙";
+    if (!tbtn.firstChild) tbtn.innerHTML = '<span class="tsw"><i></i></span>';
+    tbtn.firstChild.classList.toggle("dark", dark);
+    tbtn.setAttribute("role", "switch"); tbtn.setAttribute("aria-checked", String(dark));
     tbtn.title = tbtn.ariaLabel = dark ? "라이트 모드로 바꾸기" : "다크 모드로 바꾸기";
   };
   tbtn.onclick = () => window.Theme && Theme.toggle();
