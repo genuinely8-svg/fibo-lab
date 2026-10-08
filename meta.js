@@ -30,6 +30,22 @@
   const COMMODITY_TOKENS = new Set(["PAXG", "XAUT", "XAUM", "KAU", "KAG", "DGX", "PMGT", "XAU", "XAG", "XPT", "XPD"]);
   const typeOf = s => { const S = String(s).toUpperCase(); return types[S] || (COMMODITY_TOKENS.has(base(S)) ? "COMMODITY_TOKEN" : null); };
 
+  // 토큰화 주식·원자재 로고: financialmodelingprep 공개 로고 이미지 (키 필요 없음). 바이낸스 기호가 실제 티커와 다른 것만 따로 적음
+  const RWA_TICKER = {
+    XAU: "GCUSD", XAG: "SLV", XPT: "PLUSD", XPD: "PAUSD", COPPER: "HGUSD", CL: "CLUSD", BZ: "CLUSD", NATGAS: "NGUSD",
+    SKHYNIX: "000660.KS", SAMSUNG: "005930.KS", HYUNDAI: "005380.KS", SAMSUNGEM: "009150.KS", HANMI: "128940.KS",
+    LGELECTRONICS: "066570.KS", NAVER: "035420.KS", KODEX200: "069500.KS", CSOPSKHYNIX2L: "000660.KS", CSOPSAMSUNG2L: "005930.KS",
+    HK0700: "0700.HK", TENCENT: "0700.HK", HK1810: "1810.HK", MEITUAN: "3690.HK", KUAISHOU: "1024.HK", POPMART: "9992.HK",
+    BYD: "1211.HK", HK0992: "0992.HK", ZHONGJI: "300308.SZ", GIGADEV: "603986.SS",
+    PAXG: "GCUSD", XAUT: "GCUSD", XAUM: "GCUSD", KAU: "GCUSD", KAG: "SLV",
+  };
+  const NO_LOGO = new Set(["INDEX", "FX", "PREMARKET"]);
+  function rwaLogo(s, t) {
+    const b = String(s).toUpperCase().replace(/USDT$/, "");
+    if (top.L[b] && t === "COMMODITY_TOKEN") return top.L[b];        // PAXG 같은 금 토큰은 코인게코 로고가 정확
+    const tk = RWA_TICKER[b] || (NO_LOGO.has(t) || t === "CN_EQUITY" || t === "HK_EQUITY" ? null : b);
+    return tk ? `https://financialmodelingprep.com/image-stock/${encodeURIComponent(tk)}.png` : null;
+  }
   async function loadTop() {
     const hit = get("cg-top1000-v1", DAY);
     if (hit) { top = hit; topAt = getAny("cg-top1000-v1").at; return; }
@@ -118,7 +134,7 @@
     typesLoaded,
     base,
     rank: s => top.R[base(s)] || null,
-    logo: s => top.L[base(s)] || null,
+    logo: s => { const t = typeOf(s); return t ? rwaLogo(s, t) : (top.L[base(s)] || null); },   // 주식·원자재는 코인게코(같은 기호의 엉뚱한 코인) 대신 주식 로고
     name: s => top.N[base(s)] || null,
     ko: s => ko[base(s)] || null,
     type: typeOf,                                                        // "COMMODITY" 등, 코인이면 null

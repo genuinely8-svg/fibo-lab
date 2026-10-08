@@ -327,7 +327,7 @@
   }
   $("ptabs").onclick = e => { const b = e.target.closest("button"); if (b) setPtab(b.dataset.p); };
   CoinMeta.load().then(() => renderHd()).catch(() => {});        // 처음 열 때 로고(코인게코) 받아서 위쪽 코인 버튼에 표시
-  const logoImg = b => CoinMeta.logo(b) ? `<img src="${esc(CoinMeta.logo(b))}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="ph"></span>`;
+  const logoImg = b => CoinMeta.logo(b) ? `<img src="${esc(CoinMeta.logo(b))}" alt="" onerror="this.outerHTML='<span class=ph></span>'">` : `<span class="ph"></span>`;
   function renderPicker() {
     const q = $("psearch").value.trim().toUpperCase();
     const src = S.ptab === "rwa" ? (S.rwa || []) : S.coins;
