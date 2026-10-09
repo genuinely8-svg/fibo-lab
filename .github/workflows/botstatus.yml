@@ -1,0 +1,26 @@
+name: 봇 상태 보기 (Signals 봇 기록)
+
+on:
+  workflow_dispatch:            # Actions 탭에서 Run workflow → 결과는 실행 화면의 Annotations 에 표시
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: test / jina 봇 상태
+        env:
+          BOT_SECRET: ${{ secrets.BOT_SECRET }}
+        run: |
+          for a in crypto rwa; do
+            curl -sS --max-time 40 -H "Authorization: Bearer $BOT_SECRET" "https://fibo-lab-kappa.vercel.app/api/sigbot?acct=$a" > s_$a.json || true
+          done
+          node -e '
+            const fs=require("fs"); const k=t=>new Date(t+9*3600e3).toISOString().slice(5,16).replace("T"," ");
+            for (const a of ["crypto","rwa"]) {
+              let j; try { j=JSON.parse(fs.readFileSync("s_"+a+".json","utf8")); } catch(e){ console.log("::warning::"+a+" 읽기 실패"); continue; }
+              if (!j.sbot) { console.log("::warning::"+a+" "+JSON.stringify(j).slice(0,300)); continue; }
+              const b=j.sbot, L=b.log.slice(0,40).map(x=>k(x.t)+" "+x.msg);
+              console.log("::notice title="+j.nick+" 요약::기준 "+(b.base||0).toFixed(2)+" · 원금기준 "+b.dep0+" · 진행중 "+Object.keys(b.act).join(",")+" · 마지막 기록 "+(b.log[0]?k(b.log[0].t):"-"));
+              for (let i=0;i<4;i++) console.log("::notice title="+j.nick+" 기록 "+(i+1)+"::"+L.slice(i*10,i*10+10).join(" %0A "));
+            }'
