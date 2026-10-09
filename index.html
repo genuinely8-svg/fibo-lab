@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261009131701"></script>
-<title>Artha</title>
+<script src="theme.js?v=20261009155510"></script>
+<title>Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
   :root{
@@ -214,8 +214,9 @@
 </style>
 </head>
 <body>
+<script src="intro.js?v=20261009155510"></script>
 <div class="wrap">
-  <h1 class="brand">Artha</h1>
+  <h1 class="brand">Gwave</h1>
   <nav id="nav"></nav>
 
   <div class="card collapsed" id="setCard">
@@ -354,10 +355,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261009131701"></script>
-<script src="chart.js?v=20261009131701"></script>
-<script src="nav.js?v=20261009131701"></script>
-<script src="meta.js?v=20261009131701"></script>
+<script src="fib-core.js?v=20261009155510"></script>
+<script src="chart.js?v=20261009155510"></script>
+<script src="nav.js?v=20261009155510"></script>
+<script src="meta.js?v=20261009155510"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -1129,7 +1130,7 @@ const Live = (() => {
 
 // ── 시작: 설정 불러오고 바로 분석 ─────────────────────────────────
 if (RWA) {                                   // RWA 탭 기본값: 바이낸스 선물만(현물엔 없음), 진입 깊이 -0.618, 시총 필터 없음
-  document.title = "Stock · Artha";
+  document.title = "Stock · Gwave";
   $("ex").value = "futures"; $("ex").querySelector('option[value="binance"]').remove();
   $("ratio").value = "0.618";
   $("mcapLbl").style.display = "none";

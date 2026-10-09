@@ -13,7 +13,7 @@
 |---|---|---|
 | Signals | `index.html` | 바이낸스 캔들 → 진입 가격 통계 |
 | Signals RWA | `index.html` (`/signals-rwa.html` 로 열면, vercel.json rewrite) | 같은 계산을 바이낸스 선물 토큰화 주식·원자재 등에 · 기본 깊이 -0.618 · 설정 따로 저장 |
-| Trading Engine (Artha Trading Engine) | `lowsig.html`, `lowsig-core.js` | 비트코인·이더리움 전용 (BTC/ETH 버튼) · 바이낸스 12시간봉 추세추종(v4) 신호, 차트 위 1m~12H 버튼으로 진입2·3·익절·SL 시각 확인 |
+| Trading Engine (Gwave Trading Engine) | `lowsig.html`, `lowsig-core.js` | 비트코인·이더리움 전용 (BTC/ETH 버튼) · 바이낸스 12시간봉 추세추종(v4) 신호, 차트 위 1m~12H 버튼으로 진입2·3·익절·SL 시각 확인 |
 | (코인 상세) | `coin.html` | 바이낸스 + 코인게코 |
 | 계산기 | `calc.html` | 수수료·펀딩비(바이낸스 실시간)·물타기/불타기 평단·청산가·복리 계산 |
 | 청산히트맵 | `liquidation.html` | 바이낸스 OI로 추정한 청산 지도 + 실시간 청산 |
@@ -23,7 +23,7 @@
 | 주요뉴스 | `news.html` | 블록미디어·토큰포스트·CoinDesk RSS, 비트겟 공지 |
 
 ## 화면 기준 (모든 탭 공통 — 탭을 옮겨도 로고·메뉴 위치가 절대 안 움직이게)
-- `<h1 class="brand">Artha</h1>` + `<nav id="nav"></nav>` 로 시작, 페이지 폭 `.wrap` 최대 1320px (common.css, Signals 는 index.html 안에 같은 값)
+- `<h1 class="brand">Gwave</h1>` + `<nav id="nav"></nav>` 로 시작, 페이지 폭 `.wrap` 최대 1320px (common.css, Signals 는 index.html 안에 같은 값)
 - `html{scrollbar-gutter:stable}` 로 스크롤바 자리 항상 확보. 새 탭을 만들면 이 기준 그대로
 
 ## 공통 파일

@@ -1,4 +1,4 @@
-/* GET /api/lowsig?sym=BTC|ETH — Artha Trading Engine (비트코인·이더리움 12시간봉 추세추종) 과거 검증 결과
+/* GET /api/lowsig?sym=BTC|ETH — Gwave Trading Engine (비트코인·이더리움 12시간봉 추세추종) 과거 검증 결과
    - 신호는 12시간봉, 진입2·3·익절·SL의 정확한 시각·가격은 1분봉으로 계산 (lowsig-core.js, 봇과 같은 규칙)
    - 12시간봉이 새로 마감됐을 때 한 번만 계산해서 DB(Upstash)에 저장 → 방문자는 저장된 결과만 받음
      (방문자 브라우저가 바이낸스에 분봉을 수백 번 요청하지 않게)

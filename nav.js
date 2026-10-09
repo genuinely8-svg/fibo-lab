@@ -33,9 +33,12 @@
   const KO = LANG === "ko";
   const style = document.createElement("style");
   style.textContent = `
-    /* 글꼴: 본문은 Pretendard(한글·숫자 깔끔), 로고 "Artha"는 Cinzel */
+    /* 글꼴: 본문은 Pretendard(한글·숫자 깔끔), 로고 "GWAVE"는 Space Grotesk (인트로와 같은 글꼴), 첫 글자 G만 녹색 */
     body{font-family:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Malgun Gothic",sans-serif;font-feature-settings:"tnum"}
-    h1.brand{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.12em;font-size:26px}
+    h1.brand{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;letter-spacing:.08em;font-size:26px;text-transform:uppercase}
+    h1.brand a{display:inline-block}
+    h1.brand a::first-letter{color:#05875A}
+    :root[data-theme="dark"] h1.brand a::first-letter{color:#22c55e}
     @media (max-width:700px){ h1.brand{font-size:23px} }
     .navwrap{display:flex;align-items:stretch;margin:0 0 16px}
     /* overflow-y:hidden — 가로 스크롤 칸이 손가락 따라 위아래로 흔들리지 않게 (아이폰) */
@@ -54,7 +57,7 @@
     button.themebtn:active .tsw i{width:24px}
     button.themebtn:active .tsw.dark i{transform:translateX(14px)}
     button.themebtn:focus-visible .tsw{outline:2px solid var(--accent);outline-offset:2px}
-    /* 로고 Artha 누르면 홈 */
+    /* 로고 Gwave 누르면 홈 */
     h1.brand a{color:inherit;text-decoration:none}
     .navtabs::-webkit-scrollbar{display:none}
     .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;
@@ -96,8 +99,15 @@
     body.navsheet-on .navsheet-bg{opacity:1;visibility:visible;transition:opacity .22s}
     body.navsheet-on .navsheet{transform:none}`;
   document.head.appendChild(style);
+  // 로고 글꼴 (Space Grotesk) — 페이지마다 따로 안 넣어도 되게 여기서 한 번에
+  if (!document.querySelector('link[href*="Space+Grotesk"]')) {
+    const f = document.createElement("link");
+    f.rel = "stylesheet";
+    f.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap";
+    document.head.appendChild(f);
+  }
 
-  const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+  const here =(location.pathname.split("/").pop() || "index.html").toLowerCase();
   const wrap = document.getElementById("nav");
   if (!wrap) return;
   wrap.className = "navwrap";
@@ -112,7 +122,7 @@
     '</div><button type="button" class="themebtn"></button>' +
     `<div class="navpanel" role="menu"><div class="ttl notranslate" translate="no">${grpName}</div>${INSIGHTS.map(item).join("")}</div>`;
   const el = wrap.querySelector(".navtabs");
-  // 로고 "Artha" 누르면 홈(Signals)으로
+  // 로고 "Gwave" 누르면 홈(Signals)으로
   const brand = document.querySelector("h1.brand");
   if (brand && !brand.querySelector("a")) brand.innerHTML = `<a href="index.html" title="Home">${brand.innerHTML}</a>`;
   // ── 인사이트: PC(마우스)는 올리면 펼침, 휴대폰(터치)은 누르면 시트 ──
