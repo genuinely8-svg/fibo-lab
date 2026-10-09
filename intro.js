@@ -69,9 +69,9 @@
     "#gw .r3{animation:gwrise 1s cubic-bezier(.2,.7,.2,1) .5s both}",
     "#gw .boot{font-size:13px;color:#4A5363;letter-spacing:.1em}",
     "#gw .cur{color:" + GREEN + ";animation:gwblink 1s steps(1) infinite}",
-    "#gw h1{margin:20px 0 0;font-weight:700;font-size:clamp(64px,13vw,128px);line-height:.95;letter-spacing:.06em;color:" + INK + "}",
-    "#gw h1 b{color:" + GREEN + ";font-weight:700}",
-    "#gw .sub{margin-top:18px;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:14px;color:#4A5363}",
+    "#gw h1{margin:22px 0 0;line-height:0}",
+    "#gw h1 svg{height:clamp(44px,9vw,104px);width:auto;display:block}",
+    "#gw .sub{margin-top:26px;display:flex;gap:18px;flex-wrap:wrap;justify-content:center;font-family:'Space Grotesk',system-ui,sans-serif;font-weight:500;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#2B3443}",
     "#gw .sub s{text-decoration:none;color:#CBD2DC}",
     "#gw .pos{margin-top:40px;display:flex;align-items:center;gap:18px;padding:14px 22px;border:1px solid #DCE3EA;border-radius:12px;background:#fff;box-shadow:0 20px 50px -24px rgba(5,135,90,.4)}",
     "#gw .pos small{font-size:12px;color:" + MUTED + ";text-align:left;line-height:1.5}",
@@ -79,7 +79,7 @@
     "#gw .join{margin-top:40px;height:56px;padding:0 40px;border:1.5px solid " + GREEN + ";border-radius:4px;background:#fff;color:" + GREEN + ";",
     "  font-size:15px;font-weight:500;letter-spacing:.12em;cursor:pointer;transition:background .2s ease,color .2s ease}",
     "#gw .join:hover,#gw .join:focus-visible{background:" + GREEN + ";color:#fff;outline:none}",
-    "@media (max-width:600px){#gw .sub{font-size:12px;gap:8px}#gw .pos strong{font-size:26px}#gw .join{padding:0 24px;font-size:13px}}",
+    "@media (max-width:600px){#gw .sub{font-size:11px;gap:8px;letter-spacing:.1em}#gw .pos strong{font-size:26px}#gw .join{padding:0 24px;font-size:13px}}",
     "@media (prefers-reduced-motion:reduce){#gw *{animation:none!important}}"
   ].join("\n");
   document.head.appendChild(css);
@@ -142,8 +142,8 @@
     '<div class="tape top mono" aria-hidden="true"><div class="run">' + tapeItems + tapeItems + "</div></div>" +
     '<div class="mid">' +
       '<div class="boot mono r1">&gt; INITIALIZING TRADING TERMINAL<span class="cur">_</span></div>' +
-      '<h1 class="sg r2"><b>G</b>WAVE</h1>' +
-      '<div class="sub mono r2"><span>Crypto &amp; Stock Signals</span><s>/</s><span>Trading Engine</span><s>/</s><span>Paper Trading</span></div>' +
+      '<h1 class="r2"><svg viewBox="0 0 680 100" role="img" aria-label="Gwave"><defs><linearGradient id="gwg-intro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14C77B"/><stop offset="1" stop-color="#0B7F74"/></linearGradient></defs><path fill="url(#gwg-intro)" d="M128,0H24Q0,0 0,24V76Q0,100 24,100H128V42H64V62H106V78H26Q22,78 22,74V26Q22,22 26,22H128Z"/><path fill="#0B1220" d="M142,0H168L208,100H182ZM222,0H248L208,100H182ZM222,0H248L288,100H262ZM302,0H328L288,100H262ZM380,0H406L366,100H340ZM380,0H406L446,100H420ZM456,0H482L522,100H496ZM536,0H562L522,100H496ZM576,0H680V22H602V39H670V61H602V78H680V100H576Z"/></svg></h1>' +
+      '<div class="sub r2"><span>Crypto &amp; Stock Signals</span><s>/</s><span>Trading Engine</span><s>/</s><span>Paper Trading</span></div>' +
       '<div class="pos mono r3"><small>PAPER POSITION · DEMO<br>BTCUSDT · LONG 10x</small><strong>+<span id="gw-pnl">0.00</span>%</strong></div>' +
       '<button type="button" class="join mono r3" id="gw-join">[ JOIN THE TERMINAL ]</button>' +
     "</div>" +

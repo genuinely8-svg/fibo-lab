@@ -33,12 +33,12 @@
   const KO = LANG === "ko";
   const style = document.createElement("style");
   style.textContent = `
-    /* 글꼴: 본문은 Pretendard(한글·숫자 깔끔), 로고 "GWAVE"는 Space Grotesk (인트로와 같은 글꼴), 첫 글자 G만 녹색 */
+    /* 글꼴: 본문은 Pretendard(한글·숫자 깔끔) · 로고는 GWAVE 벡터 로고 (G는 녹색 그라데이션, WAVE는 글자색이라 다크 모드에서도 보임) */
     body{font-family:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Malgun Gothic",sans-serif;font-feature-settings:"tnum"}
-    h1.brand{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;letter-spacing:.08em;font-size:26px;text-transform:uppercase}
-    h1.brand a{display:inline-block}
-    h1.brand a::first-letter{color:#05875A}
-    :root[data-theme="dark"] h1.brand a::first-letter{color:#22c55e}
+    h1.brand{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;letter-spacing:.08em;font-size:26px;line-height:1}
+    h1.brand a{display:inline-flex;align-items:center;color:var(--text)}
+    h1.brand svg{height:28px;width:auto;display:block}
+    @media (max-width:700px){ h1.brand svg{height:24px} }
     @media (max-width:700px){ h1.brand{font-size:23px} }
     .navwrap{display:flex;align-items:stretch;margin:0 0 16px}
     /* overflow-y:hidden — 가로 스크롤 칸이 손가락 따라 위아래로 흔들리지 않게 (아이폰) */
@@ -126,7 +126,8 @@
   const el = wrap.querySelector(".navtabs");
   // 로고 "Gwave" 누르면 홈(Signals)으로
   const brand = document.querySelector("h1.brand");
-  if (brand && !brand.querySelector("a")) brand.innerHTML = `<a href="index.html" title="Home">${brand.innerHTML}</a>`;
+  const LOGO = '<svg viewBox="0 0 680 100" role="img" aria-label="Gwave"><defs><linearGradient id="gwg-nav" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14C77B"/><stop offset="1" stop-color="#0B7F74"/></linearGradient></defs><path fill="url(#gwg-nav)" d="M128,0H24Q0,0 0,24V76Q0,100 24,100H128V42H64V62H106V78H26Q22,78 22,74V26Q22,22 26,22H128Z"/><path fill="currentColor" d="M142,0H168L208,100H182ZM222,0H248L208,100H182ZM222,0H248L288,100H262ZM302,0H328L288,100H262ZM380,0H406L366,100H340ZM380,0H406L446,100H420ZM456,0H482L522,100H496ZM536,0H562L522,100H496ZM576,0H680V22H602V39H670V61H602V78H680V100H576Z"/></svg>';
+  if (brand) brand.innerHTML = `<a href="index.html" title="Home">${LOGO}</a>`;
   // ── 인사이트: PC(마우스)는 올리면 펼침, 휴대폰(터치)은 누르면 시트 ──
   (function () {
     const grp = wrap.querySelector(".navgrp"), panel = wrap.querySelector(".navpanel");
