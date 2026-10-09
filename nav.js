@@ -37,8 +37,8 @@
     body{font-family:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Malgun Gothic",sans-serif;font-feature-settings:"tnum"}
     h1.brand{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;letter-spacing:.08em;font-size:26px;line-height:1}
     h1.brand a{display:inline-flex;align-items:center;color:var(--text)}
-    h1.brand svg{height:28px;width:auto;display:block}
-    @media (max-width:700px){ h1.brand svg{height:24px} }
+    h1.brand svg{height:20px;width:auto;display:block}
+    @media (max-width:700px){ h1.brand svg{height:15px} }
     @media (max-width:700px){ h1.brand{font-size:23px} }
     .navwrap{display:flex;align-items:stretch;margin:0 0 16px}
     /* overflow-y:hidden — 가로 스크롤 칸이 손가락 따라 위아래로 흔들리지 않게 (아이폰) */
