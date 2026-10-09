@@ -71,7 +71,7 @@ http.createServer(async (req, res) => {
       return;
     }
     // 2) 나머지는 이 폴더의 파일(index.html, fib-core.js)을 보내줌
-    const file = decodeURIComponent(req.url.split("?")[0]).slice(1) || "index.html";   // "/?watch=..." 도 index.html
+    const file = decodeURIComponent(req.url.split("?")[0]).slice(1) || (/[?&]watch=/.test(req.url) ? "index.html" : "home.html");   // 첫 화면은 홈, "/?watch=..." 공유 링크는 index.html
     const full = path.join(__dirname, file);
     if (!full.startsWith(__dirname) || !fs.existsSync(full) || !fs.statSync(full).isFile()) { res.writeHead(404); res.end("없는 파일"); return; }
     res.writeHead(200, { "content-type": TYPES[path.extname(full)] || "application/octet-stream" });

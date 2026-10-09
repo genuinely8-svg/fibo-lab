@@ -19,5 +19,18 @@
       "source": "/signals-rwa",
       "destination": "/index.html"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "missing": [
+        {
+          "type": "query",
+          "key": "watch"
+        }
+      ],
+      "destination": "/home.html",
+      "permanent": false
+    }
   ]
 }

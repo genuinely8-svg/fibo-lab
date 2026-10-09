@@ -1,8 +1,9 @@
 /*
   intro.js — 첫 화면 인트로 (C안 · Grid Ticker)
-  - index.html 의 <body> 바로 아래에서 불러와요 (메인 화면이 먼저 번쩍 보이지 않게)
+  - home.html(홈) 의 <body> 바로 아래에서 불러와요 (홈 화면이 먼저 번쩍 보이지 않게)
   - 흰 모눈 배경 + 위아래로 흐르는 실시간 시세(바이낸스) + 뒤에 흐린 모의투자 화면 + 큰 GWAVE 글자
-  - [ JOIN THE TERMINAL ] 누르면 인트로가 흐려지며 사라지고 메인(Crypto)이 나타남
+  - [ JOIN THE TERMINAL ] 누르면 터미널 접속 문구 5줄이 1.5초쯤 찍히고(클릭하면 건너뜀)
+    인트로가 흐려지며 사라지고 홈(터미널 화면)이 나타남 — 접속 문구는 이때만 나와요 (로고로 홈에 올 때는 안 나옴)
   - 한 번 들어가면 브라우저 창을 닫기 전까지(sessionStorage) 다시 안 보여요
   - 안 보이는 경우: Stock 탭(/signals-rwa), 주소 뒤에 ?nointro
   - 다시 보고 싶으면 주소 뒤에 ?intro
@@ -79,6 +80,14 @@
     "#gw .join{margin-top:40px;height:56px;padding:0 40px;border:1.5px solid " + GREEN + ";border-radius:4px;background:#fff;color:" + GREEN + ";",
     "  font-size:15px;font-weight:500;letter-spacing:.12em;cursor:pointer;transition:background .2s ease,color .2s ease}",
     "#gw .join:hover,#gw .join:focus-visible{background:" + GREEN + ";color:#fff;outline:none}",
+    /* JOIN 누른 뒤 접속 문구 */
+    "#gw .bootseq{width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px;text-align:left;font-size:14px;cursor:pointer}",
+    "#gw .bootseq svg{height:34px;width:auto;display:block;margin-bottom:16px}",
+    "#gw .bl{display:flex;justify-content:space-between;gap:16px;color:#4A5363;animation:gwrise .25s ease both}",
+    "#gw .bl b{color:" + GREEN + ";font-weight:600}",
+    "#gw .bprog{height:3px;background:#EEF1F4;margin-top:12px;overflow:hidden}",
+    "#gw .bprog i{display:block;height:3px;width:0;background:" + GREEN + ";transition:width .25s ease}",
+    "#gw .bskip{font-size:12px;color:#8A93A0;margin-top:4px}",
     "@media (max-width:600px){#gw .sub{font-size:11px;gap:8px;letter-spacing:.1em}#gw .pos strong{font-size:26px}#gw .join{padding:0 24px;font-size:13px}}",
     "@media (prefers-reduced-motion:reduce){#gw *{animation:none!important}}"
   ].join("\n");
@@ -181,10 +190,19 @@
     })
     .catch(function () {});
 
-  /* 들어가기: 인트로가 흐려지며 사라지고 메인이 나타남 */
-  var btn = el.querySelector("#gw-join");
-  btn.addEventListener("click", function () {
-    try { sessionStorage.setItem(KEY, "1"); } catch (e) {}
+  /* 들어가기: 터미널 접속 문구 → 인트로가 흐려지며 사라지고 홈이 나타남 */
+  var BOOT = [
+    ["Connecting to Gwave Terminal", "OK"],
+    ["Loading market data (Binance)", "OK"],
+    ["Syncing swing signals", "OK"],
+    ["AI Trading Engine", "ONLINE"],
+    ["Session ready", "\u2713"]
+  ];
+  var btn = el.querySelector("#gw-join"), leaving = false, bootTimer = null;
+  function leave() {
+    if (leaving) return;
+    leaving = true;
+    clearInterval(bootTimer);
     el.classList.add("out");
     root.classList.add("gw-out");
     root.classList.remove("gw-on");
@@ -193,5 +211,25 @@
       el.remove();
       css.textContent = "html.gw-out .wrap{opacity:1;transition:opacity .8s ease}";
     }, 1200);
+  }
+  btn.addEventListener("click", function () {
+    try { sessionStorage.setItem(KEY, "1"); } catch (e) {}
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) return leave();
+    var mid = el.querySelector(".mid"), logo = el.querySelector("h1 svg").outerHTML.replace(/gwg-intro/g, "gwg-boot");
+    mid.innerHTML = '<div class="bootseq mono" role="status" aria-live="polite">' + logo +
+      '<div id="gw-lines" style="display:flex;flex-direction:column;gap:10px"></div>' +
+      '<div class="bprog"><i id="gw-prog"></i></div><div class="bskip">Click anywhere to skip</div></div>';
+    var lines = mid.querySelector("#gw-lines"), prog = mid.querySelector("#gw-prog"), n = 0;
+    mid.querySelector(".bootseq").addEventListener("click", leave);
+    bootTimer = setInterval(function () {
+      if (n >= BOOT.length) { clearInterval(bootTimer); setTimeout(leave, 350); return; }
+      var row = document.createElement("div");
+      row.className = "bl";
+      row.innerHTML = "<span>&gt; " + BOOT[n][0] + "</span><b>" + BOOT[n][1] + "</b>";
+      lines.appendChild(row);
+      n++;
+      prog.style.width = Math.round(n / BOOT.length * 100) + "%";
+    }, 260);
   });
 })();

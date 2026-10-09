@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
+<script src="theme.js?v=20261010021812"></script>
+<title>Gwave — Swing smarter</title>
+<link rel="stylesheet" href="common.css?v=20261010021812">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<!--
+  home.html — Gwave 홈 (터미널 모드)
+  - 인트로(intro.js)에서 [ JOIN THE TERMINAL ] → 부팅 문구 → 이 화면
+  - 로고(GWAVE)를 누르면 언제든 여기로 (부팅 문구는 인트로에서 들어올 때만)
+  - Ctrl+K (맥은 ⌘K) 또는 오른쪽 위 "Search" 버튼 → 명령창
+  - 로고·탭 위치와 페이지 폭은 다른 탭과 똑같이 (common.css 의 .wrap)
+-->
+<style>
+  :root{ --gw:#05875A; --ink-up:#05875A; --ink-dn:#D13438; --grid:#EEF1F4; }
+  :root[data-theme="dark"]{ --gw:#2fbf85; --ink-up:#2fbf85; --ink-dn:#f0625a; --grid:#1b1f26; }
+  body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:48px 48px}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .wrap{padding-bottom:90px}
+
+  /* 맨 위 세션 줄 */
+  .sess{display:flex;flex-wrap:wrap;gap:6px 22px;justify-content:space-between;align-items:center;background:#0B1220;color:#B9C3CF;
+        padding:8px 14px;border-radius:6px;font-size:12px;margin:0 0 34px}
+  .sess span{display:inline-flex;gap:18px;flex-wrap:wrap}
+  .sess .live{color:#2fbf85;font-weight:600}
+
+  /* 큰 제목 */
+  .prompt{font-size:13px;color:var(--muted);margin:0 0 10px}
+  .prompt b{color:var(--text);font-weight:500}
+  .cur{display:inline-block;width:8px;height:15px;background:var(--gw);margin-left:4px;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .hero{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;letter-spacing:-.05em;line-height:.92;font-size:clamp(56px,10vw,148px);margin:0}
+  .hero span{display:block}
+  .hero .g{color:var(--gw)}
+
+  .lead{display:flex;flex-wrap:wrap;gap:24px 32px;justify-content:space-between;align-items:flex-end;border-top:2px solid var(--text);padding-top:26px;margin-top:36px}
+  .lead p{margin:0;flex:1 1 420px;max-width:660px;font-size:clamp(19px,2vw,26px);line-height:1.4;font-weight:500}
+  .lead p em{font-style:normal;color:var(--muted)}
+  .cta{display:flex;flex-wrap:wrap;gap:12px}
+  .btn{display:inline-flex;align-items:center;min-height:50px;padding:0 26px;border-radius:6px;font-weight:600;font-size:16px;text-decoration:none}
+  .btn.pri{background:var(--gw);color:#fff}
+  .btn.sec{background:var(--card);color:var(--text);border:1px solid var(--line)}
+
+  /* 3개 패널 */
+  .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:40px;border:1px solid var(--text);background:var(--card)}
+  .panel{display:flex;flex-direction:column;text-decoration:none;color:var(--text);border-right:1px solid var(--line)}
+  .panel:last-child{border-right:0;background:#0B1220;color:#fff}
+  .panel .ph{display:flex;justify-content:space-between;gap:10px;padding:10px 18px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .panel:last-child .ph{border-color:#1f2b36;color:#9fb0bf}
+  .panel .ph i{font-style:normal;color:var(--gw);font-weight:600}
+  .panel:last-child .ph i{color:#2fbf85}
+  .panel .pb{padding:22px 18px;display:flex;flex-direction:column;gap:10px}
+  .panel b{font-family:"Space Grotesk",system-ui,sans-serif;font-size:24px}
+  .panel small{font-size:15px;line-height:1.55;color:var(--muted)}
+  .panel:last-child small{color:#B9C3CF}
+  .panel:hover b{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}
+  @media (max-width:860px){ .panel{border-right:0;border-bottom:1px solid var(--line)} .panel:last-child{border-bottom:0} }
+
+  /* 명령창 (Ctrl+K) */
+  .kbtn{display:inline-flex;align-items:center;gap:12px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:6px;
+        background:var(--card);color:var(--muted);font-size:13px;font-weight:400;cursor:pointer;margin:0 0 16px}
+  .kbtn kbd{font:inherit;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:2px 6px}
+  .topline{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:0 0 12px}
+  .topline .prompt,.topline .kbtn{margin:0}
+  @media (hover:none),(max-width:700px){ .kbtn{display:none} }   /* 휴대폰은 키보드 단축키가 없으니 숨김 */
+  .pal-bg{position:fixed;inset:0;z-index:80;background:rgba(11,18,32,.35);display:flex;justify-content:center;align-items:flex-start;padding:14vh 16px 16px}
+  .pal{width:100%;max-width:560px;background:var(--card);border:1px solid var(--text);box-shadow:0 30px 60px -20px rgba(11,18,32,.45)}
+  .pal input{width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:16px 18px;font-size:15px;outline:none}
+  .pal ul{list-style:none;margin:0;padding:0;max-height:50vh;overflow-y:auto}
+  .pal a{display:flex;justify-content:space-between;gap:16px;padding:12px 18px;color:var(--text);text-decoration:none;font-size:14px}
+  .pal a small{color:var(--muted);font-size:12px}
+  .pal li.on a{background:color-mix(in srgb,var(--gw) 12%,transparent)}
+  .pal .empty{padding:14px 18px;color:var(--muted);font-size:13px}
+
+  /* 맨 아래 상태 줄 */
+  .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--card);border-top:1px solid var(--text);overflow:hidden;font-size:12px;color:var(--muted)}
+  .bar .run{display:flex;gap:32px;white-space:nowrap;padding:9px 16px;animation:mq 50s linear infinite;width:max-content}
+  @keyframes mq{to{transform:translateX(-50%)}}
+  .bar .ok{color:var(--gw);font-weight:600}
+  .bar .u{color:var(--ink-up)} .bar .d{color:var(--ink-dn)}
+  @media (prefers-reduced-motion:reduce){ .bar .run,.cur{animation:none} }
+</style>
+</head>
+<body>
+<script src="intro.js?v=20261010021812"></script>
+<div class="wrap">
+  <h1 class="brand">Gwave</h1>
+  <nav id="nav"></nav>
+
+  <div class="sess mono notranslate" translate="no">
+    <span><span class="live">● SESSION ACTIVE</span><span>GWAVE TERMINAL v1.0</span><span>FEED: BINANCE</span></span>
+    <span><span>AI ENGINE <span class="live">● LIVE</span></span><span id="clock">UTC --:--:--</span></span>
+  </div>
+
+  <div class="topline">
+    <p class="prompt mono notranslate" translate="no">~/gwave $ <b>welcome</b><span class="cur"></span></p>
+    <button type="button" class="kbtn mono" id="kbtn">Search command <kbd id="kkey">Ctrl K</kbd></button>
+  </div>
+  <h2 class="hero notranslate" translate="no"><span>Swing</span><span class="g">smarter.</span></h2>
+
+  <div class="lead">
+    <p>The best indicator for mid-to-long-term swing traders. <em>Made more reliable by real-time AI trading on every signal.</em></p>
+    <div class="cta">
+      <a class="btn pri" href="index.html">Open Signals</a>
+      <a class="btn sec" href="paper.html">Try Paper Trading</a>
+    </div>
+  </div>
+
+  <div class="panels">
+    <a class="panel" href="index.html">
+      <span class="ph mono notranslate" translate="no"><span>[1] CRYPTO</span><i>● LIVE</i></span>
+      <span class="pb"><b>Swing signals</b><small>Entry zones across the top 100 coins on Binance spot and futures.</small></span>
+    </a>
+    <a class="panel" href="lowsig.html">
+      <span class="ph mono notranslate" translate="no"><span>[2] TRADING ENGINE</span><i>● EXECUTING</i></span>
+      <span class="pb"><b>AI that trades it live</b><small>Every signal is executed in real time, so you see how it really performs.</small></span>
+    </a>
+    <a class="panel" href="paper.html">
+      <span class="ph mono notranslate" translate="no"><span>[3] PAPER TRADING</span><i>● READY</i></span>
+      <span class="pb"><b>Test before you risk</b><small>Start with 10,000 USDT and follow the signals risk-free.</small></span>
+    </a>
+  </div>
+</div>
+
+<div class="bar mono notranslate" translate="no" aria-label="Market ticker"><div class="run" id="tape"></div></div>
+
+<div class="pal-bg" id="pal" hidden>
+  <div class="pal mono" role="dialog" aria-label="Command search">
+    <input id="palq" type="text" placeholder="> Type a coin or command…" autocomplete="off" aria-label="Search">
+    <ul id="pall"></ul>
+  </div>
+</div>
+
+<script src="nav.js?v=20261010021812"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* 세션 줄 시계 (UTC) */
+  function tick() { var d = new Date(); $("clock").textContent = "UTC " + d.toISOString().slice(11, 19); }
+  tick(); setInterval(tick, 1000);
+
+  /* 숫자 키 1·2·3 → 패널로 이동 (입력칸에 쓰는 중이면 무시) */
+  var KEYS = { "1": "index.html", "2": "lowsig.html", "3": "paper.html" };
+
+  /* 명령창 */
+  var COINS = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE", "ADA", "AVAX", "LINK", "TON", "SUI", "TRX"];
+  var CMDS = [
+    ["Go to Crypto signals", "index.html", "[1]"],
+    ["Go to Stock signals", "signals-rwa.html", "Stock"],
+    ["Go to Trading Engine", "lowsig.html", "[2]"],
+    ["Go to Paper Trading", "paper.html", "[3]"],
+    ["Open Calculator", "calc.html", "Tool"],
+    ["Market Direction", "market.html", "Insights"],
+    ["Liquidation Map", "liquidation.html", "Insights"],
+    ["Open interest · Funding", "oi.html", "Insights"],
+    ["Top Movers 24h", "movers.html", "Insights"],
+    ["News", "news.html", "Insights"]
+  ].concat(COINS.map(function (c) { return [c + "/USDT — open chart", "coin.html?s=" + c, "Coin"]; }));
+  var pal = $("pal"), q = $("palq"), list = $("pall"), sel = 0, shown = [];
+  if (/Mac|iPhone|iPad/.test(navigator.platform)) $("kkey").textContent = "⌘ K";
+
+  function render() {
+    var t = q.value.trim().toLowerCase();
+    shown = CMDS.filter(function (c) { return !t || c[0].toLowerCase().indexOf(t) >= 0; }).slice(0, 10);
+    if (sel >= shown.length) sel = 0;
+    list.innerHTML = shown.length ? shown.map(function (c, i) {
+      return '<li' + (i === sel ? ' class="on"' : "") + '><a href="' + c[1] + '"><span>' + c[0] + "</span><small>" + c[2] + "</small></a></li>";
+    }).join("") : '<li class="empty">No match</li>';
+  }
+  function openPal() { pal.hidden = false; q.value = ""; sel = 0; render(); q.focus(); }
+  function closePal() { pal.hidden = true; }
+  $("kbtn").addEventListener("click", openPal);
+  pal.addEventListener("click", function (e) { if (e.target === pal) closePal(); });
+  q.addEventListener("input", function () { sel = 0; render(); });
+  q.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { sel = Math.min(sel + 1, shown.length - 1); render(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
+    else if (e.key === "Enter" && shown[sel]) { location.href = shown[sel][1]; }
+  });
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); pal.hidden ? openPal() : closePal(); return; }
+    if (e.key === "Escape" && !pal.hidden) { closePal(); return; }
+    if (document.getElementById("gw")) return;                       // 인트로가 떠 있으면 무시
+    var tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (KEYS[e.key] && pal.hidden) location.href = KEYS[e.key];
+  });
+
+  /* 맨 아래 시세 줄 (바이낸스 현물 24시간 시세) */
+  var fmt = function (v) { var n = +v; return n >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 1 }) : n >= 1 ? n.toFixed(2) : n.toFixed(4); };
+  function tape(items) {
+    var html = '<span class="ok">● CONNECTED</span>' + items.join("");
+    $("tape").innerHTML = html + html;                               // 두 번 이어 붙여서 끊김 없이 흐르게
+  }
+  tape(COINS.map(function (c) { return "<span>" + c + "USDT —</span>"; }));
+  var syms = encodeURIComponent(JSON.stringify(COINS.map(function (c) { return c + "USDT"; })));
+  fetch("https://api.binance.com/api/v3/ticker/24hr?symbols=" + syms)
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (rows) {
+      if (!rows || !rows.length) return;
+      tape(rows.map(function (t) {
+        var ch = +t.priceChangePercent, up = ch >= 0;
+        return "<span>" + t.symbol + " " + fmt(t.lastPrice) + ' <span class="' + (up ? "u" : "d") + '">' + (up ? "▲ +" : "▼ ") + ch.toFixed(2) + "%</span></span>";
+      }));
+    })
+    .catch(function () {});
+})();
+</script>
+</body>
+</html>
