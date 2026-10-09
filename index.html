@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="theme.js?v=20261009112927"></script>
+<script src="theme.js?v=20261009131208"></script>
 <title>Artha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -354,10 +354,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261009112927"></script>
-<script src="chart.js?v=20261009112927"></script>
-<script src="nav.js?v=20261009112927"></script>
-<script src="meta.js?v=20261009112927"></script>
+<script src="fib-core.js?v=20261009131208"></script>
+<script src="chart.js?v=20261009131208"></script>
+<script src="nav.js?v=20261009131208"></script>
+<script src="meta.js?v=20261009131208"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -449,9 +449,24 @@ async function getCandles(ex, coin, unit, count) {
 // ── 코인 로고·이름·시가총액 순위·주식/원자재 구분 (meta.js) ──────────────
 function saved(key) { try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && Date.now() - v.at < 24 * 3600e3) return v.data; } catch (e) {} return null; }
 const logosReady = CoinMeta.load();
-const logoHtml = sym => CoinMeta.logo(sym)
-  ? `<img src="${CoinMeta.logo(sym)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=ph>${CoinMeta.base(sym).slice(0, 3)}</span>'">`
-  : `<span class="ph">${CoinMeta.base(sym).slice(0, 3)}</span>`;
+// 로고를 못 불러온 주소는 기억해 두고 다음부터는 바로 글자(ph)로 → 다시 그릴 때마다 빈칸↔글자로 깜빡이지 않게
+const badLogos = new Set();
+const logoHtml = sym => {
+  const u = CoinMeta.logo(sym), ph = `<span class="ph">${CoinMeta.base(sym).slice(0, 3)}</span>`;
+  if (!u || badLogos.has(u)) return ph;
+  return `<img data-lg src="${u}" alt="" onerror="badLogos.add(this.src);this.outerHTML='${ph.replace(/"/g, "")}'">`;
+};
+// 목록을 다시 그릴 때 이미 다 받아 둔 로고 그림은 새로 만들지 않고 그대로 옮겨 씀 (아이폰에서 로고가 깜빡이던 문제)
+function setHtmlKeepLogos(el, html) {
+  const keep = new Map();
+  el.querySelectorAll("img[data-lg]").forEach(img => {
+    if (img.complete && img.naturalWidth) { const a = keep.get(img.src) || []; a.push(img); keep.set(img.src, a); }
+  });
+  el.innerHTML = html;
+  el.querySelectorAll("img[data-lg]").forEach(img => {
+    const a = keep.get(img.src); if (a && a.length) img.replaceWith(a.pop());
+  });
+}
 // 티커 옆 꼬리표: 시가총액 순위(#1) 또는 주식·원자재 표시
 function rankTag(sym) {
   const t = CoinMeta.typeLabel(sym);
@@ -698,7 +713,7 @@ function renderTable() {
   shownSet = setKey(rows);
   renderSummary();
   let rank = 0;
-  $("tbody").innerHTML = rows.map(r => {
+  setHtmlKeepLogos($("tbody"), rows.map(r => {
     // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
     const logo = logoHtml(r.market);
@@ -708,7 +723,7 @@ function renderTable() {
     const row = `<tr${NT} data-m="${r.market}" class="${r.market === openCoin ? "open" : ""}${isLow(r) ? " lowsample" : ""}" title="${isLow(r) ? LOW_TIP : ROW_TIP}">${rowTds(r, ++rank, name)}</tr>`;
     // 펼친 코인이면 바로 아래에 차트 줄을 하나 더
     return r.market === openCoin ? row + `<tr class="exp"><td colspan="12" id="expCell"></td></tr>` : row;
-  }).join("");
+  }).join(""));
   // 차트 묶음을 펼친 줄 안으로 옮기기 (없으면 숨김 보관함으로)
   renderCards(rows);
   if (isMobile()) { if ($("expCard")) $("expCard").appendChild(chartPanel); }
@@ -741,7 +756,7 @@ function cardParts(r) {
 }
 function renderCards(rows) {
   let rank = 0;
-  $("cards").innerHTML = rows.filter(r => !r.error || mode === "watch").map(r => {
+  setHtmlKeepLogos($("cards"), rows.filter(r => !r.error || mode === "watch").map(r => {
     const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
     const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a>`;
     if (r.error) return `<div class="ccard"${NT}><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
@@ -754,7 +769,7 @@ function renderCards(rows) {
       ${open ? `<div class="cdet">${p.cdet}</div>
         <div class="cchart" id="expCard" onclick="event.stopPropagation()"></div>` : ""}
     </div>`;
-  }).join("") || `<div class="muted-c">결과가 없어요</div>`;
+  }).join("") || `<div class="muted-c">결과가 없어요</div>`);
   for (const el of $("cards").querySelectorAll(".ccard[data-m]")) el.onclick = () => toggleCoin(el.dataset.m);
 }
 
