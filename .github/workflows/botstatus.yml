@@ -15,6 +15,7 @@ jobs:
           for a in crypto rwa; do
             curl -sS --max-time 40 -H "Authorization: Bearer $BOT_SECRET" "https://fibo-lab-kappa.vercel.app/api/sigbot?acct=$a" > s_$a.json || true
           done
+          curl -sS --max-time 60 -X POST -H "Authorization: Bearer $BOT_SECRET" "https://fibo-lab-kappa.vercel.app/api/sigbot" > run.json || true
           node -e '
             const fs=require("fs"); const k=t=>new Date(t+9*3600e3).toISOString().slice(5,16).replace("T"," ");
             for (const a of ["crypto","rwa"]) {
@@ -23,4 +24,5 @@ jobs:
               const b=j.sbot, L=b.log.slice(0,40).map(x=>k(x.t)+" "+x.msg);
               console.log("::notice title="+j.nick+" 요약::기준 "+(b.base||0).toFixed(2)+" · 원금기준 "+b.dep0+" · 진행중 "+Object.keys(b.act).join(",")+" · 마지막 기록 "+(b.log[0]?k(b.log[0].t):"-"));
               for (let i=0;i<4;i++) console.log("::notice title="+j.nick+" 기록 "+(i+1)+"::"+L.slice(i*10,i*10+10).join(" %0A "));
-            }'
+            }
+            try { const r=JSON.parse(fs.readFileSync("run.json","utf8")); for (const a of ["crypto","rwa"]) { const x=r[a]||{}; console.log("::notice title="+(x.nick||a)+" 지금 실행::스캔 "+x.coins+"개 · 진입 구간 "+(x.inZone||[]).length+"개 ["+(x.inZone||[]).join(",")+"] · 진행중 "+(x.active||[]).join(",")+" · 이번에 한 일 "+(x.did||[]).length+"건 "+(x.did||[]).join(" | ").slice(0,800)+(x.error?" · 오류 "+x.error:"")); } } catch(e) { console.log("::warning::실행 결과 읽기 실패"); }'
