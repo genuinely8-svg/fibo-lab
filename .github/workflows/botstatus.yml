@@ -21,8 +21,8 @@ jobs:
             for (const a of ["crypto","rwa"]) {
               let j; try { j=JSON.parse(fs.readFileSync("s_"+a+".json","utf8")); } catch(e){ console.log("::warning::"+a+" 읽기 실패"); continue; }
               if (!j.sbot) { console.log("::warning::"+a+" "+JSON.stringify(j).slice(0,300)); continue; }
-              const b=j.sbot, L=b.log.slice(0,40).map(x=>k(x.t)+" "+x.msg);
+              const b=j.sbot, L=b.log.slice(0,24).map(x=>k(x.t)+" "+x.msg);
               console.log("::notice title="+j.nick+" 요약::기준 "+(b.base||0).toFixed(2)+" · 원금기준 "+b.dep0+" · 진행중 "+Object.keys(b.act).join(",")+" · 마지막 기록 "+(b.log[0]?k(b.log[0].t):"-"));
-              for (let i=0;i<4;i++) console.log("::notice title="+j.nick+" 기록 "+(i+1)+"::"+L.slice(i*10,i*10+10).join(" %0A "));
+              for (let i=0;i<2;i++) console.log("::notice title="+j.nick+" 기록 "+(i+1)+"::"+L.slice(i*12,i*12+12).join(" %0A "));
             }
             try { const r=JSON.parse(fs.readFileSync("run.json","utf8")); for (const a of ["crypto","rwa"]) { const x=r[a]||{}; console.log("::notice title="+(x.nick||a)+" 지금 실행::스캔 "+x.coins+"개 · 진입 구간 "+(x.inZone||[]).length+"개 ["+(x.inZone||[]).join(",")+"] · 진행중 "+(x.active||[]).join(",")+" · 이번에 한 일 "+(x.did||[]).length+"건 "+(x.did||[]).join(" | ").slice(0,800)+(x.error?" · 오류 "+x.error:"")); } } catch(e) { console.log("::warning::실행 결과 읽기 실패"); }'
