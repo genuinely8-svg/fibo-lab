@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010021812"></script>
+<script src="theme.js?v=20261010022804"></script>
 <title>Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -43,6 +43,9 @@
   button:disabled{opacity:.5;cursor:wait}
   #status{color:var(--muted);font-size:12px;margin-top:10px;min-height:1em}
   .tablewrap{overflow-x:auto}
+  /* 칸 폭 고정: 가격 자릿수·상태 글자가 바뀌어도 칸 폭이 다시 계산되지 않게 (실시간 갱신 때 표가 움찔거리던 원인) */
+  .tablewrap > table{table-layout:fixed;min-width:1080px}
+  .tablewrap > table td{overflow:hidden;text-overflow:ellipsis}
   table{border-collapse:collapse;width:100%}
   th,td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   /* PC 최적화: 칸 제목은 두 줄까지 허용, ±오차는 숫자 아래 작은 글씨로 → 표 폭을 줄여 좁은 화면에서도 안 잘리게 */
@@ -150,6 +153,7 @@
   .live i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
   .live.on i{background:#22c55e;box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 25%,transparent)}
   .live.on b{color:#22c55e}
+  .live b{font-variant-numeric:tabular-nums;min-width:11.5em;text-align:left}
   .live.wait i{background:var(--warn);animation:blink 1s infinite}
   .live.wait b{color:var(--warn)}
   @keyframes blink{50%{opacity:.25}}
@@ -197,6 +201,7 @@
     .ccard .c1 .badge{margin-left:auto}
     .ccard .c2{margin:7px 0 0 24px;font-size:13.5px;font-variant-numeric:tabular-nums}
     .ccard .c2 .arrow{color:var(--muted);margin:0 4px}
+    .ccard .c2 .px{display:inline-block;min-width:8.5ch}   /* 가격 자릿수가 바뀌어도 → 진입가 위치가 안 흔들리게 */
     .ccard .c2 .dist{font-weight:700;margin-left:4px}
     .ccard .c3{display:flex;align-items:center;gap:6px;margin:5px 0 0 24px;font-size:12.5px;color:var(--muted)}
     .ccard .c3 a.more{margin-left:auto}
@@ -213,6 +218,7 @@
     .legend{font-size:11px;gap:4px 10px}
   }
 </style>
+<link rel="stylesheet" href="gwave-ui.css?v=20261010022804">
 </head>
 <body>
 <div class="wrap">
@@ -320,6 +326,8 @@
   <div class="card tablewrap">
     <div class="sumrow"><div class="summary notranslate" id="summary" translate="no"></div><span class="live notranslate" id="live" translate="no"><i></i><b>실시간 준비 중</b></span></div>
     <table>
+      <colgroup><col style="width:3.5%"><col style="width:17%"><col style="width:9%"><col style="width:9%"><col style="width:7.5%"><col style="width:7.5%">
+        <col style="width:6%"><col style="width:7%"><col style="width:7.5%"><col style="width:6.5%"><col style="width:9.5%"><col style="width:10%"></colgroup>
       <thead><tr>
         <th style="text-align:left">#</th><th>코인</th><th>현재가</th><th>진입 가격</th><th>진입까지 거리</th><th>상태</th>
         <th>과거 터치</th><th class="mv" id="thAvg">평균 반등</th><th class="mv" id="thAdv">평균 추가하락</th><th class="mv" id="thWin">반등 우세</th><th class="mv" id="thExp">예상 반등가</th>
@@ -355,10 +363,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261010021812"></script>
-<script src="chart.js?v=20261010021812"></script>
-<script src="nav.js?v=20261010021812"></script>
-<script src="meta.js?v=20261010021812"></script>
+<script src="fib-core.js?v=20261010022804"></script>
+<script src="chart.js?v=20261010022804"></script>
+<script src="nav.js?v=20261010022804"></script>
+<script src="meta.js?v=20261010022804"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
@@ -660,6 +668,8 @@ function renderSummary() {
     <span style="color:var(--muted)">${ev ? "Sorted by expected value" : "Sorted by distance to entry"}</span>`;
   if (html !== lastSummary) { $("summary").innerHTML = html; lastSummary = html; }   // 숫자가 그대로면 다시 그리지 않음
 }
+let shownLabels = new Map(); // 표를 그릴 때 코인별 상태 (진입 구간/근접/이탈/대기)
+let shownAt = 0;           // 표를 마지막으로 다시 그린 시각
 let shownOrder = "";     // 지금 화면에 보이는 코인 순서 (실시간 정렬 때 바뀌었는지 비교용)
 let shownSet = "";       // 지금 화면에 보이는 코인 묶음 (순서 무시, 재분석 때 종목이 바뀌었는지 비교용)
 const setKey = rows => rows.map(r => r.market + (r.error ? "!" : "")).sort().join(",");
@@ -711,6 +721,8 @@ function renderTable() {
   $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
   const rows = sortedRows();
   shownOrder = rows.map(r => r.market).join(",");
+  shownLabels = new Map(rows.map(r => [r.market, r.error ? "!" : FibCore.label(r.current)]));
+  shownAt = Date.now();
   shownSet = setKey(rows);
   renderSummary();
   let rank = 0;
@@ -1105,10 +1117,14 @@ const Live = (() => {
   }
   setInterval(flush, 300);
 
-  // 정렬은 3초에 한 번만: 순서가 실제로 바뀌었을 때만 표를 다시 그림
+  // 줄 순서 다시 정하기 (3초마다 확인)
+  // - 상태(진입 구간·근접·이탈·대기)가 바뀐 코인이 있으면 바로 다시 정렬
+  // - 같은 상태 안에서 거리만 조금씩 엎치락뒤치락하는 건 30초에 한 번만 (줄이 계속 바뀌며 움찔거리지 않게)
   setInterval(() => {
     if (!results.length || running || openCoin || curEx !== curLiveEx) return;   // 차트를 펼쳐 보는 중엔 줄이 안 움직이게
-    if (sortedRows().map(r => r.market).join(",") !== shownOrder) renderTable();
+    if (sortedRows().map(r => r.market).join(",") === shownOrder) return;
+    const moved = results.some(r => shownLabels.get(r.market) !== (r.error ? "!" : FibCore.label(r.current)));
+    if (moved || Date.now() - shownAt >= 30000) renderTable();
   }, 3000);
 
   // 연결 상태 옆에 마지막 가격 수신 시각

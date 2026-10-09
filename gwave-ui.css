@@ -1,0 +1,51 @@
+/*
+  gwave-ui.css — 사이트 전체 공통 "터미널" 디자인 (홈 화면과 같은 느낌)
+  - 모든 탭 페이지의 </head> 바로 앞에서 불러와요 (각 페이지 자체 스타일보다 뒤에 와야 덮어씀)
+  - 색: 흰 바탕 + 연한 모눈, 글자 #0B1220, 강조(롱) 녹색 #05875A / 다크 모드도 같은 느낌
+  - 각진 모서리(6px), 숫자·라벨·표 머리글은 IBM Plex Mono
+  - 세션 줄(● SESSION ACTIVE … UTC 시계)은 nav.js 가 메뉴 아래에 그려 줘요
+  - Crypto 탭의 SHORT 모드는 강조색이 그대로 빨강
+*/
+
+/* ── 색 ── (theme.js 가 항상 data-theme 을 붙이므로 그걸 기준으로) */
+:root[data-theme="light"]{
+  --bg:#FFFFFF; --card:#FFFFFF; --text:#0B1220; --muted:#5B6474; --line:#E3E8EE;
+  --gw:#05875A; --grid:#EEF1F4; --ink:#0B1220;
+}
+:root[data-theme="dark"]{
+  --bg:#0B1018; --card:#111821; --text:#E6EBF0; --muted:#8B96A5; --line:#1F2A36;
+  --gw:#2FBF85; --grid:#141C26; --ink:#E6EBF0;
+}
+:root[data-theme="light"]:not([data-dir="short"]){ --accent:#05875A; --pos:#05875A }
+:root[data-theme="dark"]:not([data-dir="short"]){ --accent:#2FBF85; --pos:#2FBF85 }
+:root[data-theme="light"][data-dir="short"]{ --accent:#D13438 }
+:root[data-theme="dark"][data-dir="short"]{ --accent:#F0625A }
+
+/* ── 바탕: 홈과 같은 모눈 ── */
+body{
+  background-color:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+
+/* ── 카드·패널: 각지게, 얇은 선 ── */
+.card{border-radius:6px;border-color:var(--line);box-shadow:none}
+button,select,input,textarea{border-radius:6px}
+.badge{border-radius:4px}
+a.more{border-radius:4px}
+
+/* ── 글꼴: 숫자·라벨·표 머리글은 고정폭 ── */
+th,thead th,label,.status,#status,.live,.tile .k,.small,.mono{
+  font-family:"IBM Plex Mono",ui-monospace,"Pretendard Variable",Pretendard,monospace;
+}
+th,thead th{letter-spacing:.01em}
+td,.tile .v{font-variant-numeric:tabular-nums}
+
+/* ── 세션 줄 (nav.js 가 메뉴 아래에 넣음) ── */
+.gw-sess{display:flex;flex-wrap:wrap;gap:6px 22px;justify-content:space-between;align-items:center;background:#0B1220;color:#B9C3CF;
+  padding:8px 14px;border-radius:6px;font:12px/1.4 "IBM Plex Mono",ui-monospace,monospace;margin:0 0 16px}
+:root[data-theme="dark"] .gw-sess{background:#05080D;border:1px solid var(--line)}
+.gw-sess span{display:inline-flex;gap:18px;flex-wrap:wrap}
+.gw-sess .gw-live{color:#2FBF85;font-weight:600}
+.gw-sess .gw-clock{font-variant-numeric:tabular-nums;min-width:12ch}
+@media (max-width:700px){ .gw-sess .gw-hide-m{display:none} .gw-sess{margin-bottom:12px} }

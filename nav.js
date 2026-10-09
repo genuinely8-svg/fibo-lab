@@ -124,6 +124,18 @@
     '</div><button type="button" class="themebtn"></button>' +
     `<div class="navpanel" role="menu"><div class="ttl notranslate" translate="no">${grpName}</div>${INSIGHTS.map(item).join("")}</div>`;
   const el = wrap.querySelector(".navtabs");
+  // ── 세션 줄 (홈 화면과 같은 터미널 느낌 · 모든 탭 공통, 모양은 gwave-ui.css) ──
+  if (!document.querySelector(".gw-sess")) {
+    const sess = document.createElement("div");
+    sess.className = "gw-sess notranslate";
+    sess.translate = false;
+    sess.innerHTML = '<span><span class="gw-live">● SESSION ACTIVE</span><span class="gw-hide-m">GWAVE TERMINAL v1.0</span><span class="gw-hide-m">FEED: BINANCE</span></span>' +
+      '<span><span>AI ENGINE <span class="gw-live">● LIVE</span></span><span class="gw-clock">UTC --:--:--</span></span>';
+    wrap.after(sess);
+    const ck = sess.querySelector(".gw-clock");
+    const tick = () => { ck.textContent = "UTC " + new Date().toISOString().slice(11, 19); };
+    tick(); setInterval(tick, 1000);
+  }
   // 로고 "Gwave" 누르면 홈(home.html · 터미널 화면)으로
   const brand = document.querySelector("h1.brand");
   const LOGO = '<svg viewBox="0 0 617.1 100" role="img" aria-label="Gwave"><defs><linearGradient id="gwg-nav" x1="0" y1="0" x2="1" y2="0.6"><stop offset="0" stop-color="#3FB06E"/><stop offset="1" stop-color="#2E8A85"/></linearGradient></defs><path fill-rule="evenodd" fill="url(#gwg-nav)" d="M4.1,18.3L1.4,24.6L0.0,31.7L0.0,70.0L2.7,78.9L5.4,83.8L11.6,91.0L17.3,95.2L24.0,98.1L34.4,100.0L102.4,99.8L110.5,97.9L116.2,95.2L123.2,89.5L127.5,83.8L130.3,77.6L131.7,70.8L131.7,40.2L131.0,38.9L74.9,38.7L73.0,39.4L71.7,40.6L63.0,54.8L62.1,58.1L63.0,60.6L72.5,61.4L105.6,61.6L106.3,62.4L106.0,70.5L103.3,74.3L99.2,76.8L96.0,77.3L38.1,77.3L34.6,76.8L31.1,75.2L26.7,71.1L25.4,68.6L24.6,64.9L24.4,37.9L25.2,31.7L28.3,27.0L32.5,23.8L37.6,22.4L115.9,22.1L118.9,19.0L129.4,1.7L128.7,0.0L32.1,0.0L21.7,2.9L16.5,5.7L8.3,12.7Z"/><path fill-rule="evenodd" fill="currentColor" d="M522.4,41.0L521.4,45.4L521.6,97.9L522.2,99.2L615.6,99.5L617.0,98.7L617.1,79.0L615.7,77.8L546.7,77.6L545.6,76.5L545.6,61.7L546.8,60.0L607.0,59.7L608.1,58.1L608.1,40.2L607.3,39.0L527.8,38.7L524.6,39.2ZM522.7,21.4L523.3,21.9L599.0,21.9L612.5,21.0L615.1,20.3L616.0,18.6L617.0,1.6L615.7,0.2L536.3,0.3L534.1,1.6L523.0,19.8ZM386.2,0.8L386.3,2.7L438.3,97.6L440.2,99.4L461.0,99.5L464.3,97.6L479.7,70.0L485.9,57.6L517.0,2.1L517.0,0.8L515.9,0.2L490.6,0.3L488.6,1.7L463.7,47.0L452.1,69.0L451.0,69.5L439.5,49.5L414.0,1.4L411.9,0.2L387.0,0.2ZM285.9,98.4L287.0,99.5L311.1,99.5L312.5,99.0L322.4,82.2L325.7,75.1L340.8,48.6L349.8,31.3L351.1,29.7L351.9,29.7L373.7,71.0L389.0,98.6L390.6,99.5L414.8,99.5L416.2,99.0L412.2,90.0L379.8,29.8L377.0,26.7L373.5,26.3L373.5,25.2L374.9,23.3L374.4,20.0L365.9,4.0L364.1,1.7L360.2,0.2L342.7,0.2L339.5,1.4L337.9,3.0L327.3,21.4ZM199.0,0.5L198.7,1.9L205.1,15.7L228.7,63.2L244.4,96.3L247.1,98.9L250.0,99.7L262.2,99.7L264.4,99.0L266.0,97.5L271.0,87.5L274.6,81.6L303.2,26.2L311.1,12.2L316.2,2.1L316.0,0.6L314.8,0.2L291.3,0.2L288.9,1.6L286.7,4.9L256.8,62.9L255.7,63.5L225.6,1.6L222.5,0.2ZM143.8,0.3L143.3,2.2L168.3,49.8L191.3,96.5L193.3,98.9L194.8,99.4L208.7,99.7L211.0,99.2L214.4,94.9L223.2,77.6L210.0,77.6L207.9,75.7L182.1,22.7L170.6,1.0L168.9,0.2Z"/></svg>';
