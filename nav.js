@@ -8,8 +8,8 @@
     ["index.html", "Crypto"],
     ["signals-rwa.html", "Stock"],
     ["lowsig.html", "Trading Engine"],
-    ["paper.html", "모의투자"],
-    ["calc.html", "계산기"],
+    ["paper.html", "Paper Trading"],
+    ["calc.html", "Calculator"],
   ];
   // "인사이트" 묶음: PC는 마우스를 올리면 아래로 펼쳐지는 패널, 휴대폰은 누르면 아래에서 올라오는 시트
   // [주소, 한글 이름, 영어 이름, 한글 설명, 영어 설명, 아이콘, 색]
@@ -60,7 +60,9 @@
     /* 로고 Gwave 누르면 홈 */
     h1.brand a{color:inherit;text-decoration:none}
     .navtabs::-webkit-scrollbar{display:none}
-    .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;
+    /* 위쪽 탭·인사이트 이름 글꼴: IBM Plex Mono (인트로 문구와 같은 글꼴) — 설명(한글)은 본문 글꼴 그대로 */
+    .navtabs a,.navpanel .ttl,.navsheet .ttl,.insi b{font-family:"IBM Plex Mono",ui-monospace,monospace;letter-spacing:.01em}
+    .navtabs a{flex:none;padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:500;font-size:14px;
                border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
     .navtabs a:hover{color:var(--text)}
     .navtabs a.on{color:var(--text);border-bottom-color:var(--accent)}
@@ -103,7 +105,7 @@
   if (!document.querySelector('link[href*="Space+Grotesk"]')) {
     const f = document.createElement("link");
     f.rel = "stylesheet";
-    f.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap";
+    f.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap";
     document.head.appendChild(f);
   }
 
@@ -112,12 +114,12 @@
   if (!wrap) return;
   wrap.className = "navwrap";
   const inHere = INSIGHTS.some(x => x[0] === here);
-  const grpName = KO ? "인사이트" : "Insights";
+  const grpName = "Insights";                // 메뉴 이름은 언어와 상관없이 항상 영어
   const item = x => `<a class="insi notranslate${x[0] === here ? " on" : ""}" translate="no" href="${x[0]}"${x[0] === here ? ' aria-current="page"' : ""}>
       <span class="ic" style="background:${x[6]}"><svg viewBox="0 0 24 24">${ICON[x[5]]}</svg></span>
-      <span><b>${KO ? x[1] : x[2]}</b><small>${KO ? x[3] : x[4]}</small></span></a>`;
+      <span><b>${x[2]}</b><small>${x[3]}</small></span></a>`;   // 이름은 영어, 설명은 한글
   wrap.innerHTML = '<div class="navtabs">' + TABS.map(([href, label]) =>
-    `<a href="${href}"${href === here ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("") +
+    `<a class="notranslate${href === here ? " on" : ""}" translate="no" href="${href}"${href === here ? ' aria-current="page"' : ""}>${label}</a>`).join("") +
     `<a class="navgrp notranslate${inHere ? " on" : ""}" translate="no" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">${grpName} <span class="chev">▾</span></a>` +
     '</div><button type="button" class="themebtn"></button>' +
     `<div class="navpanel" role="menu"><div class="ttl notranslate" translate="no">${grpName}</div>${INSIGHTS.map(item).join("")}</div>`;
