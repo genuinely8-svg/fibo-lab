@@ -32,7 +32,7 @@ Rules:
 - End with: return acct.result();`;
 
 window.BT_EXAMPLES = [
-{ name: "Example 1 · Moving average crossover", code: `// EMA crossover: fast EMA crosses above slow EMA → long, crosses below → short (or close).
+{ name: "예시 1 · 이동평균선 교차", code: `// EMA crossover: fast EMA crosses above slow EMA → long, crosses below → short (or close).
 // Capital, leverage, position size, margin mode, direction and fee come from the panel on the right.
 const FAST = 50;          // fast EMA length
 const SLOW = 200;         // slow EMA length
@@ -58,7 +58,7 @@ for (let i = 1; i < cs.length; i++) {
   if (i % 2000 === 0) progress(i / cs.length);
 }
 return acct.result();` },
-{ name: "Example 2 · Moving average + RSI", code: `// Trend filter + pullback: trade only in the direction of the 200 EMA,
+{ name: "예시 2 · 이동평균선 + RSI", code: `// Trend filter + pullback: trade only in the direction of the 200 EMA,
 // enter when RSI comes back out of oversold (long) / overbought (short). Fixed stop loss and take profit.
 const TREND = 200;        // trend EMA length
 const RSI_LEN = 14;
@@ -84,7 +84,7 @@ for (let i = 1; i < cs.length; i++) {
   if (i % 2000 === 0) progress(i / cs.length);
 }
 return acct.result();` },
-{ name: "Example 3 · Moving average + MACD", code: `// MACD signal-line cross in the direction of the 100 EMA trend.
+{ name: "예시 3 · 이동평균선 + MACD", code: `// MACD signal-line cross in the direction of the 100 EMA trend.
 // Exit on the opposite MACD cross, with an ATR-based stop loss.
 const TREND = 100;        // trend EMA length
 const ATR_LEN = 14;
@@ -110,7 +110,7 @@ for (let i = 1; i < cs.length; i++) {
   if (i % 2000 === 0) progress(i / cs.length);
 }
 return acct.result();` },
-{ name: "Example 4 · MACD + RSI + Elliott wave (simplified)", code: `// Simplified Elliott "wave 3" entry using a ZigZag:
+{ name: "예시 4 · MACD + RSI + 엘리어트 파동 (단순화)", code: `// Simplified Elliott "wave 3" entry using a ZigZag:
 //   wave 1 = swing from a low to a high, wave 2 = pullback that holds above the wave 1 start
 //   and retraces 30–80% of wave 1. Enter long when price breaks the wave 1 high (start of wave 3)
 //   while MACD histogram > 0 and RSI > 50. Stop at the wave 2 low, target = wave 1 length × 1.6.

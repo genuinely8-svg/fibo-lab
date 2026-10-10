@@ -39,11 +39,11 @@ async function getRows(url) {
     let r;
     try { r = await fetch(url); } catch (e) { await sleep(2000); continue; }
     if (r.ok) return r.json();
-    if (r.status === 400) throw new Error("Unknown symbol or invalid timeframe");
+    if (r.status === 400) throw new Error("없는 코인이거나 잘못된 봉 단위예요");
     if (r.status === 451 || r.status === 403) throw Object.assign(new Error("blocked"), { blocked: true });
     await sleep(r.status === 429 || r.status === 418 ? 15000 : 3000);
   }
-  throw new Error("Could not download data from Binance. Please try again shortly");
+  throw new Error("바이낸스에서 데이터를 못 받았어요. 잠시 뒤 다시 실행해 주세요");
 }
 
 async function download(market, sym, iv, from, to, label) {
@@ -54,7 +54,7 @@ async function download(market, sym, iv, from, to, label) {
     if (!rows.length) break;
     for (const x of rows) if (x[0] + ms <= Date.now()) out.push([x[0], +x[1], +x[2], +x[3], +x[4], +x[5]]);
     start = rows[rows.length - 1][0] + ms;
-    send("dl", `Downloading ${label}… ${new Date(Math.min(start, Date.now())).toISOString().slice(0, 10)}`);
+    send("dl", `${label} 받는 중… ${new Date(Math.min(start, Date.now())).toISOString().slice(0, 10)}`);
     if (rows.length < 1000) break;
     await sleep(150);
   }
@@ -67,11 +67,11 @@ async function download(market, sym, iv, from, to, label) {
 */
 async function candles(sym, interval = "1h", from = "2020-01-01", opts = {}) {
   sym = String(sym).toUpperCase().replace(/USDT$/, "");
-  if (!/^[A-Z0-9]{1,20}$/.test(sym)) throw new Error("Invalid symbol: " + sym);
-  if (!IV_MS[interval]) throw new Error("Timeframe must be one of " + Object.keys(IV_MS).join(", "));
+  if (!/^[A-Z0-9]{1,20}$/.test(sym)) throw new Error("코인 기호가 이상해요: " + sym);
+  if (!IV_MS[interval]) throw new Error("봉 단위는 " + Object.keys(IV_MS).join(", ") + " 중 하나");
   let market = opts.market === "spot" ? "spot" : "futures";
   const t0 = typeof from === "number" ? from : Date.parse(from);
-  if (!isFinite(t0)) throw new Error('Start date format: "2020-01-01"');
+  if (!isFinite(t0)) throw new Error('시작일 형식: "2020-01-01"');
   const ms = IV_MS[interval], now = Date.now();
   const load = async mk => {
     const key = `${mk}|${sym}|${interval}`;
@@ -85,7 +85,7 @@ async function candles(sym, interval = "1h", from = "2020-01-01", opts = {}) {
   try { rows = await load(market); }
   catch (e) {
     if (!e.blocked || market === "spot") throw e;
-    log(`Futures data is blocked in this region — using spot data instead (${sym})`);
+    log(`이 지역에서 선물 데이터가 막혀서 현물 데이터로 대신 받아요 (${sym})`);
     rows = await load(market = "spot");
   }
   const arr = [];
@@ -121,7 +121,7 @@ function stats(equity, seed) {
   let peak = -Infinity, mdd = 0;
   for (const [, v] of equity) { peak = Math.max(peak, v); if (peak > 0) mdd = Math.max(mdd, (peak - v) / peak); }
   const end = equity[equity.length - 1][1];
-  return { "Starting capital": Math.round(s), "Final equity": Math.round(end), "Return": ((end / s - 1) * 100).toFixed(1) + "%", "Max drawdown": (mdd * 100).toFixed(1) + "%" };
+  return { "시작 자산": Math.round(s), "최종 자산": Math.round(end), "수익률": ((end / s - 1) * 100).toFixed(1) + "%", "최대 낙폭": (mdd * 100).toFixed(1) + "%" };
 }
 
 /*
@@ -132,6 +132,7 @@ function stats(equity, seed) {
   acct.pos (null or {side, entry, qty, margin, sl, tp}), acct.dead (balance gone), acct.result()
 */
 const MMR = 0.005;
+const REASON = { "Stop loss": "손절", "Take profit": "익절", "Liquidation": "청산", "Signal": "신호" };
 class Account {
   constructor(cfg = {}) {
     this.cfg = cfg;
@@ -171,8 +172,8 @@ class Account {
     this.cash += pnl;
     if (this.cash <= 1e-9) { this.cash = 0; this.dead = true; }
     const net = pnl - p.fee;
-    this.trades.push({ "Entry time": p.t, "Exit time": t, "Side": p.side === "long" ? "Long" : "Short", "Entry": p.entry, "Exit": price,
-      "PnL": Math.round(net * 100) / 100, "Return": (net / p.margin * 100).toFixed(2) + "%", "Reason": reason, ...(p.note ? { "Note": p.note } : {}) });
+    this.trades.push({ "진입 시각": p.t, "청산 시각": t, "방향": p.side === "long" ? "롱" : "숏", "진입가": p.entry, "청산가": price,
+      "손익": Math.round(net * 100) / 100, "수익률": (net / p.margin * 100).toFixed(2) + "%", "사유": REASON[reason] || reason, ...(p.note ? { "메모": p.note } : {}) });
     this.pos = null;
     return net;
   }
@@ -190,7 +191,7 @@ class Account {
           const before = this.cash, m = p.margin + p.fee; this.close(liq, c.t, "Liquidation");
           const extra = Math.max(0, p.margin - (before - this.cash));
           this.cash = Math.max(0, this.cash - extra); if (this.cash <= 1e-9) this.dead = true;
-          const tr = this.trades[this.trades.length - 1]; tr.PnL = Math.round(-m * 100) / 100; tr.Return = (-m / p.margin * 100).toFixed(2) + "%";
+          const tr = this.trades[this.trades.length - 1]; tr["손익"] = Math.round(-m * 100) / 100; tr["수익률"] = (-m / p.margin * 100).toFixed(2) + "%";
         }
       } else if (p.tp && (L ? c.h >= p.tp : c.l <= p.tp)) this.close(L ? Math.max(p.tp, c.o) : Math.min(p.tp, c.o), c.t, "Take profit");
     }
@@ -199,12 +200,12 @@ class Account {
   result(extra = {}) {
     const step = Math.max(1, Math.ceil(this.eq.length / 3000));
     const equity = this.eq.filter((_, i) => i % step === 0 || i === this.eq.length - 1);
-    const w = this.trades.filter(x => x.PnL > 0), l = this.trades.filter(x => x.PnL <= 0);
-    const sum = a => a.reduce((s, x) => s + x.PnL, 0), gw = sum(w), gl = -sum(l);
+    const w = this.trades.filter(x => x["손익"] > 0), l = this.trades.filter(x => x["손익"] <= 0);
+    const sum = a => a.reduce((s, x) => s + x["손익"], 0), gw = sum(w), gl = -sum(l);
     return {
-      summary: { ...stats(this.eq, this.capital), "Trades": this.trades.length, "Win rate": (w.length / (this.trades.length || 1) * 100).toFixed(0) + "%",
-        "Avg win": Math.round(gw / (w.length || 1)), "Avg loss": -Math.round(gl / (l.length || 1)), "Profit factor": gl ? (gw / gl).toFixed(2) : "-",
-        "Liquidations": this.liqs, ...extra },
+      summary: { ...stats(this.eq, this.capital), "매매 수": this.trades.length, "승률": (w.length / (this.trades.length || 1) * 100).toFixed(0) + "%",
+        "평균 수익": Math.round(gw / (w.length || 1)), "평균 손실": -Math.round(gl / (l.length || 1)), "손익비(PF)": gl ? (gw / gl).toFixed(2) : "-",
+        "청산 횟수": this.liqs, ...extra },
       equity, trades: this.trades,
     };
   }
@@ -223,7 +224,7 @@ onmessage = async ev => {
     const fn = new AsyncFn("config", "candles", "ta", "stats", "Account", "log", "progress", "report", code);
     const ret = await fn(config, candles, ta, stats, Account, log, progress, report);
     const r = reported || ret;
-    if (!r || typeof r !== "object") throw new Error("No result. End your script with return acct.result() or return { summary, equity, trades }");
+    if (!r || typeof r !== "object") throw new Error("결과가 없어요. 스크립트 끝에서 return acct.result(); 또는 return { summary, equity, trades } 를 해 주세요");
     send("done", JSON.parse(JSON.stringify(r)));
   } catch (e) {
     send("error", (e && e.message) || String(e));
