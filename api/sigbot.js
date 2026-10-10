@@ -1,4 +1,4 @@
-/* POST /api/sigbot — Signals 탭(LONG) 진입 신호 자동매매. 계정 두 개를 같은 매매 규칙(sigbot-core.js)으로:
+/* POST /api/sigbot — Signals 탭 진입 신호 자동매매 (롱 + 숏, 같은 코인에 동시에 둘 다는 안 잡음). 계정 두 개를 같은 매매 규칙(sigbot-core.js)으로:
      · 코인  → 모의투자 계정 SIGBOT_NICKNAME(기본 "test"),     Signals 탭과 같은 스캔 (깊이 -1, 시총 150위 안 거래량 상위 100개)
      · RWA   → 모의투자 계정 SIGBOT_RWA_NICKNAME(기본 "jina"), Signals RWA 탭과 같은 스캔 (깊이 -0.618, 토큰화 주식·원자재 등 거래량 상위 100개)
    GitHub Actions(.github/workflows/sigbot.yml)가 5분마다 불러요. 규칙은 sigbot-core.js
@@ -91,7 +91,8 @@ async function scanAll(now, acct) {
         const cs = await candles(sym);
         if (cs.length < 100) continue;
         const r = F.analyze(cs, { n: C.P.n, k: C.P.k, ratio: acct.ratio, direction: "long" });
-        coins.push({ sym, stats: r.stats, current: r.current });
+        const s = F.analyze(cs, { n: C.P.n, k: C.P.k, ratio: acct.ratio, direction: "short" });   // 같은 캔들로 숏도 계산 (다운로드 추가 없음)
+        coins.push({ sym, stats: r.stats, current: r.current, short: { stats: s.stats, current: s.current } });
       } catch (e) {}
     }
   }
@@ -151,7 +152,8 @@ module.exports = async (req, res) => {
         if (r.dirty || sy.dirty) await db.setJSON(key, user);
         await db.setJSON(a.scanKey, scan);                 // 실시간으로 갱신된 도달 여부도 저장
         out[a.id] = { nick: a.nick, scanned: scannedId === a.id, coins: scan.coins.length,
-                      inZone: scan.coins.filter(c => F.label(c.current) === "진입 구간").map(c => c.sym),
+                      inZone: scan.coins.filter(c => F.label(c.current) === "진입 구간").map(c => c.sym)
+                        .concat(scan.coins.filter(c => c.short && F.label(c.short.current) === "진입 구간").map(c => c.sym + "(숏)")),
                       active: Object.keys(user.sbot.act), did: r.log, events: sy.events.length };
       } catch (e) { out[a.id] = { nick: a.nick, error: e.message, scanErr: scanErr[a.id] || null }; }
     }
