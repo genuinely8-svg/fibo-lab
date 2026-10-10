@@ -550,7 +550,8 @@
         return;
       }
       ls.set(K.token, j.token); ls.set(K.nick, j.nick);
-      location.href = "profile.html";                       // 가입·로그인하면 내 프로필로
+      if (/\/paper(\.html)?$/.test(location.pathname)) location.reload();   // 모의투자 화면에서 로그인하면 그 화면 그대로
+      else location.href = "profile.html";                  // 다른 화면에서는 내 프로필로
     } catch (e) { err.textContent = e.message; }
     finally { go.disabled = false; }
   }

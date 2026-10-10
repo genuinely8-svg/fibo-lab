@@ -123,30 +123,21 @@
     return j;
   }
 
-  // ── 로그인 ───────────────────────────────────────────────────
-  $("lform").addEventListener("submit", async ev => {
-    ev.preventDefault();
-    const nick = $("nick").value.trim(), pin = $("pin").value;
-    $("lerr").textContent = ""; $("lbtn").disabled = true;
-    try {
-      let r = await post("/api/auth", { nick, pin });
-      if (r.needCreate) {
-        if (!(await ask(`'${nick}' is a new nickname.\nCreate a new account with this nickname and PIN?`, "Create"))) return;
-        r = await post("/api/auth", { nick, pin, create: true });
-      }
-      S.token = r.token; S.nick = r.nick; ls.set(K.token, r.token); ls.set(K.nick, r.nick);
-      $("pin").value = "";
-      start();
-    } catch (e) { $("lerr").textContent = e.message; }
-    finally { $("lbtn").disabled = false; }
-  });
+  // ── 로그인: 로그인 전에도 화면은 보여 주고, 주문 패널 위의 Log in / Sign up 으로 위쪽과 같은 가입·로그인 창을 엶 ──
+  const openAuth = m => { if (window.GwaveAuth) GwaveAuth.open(m); };
+  $("lkSignin").onclick = () => openAuth("signin");
+  $("lkJoin").onclick = () => openAuth("join");
   function logout(silent, msg) {
-    ls.del(K.token); S.token = null; S.st = null; S.admin = false;
-    closeSocks(); started = false; S.first = true;
-    $("app").hidden = true; $("login").hidden = false;
-    if (silent) $("lerr").textContent = msg || "Please log in again";
+    ls.del(K.token); ls.del(K.nick); S.token = null; S.st = null; S.admin = false;
+    if (silent) { try { sessionStorage.setItem("paper-logout-msg", msg || "Please log in again"); } catch (e) {} }
+    location.reload();                                   // 로그인 전 화면으로
   }
-  $("logout").onclick = () => { logout(); location.reload(); };
+  function renderGuest() {
+    $("who").textContent = "Guest";
+    $("tiles").innerHTML = "";
+    $("tabbody").innerHTML = '<div class="empty">Log in to see your positions, orders and history</div>';
+  }
+  $("logout").onclick = () => logout();
 
   // ── 서버 상태 ────────────────────────────────────────────────
   const EV_TITLE = { fill: ["ok", "Limit filled · Position opened"], tp: ["ok", "Take-profit triggered"], sl: ["warn", "Stop-loss triggered"], liq: ["bad", "Liquidated"], rclose: ["ok", "Limit close filled"], trail: ["ok", "Trailing stop triggered"] };
@@ -778,6 +769,7 @@
   function renderTab() {
     const st = S.st, el = $("tabbody");
     [...$("tabs").children].forEach(b => b.classList.toggle("on", b.dataset.t === S.tab));
+    if (!st) { renderGuest(); return; }
     if (S.tab === "adm") { if (!adminRows) loadAdmin(); else renderAdmin(); return; }
     // 구조(포지션 목록·TP/SL 등)가 바뀔 때만 통째로 그리고, 가격으로 바뀌는 칸만 제자리에서 갱신 → 버튼 누르는 중에 사라지지 않음
     const s = S.tab + JSON.stringify([st.pos.map(p => [p.id, p.qty, p.tp, p.sl, p.margin, p.rp, p.pt, p.trl]), st.ord.map(o => o.id), st.ol.length, st.th.length, st.th[0] && st.th[0].t, st.ol[0] && st.ol[0].status]);
@@ -1148,14 +1140,17 @@
   function start() {
     if (started) return;
     started = true;
-    $("login").hidden = true; $("app").hidden = false;
-    loadNotes();
+    $("app").hidden = false;
+    const guest = !S.token;
+    $("lockov").hidden = !guest; $("logout").hidden = guest; $("bell").hidden = guest;
+    if (guest) renderGuest(); else loadNotes();
     setMode(S.mode); setLev(ls.get(K.lev) || 10); setType(S.otype);
     setCtab(S.ctab);
     setCollapsed(isMob() ? ls.get(K.collapsedM) !== "0" : ls.get(K.collapsed) === "1");   // 모바일은 기본 접힘
     renderHd(); renderBook(); renderTrades(); renderDot();
     mkt.open(); pub.open(); loadTicker(); loadCoins();
-    refresh();
+    if (!guest) refresh();
+    try { const m = sessionStorage.getItem("paper-logout-msg"); if (m) { sessionStorage.removeItem("paper-logout-msg"); notify("warn", "Logged out", m); } } catch (e) {}
   }
   // 증거금률 경고: 80% 넘으면 한 번 알리고, 60% 아래로 내려가면 다시 알릴 수 있게 초기화
   function riskCheck() {
@@ -1192,5 +1187,5 @@
     if (S.token && Date.now() - S.lastSync > 30e3) refresh(true);
   });
 
-  if (S.token) start(); else $("login").hidden = false;
+  start();                                               // 로그인 안 했어도 시세·차트·호가는 바로 보여 줌
 })();

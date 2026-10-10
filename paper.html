@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010210408"></script>
+<script src="theme.js?v=20261010212923"></script>
 <title>Paper Trading · Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261010210408">
+<link rel="stylesheet" href="common.css?v=20261010212923">
 <style>
   html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
   /* 아이폰: 입력칸 글자가 16px 보다 작으면 누를 때 화면이 확대돼서, 터치 기기에서는 입력칸을 16px 로 */
@@ -22,10 +22,20 @@
   input{min-width:0}
   label>.lt{white-space:nowrap}                         /* 라벨 글자는 항상 한 줄 */
 
-  /* 로그인 */
-  #login{max-width:380px;margin:30px auto}
-  #login form{display:flex;flex-direction:column;gap:12px}
-  #login .err{color:var(--sell);font-size:13px;min-height:1.2em}
+  /* 로그인 전: 화면은 그대로 보여 주고 주문 패널만 살짝 흐리게 덮음 */
+  .orderbox{position:relative}
+  .lockov{position:absolute;inset:0;z-index:6;display:grid;place-items:center;padding:16px;border-radius:inherit;
+          background:color-mix(in srgb,var(--card) 40%,transparent);-webkit-backdrop-filter:blur(2.5px);backdrop-filter:blur(2.5px)}
+  .lockov[hidden]{display:none}
+  .lockov .lk{width:100%;max-width:240px;text-align:center;padding:18px 16px;border:1px solid var(--line);border-radius:8px;
+              background:color-mix(in srgb,var(--card) 92%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.12)}
+  .lockov .lk b{display:block;font-size:15px;margin-bottom:4px}
+  .lockov .lk span{display:block;font-size:12.5px;color:var(--muted);line-height:1.45;margin-bottom:14px}
+  .lockov .lkb{display:flex;flex-direction:column;gap:8px}
+  .lockov .lkb button{width:100%;padding:10px;border-radius:6px;font:600 13.5px "IBM Plex Mono",ui-monospace,monospace;cursor:pointer}
+  .lockov .lk-si{background:var(--gw,var(--accent));color:#fff;border:1px solid transparent}
+  .lockov .lk-jn{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .lockov .lk-jn:hover{border-color:color-mix(in srgb,var(--gw,var(--accent)) 50%,var(--line))}
 
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-6px 0 10px;font-size:13px;color:var(--muted)}
   .topbar b{color:var(--text)}
@@ -342,24 +352,12 @@
   }
   @media (max-width:520px){ .st.hidem{display:none} .tiles{grid-template-columns:1fr 1fr} }
 </style>
-<link rel="stylesheet" href="gwave-ui.css?v=20261010210408">
+<link rel="stylesheet" href="gwave-ui.css?v=20261010212923">
 </head>
 <body>
 <div class="wrap">
   <h1 class="brand">Gwave</h1>
   <nav id="nav"></nav>
-
-  <!-- 로그인 -->
-  <div id="login" class="card" hidden>
-    <h2>Log in / Sign up</h2>
-    <p class="sub">Enter a nickname and PIN (4+ digits). A new nickname creates a new account.</p>
-    <form id="lform">
-      <label><span class="lt">Nickname</span><input id="nick" autocomplete="username" maxlength="16"></label>
-      <label><span class="lt">PIN</span><input id="pin" type="password" autocomplete="current-password" inputmode="numeric" maxlength="32"></label>
-      <div class="err" id="lerr"></div>
-      <button id="lbtn" type="submit">Start</button>
-    </form>
-  </div>
 
   <div id="app" hidden>
     <div class="topbar">
@@ -434,6 +432,10 @@
           <div id="liqnote" class="small" style="display:block"></div>
         </div>
         <div class="obtns"><button class="buy" id="bLong">Open long</button><button class="sell" id="bShort">Open short</button></div>
+        <div class="lockov notranslate" id="lockov" translate="no" hidden>
+          <div class="lk"><b>Log in to trade</b><span>Practice with 10,000 USDT in virtual funds</span>
+            <div class="lkb"><button type="button" class="lk-si" id="lkSignin">Log in</button><button type="button" class="lk-jn" id="lkJoin">Sign up</button></div></div>
+        </div>
       </div>
 
       <div class="box lower">
@@ -456,10 +458,10 @@
 <div id="modal" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="nav.js?v=20261010210408"></script>
-<script src="common.js?v=20261010210408"></script>
-<script src="meta.js?v=20261010210408"></script>
-<script src="paper-engine.js?v=20261010210408"></script>
-<script src="paper.js?v=20261010210408"></script>
+<script src="nav.js?v=20261010212923"></script>
+<script src="common.js?v=20261010212923"></script>
+<script src="meta.js?v=20261010212923"></script>
+<script src="paper-engine.js?v=20261010212923"></script>
+<script src="paper.js?v=20261010212923"></script>
 </body>
 </html>
