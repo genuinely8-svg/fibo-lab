@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010115515"></script>
+<script src="theme.js?v=20261010210408"></script>
 <title>코인 상세 · Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -112,7 +112,7 @@
     table:not(#tfTable) th:nth-child(6),table:not(#tfTable) td:nth-child(6){display:none}
   }
 </style>
-<link rel="stylesheet" href="gwave-ui.css?v=20261010115515">
+<link rel="stylesheet" href="gwave-ui.css?v=20261010210408">
 </head>
 <body>
 <div class="wrap">
@@ -181,11 +181,9 @@
     <div id="chart"></div>
     <div id="tv" hidden></div>
     <div class="legend" id="legend">
-      <span><i style="background:var(--up)"></i>H 스윙 고점</span>
-      <span><i style="background:var(--down)"></i>L 스윙 저점</span>
       <span><i style="background:var(--accent)"></i>진입 가격 · 예상 반등가(점선)</span>
       <span style="color:var(--accent)">▲ 과거 진입가 터치</span>
-      <span style="color:#16a34a">▲ 진입 = 지금 스윙에서 진입가에 닿은 봉</span>
+      <span style="color:#16a34a">▲ 진입 = 이번 신호에서 진입가에 닿은 봉</span>
     </div>
   </div>
 
@@ -199,16 +197,16 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261010115515"></script>
-<script src="chart.js?v=20261010115515"></script>
-<script src="nav.js?v=20261010115515"></script>
-<script src="meta.js?v=20261010115515"></script>
+<script src="sig-live.js?v=20261010210408"></script>
+<script src="chart.js?v=20261010210408"></script>
+<script src="nav.js?v=20261010210408"></script>
+<script src="meta.js?v=20261010210408"></script>
 <script>
 "use strict";
 // ── 주소에서 설정 읽기: coin.html?s=BTC&ex=futures&n=5&k=20 ─────────
 const q = new URLSearchParams(location.search);
 const SYM = (q.get("s") || "BTC").toUpperCase().replace(/[^A-Z0-9]/g, "");
-const N = +q.get("n") || 5, K = +q.get("k") || 20, RATIO = [0.5, 0.618, 1].includes(+q.get("r")) ? +q.get("r") : 1;
+const N = +q.get("n") || 5, K = +q.get("k") || 20, DEPTH = ["a", "b", "c"].includes(q.get("d")) ? q.get("d") : "c";
 let ex = q.get("ex") === "binance" ? "binance" : "futures";
 
 const $ = id => document.getElementById(id);
@@ -436,7 +434,7 @@ async function loadPeriods(t) {
 
 // ── 4) 봉별 진입 분석 ──────────────────────────────────────────
 function badge(cur) {
-  const l = FibCore.label(cur);
+  const l = SigLive.label(cur);
   const cls = { "진입 구간": "b-hit", "진입 근접": "b-near", "이탈": "b-out", "대기": "b-wait" }[l];
   return `<span class="badge ${cls}">${l}</span>`;
 }
@@ -447,9 +445,17 @@ async function loadTimeframes() {
   tfResults = {};
   for (const tf of TF) {
     try {
-      const candles = await klines(tf.unit, 1000);
+      // 차트용 캔들은 바이낸스에서, 진입가·통계는 서버(api/fib)에서 계산한 결과만
+      const qs = new URLSearchParams({ ex, iv: tf.unit, count: 1000, n: N, k: K, d: DEPTH, dir: "long", syms: SYM });
+      const [candles, j] = await Promise.all([
+        klines(tf.unit, 1000),
+        fetch("api/fib?" + qs).then(r => r.json()).catch(() => ({ error: "서버에 연결이 안 돼요" })),
+      ]);
       if (candles.length < 100) throw new Error(`데이터 부족 (캔들 ${candles.length}개)`);
-      tfResults[tf.unit] = { candles, ...FibCore.analyze(candles, { n: N, k: K, ratio: RATIO }) };
+      const row = j.rows && j.rows[0];
+      if (!row) throw new Error(j.error || "서버 응답 오류");
+      if (row.error) throw new Error(row.error);
+      tfResults[tf.unit] = { candles, ...row };
     } catch (e) { tfResults[tf.unit] = { error: e.message }; }
     renderTf();
   }}
@@ -486,10 +492,10 @@ function drawChart() {
   $("chartTitle").textContent = `${SYM} · ${tf.label}봉 · ${EXNAME[ex]}` + (r && !r.error ? ` · 과거 진입가 터치 ${r.stats.count}회` : "");
   if (view === "lw") {
     if (!r || r.error) return;
-    FiboChart.draw($("chart"), r, { krw: false });
+    GwChart.draw($("chart"), r, { krw: false });
     drawn[selTf] = true;
   } else {
-    FiboChart.tradingView($("tv"), `BINANCE:${SYM}USDT${ex === "futures" ? ".P" : ""}`, tf.tv);
+    GwChart.tradingView($("tv"), `BINANCE:${SYM}USDT${ex === "futures" ? ".P" : ""}`, tf.tv);
   }
 }
 function setView(v) {

@@ -2,7 +2,7 @@
   chart.js — 차트 그리기
   ---------------------------------------------------------------
   1) 분석 차트: 트레이딩뷰가 무료로 공개한 "Lightweight Charts" 라이브러리 사용
-     캔들 + 우리가 계산한 H / L / -1 / 예상 반등가 선 + 과거 진입가 터치 표시(▲)
+     캔들 + 진입가 / 예상가 선 + 과거 진입가 터치 표시(▲)
   2) 트레이딩뷰 탭: 진짜 트레이딩뷰 차트를 통째로 넣음 (보조지표·그리기 도구 사용 가능)
 */
 (function () {
@@ -16,13 +16,14 @@
   let drawnR = null, drawnKey = null, lastN = 0, lastFirstT = 0;   // 지금 그려진 분석 결과 / 코인+봉 단위 / 캔들 수 / 첫 캔들 시각
   const T = c => Math.floor(c.t / 1000) + KST;
 
-  // 화살표 표시 만들기: 과거 터치 ("터치") + 지금 스윙에서 진입가에 닿은 봉 (초록색 "진입", 과거 기록보다 우선)
+  // 화살표 표시 만들기: 과거 터치 ("터치") + 이번 신호에서 진입가에 닿은 봉 (초록색 "진입", 과거 기록보다 우선)
   function buildMarkers(r) {
-    const cs = r.candles, cur = r.current, short = r.direction === "short";
+    const cur = r.current, short = r.direction === "short";
     const pos = short ? "aboveBar" : "belowBar", shape = short ? "arrowDown" : "arrowUp";
-    const past = r.touches.map(t => ({ time: T(cs[t.touchIdx]), position: pos, color: cssVar("--accent"), shape, text: "터치" }));
-    const now = cur && cur.touched && cur.touchIdx != null && cs[cur.touchIdx]
-      ? [{ time: T(cs[cur.touchIdx]), position: pos, color: cssVar("--accent"), shape, text: "진입", size: 2 }] : [];
+    const TS = t => Math.floor(t / 1000) + KST;
+    const past = (r.touchT || []).map(t => ({ time: TS(t), position: pos, color: cssVar("--accent"), shape, text: "터치" }));
+    const now = cur && cur.touched && cur.touchT != null
+      ? [{ time: TS(cur.touchT), position: pos, color: cssVar("--accent"), shape, text: "진입", size: 2 }] : [];
     const seen = new Set();
     return now.concat(past).filter(m => !seen.has(m.time) && seen.add(m.time)).sort((a, b) => a.time - b.time);
   }
@@ -79,10 +80,8 @@
       if (price == null || !isFinite(price)) return;
       lines.push(series.createPriceLine({ price, color, title, lineStyle: style, lineWidth: width, axisLabelVisible: true }));
     };
-    if (cur && cur.H) add(cur.H, cssVar("--up"), "H", 2, 1);
     mustShow = [];
     if (cur && cur.level) {
-      add(cur.L, cssVar("--down"), "L", 2, 1);
       add(cur.level, cssVar("--accent"), "진입 " + cur.level.toFixed(p), 0, 2);
       add(cur.expected, cssVar("--accent"), short ? "예상 하락" : "예상 반등", 1, 1);
       mustShow = [cur.level, cur.expected].filter(v => v != null && isFinite(v));
@@ -109,7 +108,7 @@
 
   // 실시간 가격으로 마지막 캔들만 갱신 (봉이 바뀌었으면 새 캔들 추가). r 은 draw 로 그린 그 결과여야 함
   function live(r, px, unitMs) {
-    if (!series || r !== drawnR || !r.candles.length) return;
+    if (!series || r !== drawnR || !r.candles || !r.candles.length) return;
     const cs = r.candles, barT = Math.floor(Date.now() / unitMs) * unitMs;
     let last = cs[cs.length - 1];
     if (barT > last.t) { last = { t: barT, o: px, h: px, l: px, c: px }; cs.push(last); lastN = cs.length; }
@@ -118,7 +117,7 @@
     series.update({ time: T(last), open: last.o, high: last.h, low: last.l, close: last.c });
     // 방금 진입가에 닿았으면 이 캔들에 바로 "진입" 화살표
     const cur = r.current;
-    if (cur && cur.touched && cur.touchIdx == null) { cur.touchIdx = cs.length - 1; series.setMarkers(buildMarkers(r)); }
+    if (cur && cur.touched && cur.touchT == null) { cur.touchT = last.t; series.setMarkers(buildMarkers(r)); }
   }
 
   // 다크/라이트를 바꾸면 차트 색을 바로 다시 칠함 (보던 위치는 그대로)
@@ -164,5 +163,5 @@
     });
   }
 
-  window.FiboChart = { draw, live, tradingView };
+  window.GwChart = { draw, live, tradingView };
 })();

@@ -11,7 +11,7 @@
     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 */
 const fs = require("fs");
-const FibCore = require("./fib-core.js");
+const FibCore = require("./api/_lib/fib-core.js");
 
 const CFG = { interval: "1h", count: 2000, n: 5, k: 20, top: 50, near: 0.3 };
 const STATE_FILE = ".alert-state/state.json";

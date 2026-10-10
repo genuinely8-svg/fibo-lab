@@ -1,6 +1,6 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<title>모멘텀 개선 비교 · Gwave</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
+<title>모멘텀 생존편향 보정 · Gwave</title>
 <style>
 body{margin:0;background:#101014;color:#ECEEF2;font-family:system-ui,"Malgun Gothic",sans-serif;padding:24px;font-size:14px}
 h2{margin:0 0 6px;font-size:20px}h3{margin:26px 0 4px;font-size:16px}
@@ -11,13 +11,12 @@ th{color:#8B95A1;font-weight:500}td:first-child,th:first-child{text-align:left}
 details{margin-top:10px}summary{cursor:pointer;color:#B0B8C1}
 ol{color:#B0B8C1;line-height:1.8;padding-left:20px;max-width:1000px}
 </style></head><body>
-<h2>상위 코인 모멘텀 · 상장 1년 이상 / 5개 보유 비교 (그 당시 상위 15개)</h2>
+<h2>상위 코인 모멘텀 · 생존 편향 고친 버전 (그 당시 상위 15개)</h2>
 <div id="st" class="mut">데이터 받는 중… (코인이 많아서 3~5분 걸려요)</div>
 <ol>
-<li><b>대상</b> — 리밸런싱하는 날마다 그날까지 <b>최근 30일 바이낸스 선물 거래대금 상위 15개</b>를 다시 뽑음 (그 시점에 알 수 있는 정보만 씀, 스테이블코인 제외)</li>
-<li><b>상장 조건</b> — 기존: 바이낸스 선물 상장 60일 이상 / 개선: <b>상장 1년 이상</b> (새로 나온 밈코인 거르기)</li>
-<li><b>보유 개수</b> — 기존: 가장 많이 오른 <b>3개</b> / 개선: <b>5개</b>를 똑같이 나눠 보유</li>
-<li><b>나머지 규칙은 같음</b> — "최근 4주 수익 플러스 + 50일선 위"인 코인만, BTC가 50일선 아래면 쉬기, 주 1회(월) / 주 3회(월·수·금)</li>
+<li><b>그 당시 상위 15개</b> — 리밸런싱하는 날마다, 그날까지의 <b>최근 30일 바이낸스 선물 거래대금 상위 15개</b>를 다시 뽑음 (스테이블코인 제외, 상장 60일 이상). 그 시점에 알 수 있는 정보만 씀</li>
+<li><b>지금 시총 상위 15개</b> — 어제까지 쓰던 방식 (비교용, 결과가 부풀려짐)</li>
+<li><b>규칙은 같음</b> — 대상 중 "최근 4주 수익 플러스 + 50일선 위"인 코인 중 가장 많이 오른 3개를 똑같이 나눠 보유, BTC가 50일선 아래면 쉬기, 주 1회(월) / 주 3회(월·수·금)</li>
 </ol>
 <div class="mut">공통: 시작 $50,000 · 매매마다 수수료+미끄러짐 0.1% · 2배·3배는 선물(하루 최저가 기준 강제청산 체크, 펀딩비 비용 포함) · 지금은 상장폐지돼서 바이낸스가 데이터를 안 주는 코인은 빠질 수 있음</div>
 <div id="out"></div>
@@ -33,7 +32,6 @@ async function load() {
   const ex = await j(F + "/fapi/v1/exchangeInfo");
   const base = s => s.replace(/^1000+|^1M/, "");
   // 상장폐지 준비 중인 것까지 포함 (지금 거래 중인 것만 쓰면 생존 편향이 다시 생김)
-  const onboard = {}; for (const x of ex.symbols) onboard[x.symbol] = x.onboardDate || 0;
   const syms = ex.symbols.filter(s => s.quoteAsset === "USDT" && s.contractType === "PERPETUAL" && s.underlyingType === "COIN" && !STABLE.has(base(s.baseAsset))).map(s => s.symbol);
   const day = {}, low = {}, qv = {};
   let done = 0;
@@ -48,6 +46,10 @@ async function load() {
     st(`데이터 받는 중… ${++done}/${syms.length} (코인이 많아서 3~5분 걸려요)`);
     await sleep(220);
   }
+  // 지금 시총 상위 15개 (비교용)
+  const cg = await j("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1");
+  const nowTop = [];
+  for (const c of cg) { const b = c.symbol.toUpperCase(); if (STABLE.has(b)) continue; const s = day[b + "USDT"] ? b + "USDT" : day["1000" + b + "USDT"] ? "1000" + b + "USDT" : null; if (s && !nowTop.includes(s)) nowTop.push(s); if (nowTop.length === 15) break; }
   const funding = {};
   for (const s of ["BTCUSDT", "ETHUSDT"]) {
     let out = [], t0 = Date.now() - 800 * 864e5;
@@ -57,7 +59,7 @@ async function load() {
   const fday = new Map();
   for (const s of ["BTCUSDT", "ETHUSDT"]) for (const x of funding[s]) { const d = Math.floor(x.t / 864e5) * 864e5; fday.set(d, (fday.get(d) || 0) + x.r / 2); }
   const days = [...day.BTCUSDT.keys()].sort((a, b) => a - b);
-  return { syms: Object.keys(day), day, low, qv, days, fday, onboard };
+  return { syms: Object.keys(day), day, low, qv, days, fday, nowTop };
 }
 
 const px = (D, s, i) => D.day[s].get(D.days[i]);
@@ -69,38 +71,36 @@ const dstr = t => new Date(t).toLocaleDateString("ko-KR");
 
 // 그날 기준 최근 30일 거래대금 상위 15개 (상장 60일 이상)
 const uniCache = new Map();
-function universeAt(D, i, minAge = 60) {
-  const key = i + ":" + minAge;
-  if (uniCache.has(key)) return uniCache.get(key);
-  const rows = [], t = D.days[i];
+function universeAt(D, i) {
+  if (uniCache.has(i)) return uniCache.get(i);
+  const rows = [];
   for (const s of D.syms) {
-    if (D.day[s].get(D.days[i - 60]) == null || D.day[s].get(t) == null) continue;
-    if (minAge > 60 && !(D.onboard[s] && t - D.onboard[s] >= minAge * 864e5)) continue;
+    if (D.day[s].get(D.days[i - 60]) == null || D.day[s].get(D.days[i]) == null) continue;
     let v = 0; for (let q = i - 29; q <= i; q++) v += D.qv[s].get(D.days[q]) || 0;
     rows.push([s, v]);
   }
   rows.sort((a, b) => b[1] - a[1]);
-  const u = rows.slice(0, 15).map(r => r[0]); uniCache.set(key, u); return u;
+  const u = rows.slice(0, 15).map(r => r[0]); uniCache.set(i, u); return u;
 }
 
-function pick(D, i, o) {
+function pick(D, i, uni) {
   if (!above(D, "BTCUSDT", i)) return {};
-  const list = universeAt(D, i, o.age);
+  const list = uni === "now" ? D.nowTop : universeAt(D, i);
   const cand = [];
   for (const s of list) { const p = px(D, s, i), p28 = px(D, s, i - 28); if (!p || !p28 || !above(D, s, i)) continue; const m = p / p28 - 1; if (m > 0) cand.push([s, m]); }
   cand.sort((a, b) => b[1] - a[1]);
-  const w = {}, top = cand.slice(0, o.k); for (const [s] of top) w[s] = 1 / top.length; return w;
+  const w = {}, top = cand.slice(0, 3); for (const [s] of top) w[s] = 1 / top.length; return w;
 }
 
-function sim(D, i0, i1, { freq, L = 1, age = 60, k = 3 }) {
+function sim(D, i0, i1, { freq, L = 1, uni }) {
   let eq = 50000, peak = eq, mdd = 0, trades = 0, liq = null, w = {};
   const log = [], held = new Map();
   for (let i = i0; i < i1; i++) {
     if (freq.includes(new Date(D.days[i]).getUTCDay())) {
-      const nw = pick(D, i, { age, k });
+      const nw = pick(D, i, uni);
       let turn = 0; for (const s of new Set([...Object.keys(w), ...Object.keys(nw)])) turn += Math.abs((nw[s] || 0) - (w[s] || 0));
       if (turn > 1e-9) { trades++; eq *= 1 - turn * COST * L; }
-      w = nw; log.push({ t: D.days[i], coins: Object.keys(w).map(nm), uni: universeAt(D, i, age).map(nm) });
+      w = nw; log.push({ t: D.days[i], coins: Object.keys(w).map(nm), uni: uni === "now" ? null : universeAt(D, i).map(nm) });
     }
     held.set(D.days[i + 1], Object.keys(w));
     let r = 0, worst = 0, hsum = 0;
@@ -123,22 +123,22 @@ load().then(D => {
   const n = D.days.length, idxAt = t => D.days.findIndex(x => x >= t), now = D.days[n - 1];
   const P = [["2년 전체", idxAt(now - 730 * 864e5), n - 1], ["앞 1년 (2년 전 ~ 1년 전)", idxAt(now - 730 * 864e5), idxAt(now - 365 * 864e5)], ["최근 1년", idxAt(now - 365 * 864e5), n - 1]];
   const FQ = [["주 1회", [0]], ["주 3회", [0, 2, 4]]];
-  const VAR = [["기존 (상장 60일 · 3개)", { age: 60, k: 3 }], ["상장 1년 이상 · 3개", { age: 365, k: 3 }], ["상장 60일 · 5개", { age: 60, k: 5 }], ["상장 1년 이상 · 5개", { age: 365, k: 5 }]];
+  const U = [["그 당시 상위 15개", "then"], ["지금 시총 상위 15개 (부풀려짐)", "now"]];
   st(`바이낸스 선물 코인 ${D.syms.length}개로 계산 · 마지막 일봉 ${dstr(now)}`);
   let h = "";
   for (const [pn, i0, i1] of P) {
-    h += `<h3>${pn} <span class="mut" style="font-size:13px">${dstr(D.days[i0])} ~ ${dstr(D.days[i1])}</span></h3><table><tr><th>방식</th><th>리밸런싱</th><th>배율</th><th>최종 잔고</th><th>수익률</th><th>최대 낙폭</th><th>수익률 ÷ 낙폭</th><th>매매</th><th></th></tr>`;
-    for (const [vn, v] of VAR) for (const [fn, fq] of FQ) [1, 2, 3].forEach(L => {
-      const r = sim(D, i0, i1, { freq: fq, L, ...v }), ret = (r.final / 50000 - 1) * 100;
-      h += `<tr class="${L === 1 ? "grp" : ""}"><td>${L === 1 && fn === "주 1회" ? vn : ""}</td><td>${L === 1 ? fn : ""}</td><td>${L}배</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.mdd.toFixed(1)}%</td><td>${r.mdd > 0.01 ? (ret / r.mdd).toFixed(2) : "-"}</td><td>${r.trades}</td><td class="dn">${r.liq ? "강제청산 " + r.liq : ""}</td></tr>`;
+    h += `<h3>${pn} <span class="mut" style="font-size:13px">${dstr(D.days[i0])} ~ ${dstr(D.days[i1])}</span></h3><table><tr><th>대상 코인</th><th>리밸런싱</th><th>배율</th><th>최종 잔고</th><th>수익률</th><th>최대 낙폭</th><th>수익률 ÷ 낙폭</th><th>매매</th><th></th></tr>`;
+    for (const [un, u] of U) for (const [fn, fq] of FQ) [1, 2, 3].forEach(L => {
+      const r = sim(D, i0, i1, { freq: fq, L, uni: u }), ret = (r.final / 50000 - 1) * 100;
+      h += `<tr class="${L === 1 ? "grp" : ""}"><td>${L === 1 && fn === "주 1회" ? un : ""}</td><td>${L === 1 ? fn : ""}</td><td>${L}배</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.mdd.toFixed(1)}%</td><td>${r.mdd > 0.01 ? (ret / r.mdd).toFixed(2) : "-"}</td><td>${r.trades}</td><td class="dn">${r.liq ? "강제청산 " + r.liq : ""}</td></tr>`;
     });
     h += `</table>`;
   }
   const T = Date.UTC(2025, 9, 10), ti = D.days.indexOf(T);
   if (ti > 0) {
-    h += `<h3>2025년 10월 10일 들고 있던 코인 (상장 1년 이상 · 5개 기준)</h3><table><tr><th>리밸런싱</th><th>고른 날</th><th>코인</th><th>그날 최저가</th><th>그날 종가</th><th>2배면</th><th>3배면</th></tr>`;
+    h += `<h3>2025년 10월 10일 들고 있던 코인 (그 당시 상위 15개 기준)</h3><table><tr><th>리밸런싱</th><th>고른 날</th><th>코인</th><th>그날 최저가</th><th>그날 종가</th><th>2배면</th><th>3배면</th></tr>`;
     for (const [fn, fq] of FQ) {
-      const r = sim(D, idxAt(now - 730 * 864e5), n - 1, { freq: fq, L: 1, age: 365, k: 5 });
+      const r = sim(D, idxAt(now - 730 * 864e5), n - 1, { freq: fq, L: 1, uni: "then" });
       const coins = r.held.get(T) || [], last = r.log.filter(x => x.t < T).pop();
       if (!coins.length) { h += `<tr class="grp"><td>${fn}</td><td>${last ? dstr(last.t) : "-"}</td><td colspan="5" class="mut">보유 없음 (쉬는 중)</td></tr>`; continue; }
       let tot = 0;
@@ -150,8 +150,8 @@ load().then(D => {
     }
     h += `</table>`;
   }
-  const r = sim(D, idxAt(now - 730 * 864e5), n - 1, { freq: [0], L: 1, age: 365, k: 5 });
-  h += `<details><summary>주 1회 리밸런싱 기록 (상장 1년 이상 · 5개, 2년, ${r.log.length}번) 펼쳐보기</summary><table><tr><th>고른 날</th><th>보유 코인</th><th style="text-align:left">그날의 상위 15개 (거래대금, 상장 1년 이상)</th></tr>`;
+  const r = sim(D, idxAt(now - 730 * 864e5), n - 1, { freq: [0, 2, 4], L: 1, uni: "then" });
+  h += `<details><summary>주 3회 리밸런싱 기록 (그 당시 상위 15개 기준, 2년, ${r.log.length}번) 펼쳐보기</summary><table><tr><th>고른 날</th><th>보유 코인</th><th style="text-align:left">그날의 상위 15개 (거래대금)</th></tr>`;
   for (const x of r.log.slice().reverse()) h += `<tr><td>${dstr(x.t)}</td><td style="text-align:left">${x.coins.join(", ") || '<span class="mut">쉬기</span>'}</td><td style="text-align:left" class="mut">${x.uni.join(", ")}</td></tr>`;
   h += `</table></details>`;
   document.getElementById("out").innerHTML = h;

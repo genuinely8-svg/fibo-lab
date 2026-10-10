@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010115515"></script>
+<script src="theme.js?v=20261010210408"></script>
 <title>시장 방향</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261010115515">
+<link rel="stylesheet" href="common.css?v=20261010210408">
 <style>
   :root{ --btc:#f59e0b }
   /* 상단 핵심 카드 */
@@ -71,7 +71,7 @@
     .scale{height:76px}
   }
 </style>
-<link rel="stylesheet" href="gwave-ui.css?v=20261010115515">
+<link rel="stylesheet" href="gwave-ui.css?v=20261010210408">
 </head>
 <body>
 <div class="wrap">
@@ -126,13 +126,12 @@
     </details>
   </div>
 
-  <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식(FibCore)으로 위쪽·아래쪽 양방향을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
+  <p class="foot">참고용이에요. 바이낸스 선물 1시간봉 최근 약 4달(2880개)을 받아 최근 30일 기준으로 점수를 내고(선 그래프는 최근 3달), 메인 화면과 같은 방식으로 위쪽·아래쪽 양방향을 각각 분석했어요. 투자 판단과 손익은 본인 책임이에요.</p>
 </div>
 
-<script src="common.js?v=20261010115515"></script>
-<script src="nav.js?v=20261010115515"></script>
-<script src="meta.js?v=20261010115515"></script>
-<script src="fib-core.js?v=20261010115515"></script>
+<script src="common.js?v=20261010210408"></script>
+<script src="nav.js?v=20261010210408"></script>
+<script src="meta.js?v=20261010210408"></script>
 <script>
 "use strict";
 const FUT = "https://fapi.binance.com/fapi/v1";
@@ -154,57 +153,13 @@ function mainSettings() {
   return { n: num(o.n, 5, 2, 30), k: num(o.k, 20, 3, 100), topN: num(o.topN, 50, 1, 100), fee: num(o.fee, 0.1, 0, 5) };
 }
 
-// ── 데이터 받기 ────────────────────────────────────────────────
-async function universe(topN) {
-  await CoinMeta.load();
-  if (!CoinMeta.hasTop()) throw new Error("시가총액 순위(코인게코)를 아직 못 받아왔어요 (요청 제한). 몇 분 뒤 다시 눌러주세요");
-  const rows = await getJSON(FUT + "/ticker/24hr");
-  const dayAgo = Date.now() - 86400e3;
-  return rows
-    .filter(x => x.symbol.endsWith("USDT") && !x.symbol.includes("_") && +x.quoteVolume > 0 && x.closeTime > dayAgo)
-    .map(x => ({ sym: x.symbol.slice(0, -4), vol: +x.quoteVolume }))
-    .filter(x => !STABLES.has(x.sym) && CoinMeta.isCrypto(x.sym))        // 코인만
-    .filter(x => { const r = CoinMeta.rank(x.sym); return r && r <= MAX_RANK; })
-    .sort((a, b) => b.vol - a.vol).slice(0, topN).map(x => x.sym);
-}
-const toCandles = rows => rows.map(r => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4] }));
-// 선물 klines 는 한 번에 최대 1500개 → 2번에 나눠 받음 (순서대로, 사이에 쉼)
-async function candles(sym) {
-  const a = await getJSON(`${FUT}/klines?symbol=${sym}USDT&interval=1h&limit=1500`);
-  await sleep(GAP);
-  if (!a.length || a.length < 1500) return toCandles(a);
-  const b = await getJSON(`${FUT}/klines?symbol=${sym}USDT&interval=1h&limit=${TOTAL - 1500}&endTime=${a[0][0] - 1}`);
-  await sleep(GAP);
-  return toCandles(b.concat(a));
-}
-
-// ── 점수 계산 (FibCore.analyze 를 롱·숏으로 그대로 호출) ───────────────
-// 지표 3개 (각각 −100~+100):  [터치 비율, 반등 우세 차이, 기대값 차이]
-function metrics(cs, o) {
-  const L = FibCore.analyze(cs, { n: o.n, k: o.k, direction: "long" });
-  const S = FibCore.analyze(cs, { n: o.n, k: o.k, direction: "short" });
-  const tot = L.stats.count + S.stats.count;
-  const ratio = tot ? S.stats.count / tot * 100 : null;                                  // 숏 터치 ÷ (롱+숏)
-  const win = L.stats.winRate != null && S.stats.winRate != null ? L.stats.winRate - S.stats.winRate : null;
-  const el = FibCore.expectancy(L.stats, o.fee), es = FibCore.expectancy(S.stats, o.fee);
-  const ev = el != null && es != null ? el - es : null;
-  const raw = [ratio, win, ev];
-  const s = [ratio == null ? null : clamp((ratio - 50) * 2), win == null ? null : clamp(win), ev == null ? null : clamp(ev / EV_SCALE * 100)];
-  return { raw, s, score: avg(s) };
-}
-// 코인별 결과 → 전체 평균 (지표별로 코인 평균을 낸 뒤, 세 지표를 평균)
-function aggregate(list) {
-  const rawAvg = [0, 1, 2].map(j => avg(list.map(x => x.raw[j])));
-  const sAvg = [0, 1, 2].map(j => avg(list.map(x => x.s[j])));
-  return { rawAvg, sAvg, score: avg(sAvg) };
-}
 function upTo(cs, T) {            // T 시각까지의 마지막 캔들 번호 (이진 탐색)
   let lo = 0, hi = cs.length - 1, ans = -1;
   while (lo <= hi) { const m = (lo + hi) >> 1; if (cs[m].t <= T) { ans = m; lo = m + 1; } else hi = m - 1; }
   return ans;
 }
 
-// ── 화면 (표시만 담당. 점수 계산은 위의 metrics / aggregate 그대로) ───────────────
+// ── 화면 (표시만 담당. 점수 계산은 서버 api/market) ───────────────
 // 강도 표현: 공식 판정(±30)은 그대로 두고, ±40을 더해 5단계 글자로만 보여줌
 const LEVELS = [
   [s => s >= 40, "매우 강한 상승 우위", GREEN, 1], [s => s >= 30, "상승 우위", GREEN, 1],
@@ -230,7 +185,7 @@ function interpret(score, chg) {
   return `${a} ${but}최근 4주 동안 시장 내부 상태는 ${verb}.`;
 }
 const HELP = [
-  ["터치 비율", "시장 전체에서 위쪽 진입 레벨과 아래쪽 진입 레벨 중 어느 방향의 반응이 더 많이 나타나는지 봅니다. 위쪽 확장 레벨 터치 ÷ (위쪽 + 아래쪽 터치). 가격이 위쪽 레벨에 닿은 횟수가 아래쪽보다 많을수록 높아요. 50%가 중립이에요.", v => v == null ? "-" : v.toFixed(1) + "%"],
+  ["터치 비율", "시장 전체에서 위쪽 진입 레벨과 아래쪽 진입 레벨 중 어느 방향의 반응이 더 많이 나타나는지 봅니다. 위쪽 레벨 터치 ÷ (위쪽 + 아래쪽 터치). 가격이 위쪽 레벨에 닿은 횟수가 아래쪽보다 많을수록 높아요. 50%가 중립이에요.", v => v == null ? "-" : v.toFixed(1) + "%"],
   ["반등/하락 우위", "아래쪽 레벨의 반등과 위쪽 레벨의 하락 중 어느 반응이 더 강했는지 비교합니다. 아래쪽 레벨에서 반등이 우세했던 비율 − 위쪽 레벨에서 하락이 우세했던 비율 (%p). 아래쪽 반응이 더 강했으면 +, 위쪽 반응이 더 강했으면 −예요.", v => sgn(v) + "%p"],
   ["기대값 우위", "각 진입 레벨 반응 이후 실제 가격 움직임의 평균적인 우위를 비교합니다. 아래쪽 레벨 반응의 기대값 − 위쪽 레벨 반응의 기대값 (%p, 수수료 포함). ±" + EV_SCALE + "%p를 ±100으로 환산해요.", v => sgn(v) + "%p"],
 ];
@@ -361,42 +316,17 @@ async function run() {
   if (running) return; running = true; $("run").disabled = true;
   const o = mainSettings();
   const setP = (txt, f) => { $("status").textContent = txt; $("prog").style.width = Math.round(f * 100) + "%"; };
-  $("setSum").textContent = `메인 화면 설정: 스윙 민감도 ${o.n} · 관찰 봉 수 ${o.k} · 거래량 상위 ${o.topN}개 · 수수료 ${o.fee}% · 시총 ${MAX_RANK}위 안`;
+  $("setSum").textContent = `메인 화면 설정: 신호 민감도 ${o.n} · 관찰 봉 수 ${o.k} · 거래량 상위 ${o.topN}개 · 수수료 ${o.fee}% · 시총 ${MAX_RANK}위 안`;
   $("progWrap").hidden = false;
   try {
-    setP("거래량 상위 코인 고르는 중…", 0);
-    const coins = await universe(o.topN);
-    if (!coins.length) throw new Error("분석할 코인을 못 찾았어요");
-    const need = coins.includes("BTC") ? coins : ["BTC"].concat(coins);
-    const data = {};
-    for (let i = 0; i < need.length; i++) {
-      setP(`캔들 받는 중… ${i + 1}/${need.length} · ${need[i]}`, i / need.length);
-      try { data[need[i]] = await candles(need[i]); } catch (e) { /* 이 코인은 건너뜀 */ }
-    }
-    setP("계산 중…", 1);
-    await sleep(30);
-    const usable = coins.filter(s => data[s] && data[s].length >= 300);
-    if (!usable.length) throw new Error("캔들을 받지 못했어요. 잠시 뒤 다시 눌러주세요");
-    // 1주일 간격, 그 시점까지 최근 30일로 점수 → 선 그래프 (BTC 가격과 겹침). 마지막 점(지금)의 결과를 게이지·지표·막대에도 그대로 씀
-    const btc = data.BTC || data[usable[0]];
-    const last = btc[btc.length - 1].t, pts = [];
-    for (let T = last; T - (WIN - 1) * HOUR >= btc[0].t && pts.length < 13; T -= WEEK) pts.unshift({ T });
-    for (const p of pts) {
-      const rows = [];
-      for (const sym of usable) {
-        const cs = data[sym], e = upTo(cs, p.T);
-        if (e + 1 < 300) continue;
-        const m = metrics(cs.slice(Math.max(0, e + 1 - WIN), e + 1), o);
-        if (m.score != null) rows.push({ sym, ...m });
-      }
-      p.score = rows.length ? aggregate(rows).score : null; p.n = rows.length; p.rows = rows;
-      await sleep(0);
-    }
-    const per = pts[pts.length - 1].rows;
-    if (!per.length) throw new Error("점수를 계산할 데이터가 부족해요");
-    // 4주 변화 = 각 주 점수 − 정확히 4주 전 점수 (화면 표시용, 점수 계산과 무관)
-    pts.forEach((p, i) => { const q = pts[i - 4]; p.chg = q && p.score != null && q.score != null && p.T - q.T === 4 * WEEK ? p.score - q.score : null; });
-    showTop(aggregate(per), per.length, pts[pts.length - 1].chg, pts.slice(-5));
+    setP("시장 점수 불러오는 중… (새로 계산할 때는 30초쯤 걸려요)", 0.3);
+    // 계산은 서버(api/market)에서 1시간에 한 번만 하고, 여기서는 결과만 받아요
+    const qs = new URLSearchParams({ n: o.n, k: o.k, top: o.topN, fee: o.fee });
+    const res = await fetch("api/market?" + qs).catch(() => null);
+    const j = res ? await res.json().catch(() => ({})) : { error: "서버에 연결이 안 돼요" };
+    if (!res || !res.ok || !j.pts) throw new Error(j.error || "시장 점수를 못 받았어요. 잠시 뒤 다시 눌러주세요");
+    const { pts, per, btc } = j;
+    showTop(j.agg, per.length, pts[pts.length - 1].chg, pts.slice(-5));
     barData = per.slice().sort((a, b) => b.score - a.score);
     $("barCard").hidden = false; drawBars();
     lineData = { pts, btc }; $("lineCard").hidden = false; drawLine();

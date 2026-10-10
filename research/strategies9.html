@@ -1,6 +1,6 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<title>스마트 3배 · Gwave</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
+<title>스마트 3배 눌림목 · Gwave</title>
 <style>
 body{margin:0;background:#101014;color:#ECEEF2;font-family:system-ui,"Malgun Gothic",sans-serif;padding:24px;font-size:14px}
 h2{margin:0 0 6px;font-size:20px}h3{margin:26px 0 4px;font-size:16px}
@@ -11,15 +11,13 @@ th{color:#8B95A1;font-weight:500}td:first-child,th:first-child{text-align:left}
 details{margin-top:10px}summary{cursor:pointer;color:#B0B8C1}
 ol{color:#B0B8C1;line-height:1.8;padding-left:20px;max-width:1000px}
 </style></head><body>
-<h2>스마트 3배 — 레버리지 3배 한도 안에서 "얼마나 들어갈지"를 매일 조절</h2>
+<h2>스마트 3배 (목표 변동성 100% · 브레이크 없음) + 눌림목 / 과열 규칙 비교</h2>
 <div id="st" class="mut">데이터 받는 중… (30초 정도 걸려요)</div>
 <ol>
-<li><b>대상</b> — BTC · ETH · SOL (처음부터 고정, 생존 편향 없음). 각 코인이 50일선 위일 때만 담고, 최근 4주 많이 오른 코인에 조금 더 비중</li>
-<li><b>장 상태 점수</b> — BTC가 50일선 위 / 200일선 위 / 50일선이 올라가는 중, 3가지 중 몇 개인지로 기본 비중 결정 (3개 100%, 2개 60%, 1개 25%, 0개 0%)</li>
-<li><b>변동성 맞추기</b> — 최근 30일 흔들림이 크면 비중을 줄이고, 잔잔하면 늘림 (목표: 연 변동성 50%). 그래서 폭락 직전처럼 불안할 때는 자동으로 작게 들어감</li>
-<li><b>계좌 브레이크</b> — 계좌가 고점보다 15% 빠지면 비중 절반, 25% 빠지면 1/4. 고점 대비 -10% 안으로 회복하면 원래대로</li>
-<li><b>최대 3배</b> — 위 계산 결과가 3배를 넘으면 3배로 자름. 나머지 돈은 전부 증거금으로 남겨서 버팀</li>
-<li><b>매일 확인</b>, 비중 변화가 20% 미만이면 수수료 아끼려고 그대로 둠</li>
+<li><b>기본</b> — BTC·ETH·SOL 중 50일선 위인 코인만, 장 상태 점수(BTC 50일선·200일선·50일선 기울기)로 기본 비중, 최근 30일 흔들림으로 크기 조절(목표 연 변동성 100%), 최대 3배, 계좌 브레이크 없음</li>
+<li><b>눌림목 매수</b> — 상승장(점수 2개 이상)에서 코인이 최근 20일 고점보다 7% 이상 빠지고 20일선 ±3% 안으로 내려오면, 그 코인 비중 1.5배</li>
+<li><b>과열 정리</b> — 상승장에서 코인이 20일선보다 15% 이상 위에 있으면 그 코인 비중 절반으로 줄여 수익 챙기기</li>
+<li>합계가 3배를 넘으면 3배로 맞춤 · 기준값(7%, 20일선, ±3%, 15%)은 결과 보기 전에 정한 흔한 값</li>
 </ol>
 <div class="mut">공통: 시작 $50,000 · 크로스 · 매매마다 수수료+미끄러짐 0.1% · 하루 최저가 기준 강제청산 체크 · 펀딩비 비용 포함 · 기준값은 결과를 보기 전에 정한 흔한 값</div>
 <div id="out"></div>
@@ -83,14 +81,14 @@ function basketVol(D, i, w) {
 
 // opt: cap(최대 배율), vol(변동성 맞추기), brake(계좌 브레이크), fixed(항상 이 배율로 꽉 채움)
 function sim(D, i0, i1, opt) {
-  let eq = 50000, peak = eq, mdd = 0, trades = 0, liq = null, pos = {}, brake = 1, sumExp = 0, maxExp = 0;
+  let eq = 50000, peak = eq, mdd = 0, trades = 0, liq = null, pos = {}, brake = 1, sumExp = 0, maxExp = 0, dipDays = 0, hotDays = 0;
   const curve = [], expo = new Map();
   for (let i = i0; i < i1; i++) {
     // 목표 노출 계산 (i일 종가 기준)
     const w = opt.fixed ? { BTCUSDT: 1 / 3, ETHUSDT: 1 / 3, SOLUSDT: 1 / 3 } : basket(D, i);
     let e = opt.fixed ? opt.fixed : regime(D, i);
     if (!opt.fixed && Object.keys(w).length) {
-      if (opt.vol) { const v = basketVol(D, i, w); e *= v > 0 ? 0.5 / v : 0; }
+      if (opt.vol) { const v = basketVol(D, i, w); e *= v > 0 ? (opt.tv || 0.5) / v : 0; }
       else e *= opt.cap;
       const dd = (peak - eq) / peak;
       if (opt.brake) { if (dd > 0.25) brake = 0.25; else if (dd > 0.15) brake = Math.min(brake, 0.5); else if (dd < 0.10) brake = 1; e *= brake; }
@@ -98,6 +96,17 @@ function sim(D, i0, i1, opt) {
     }
     if (!Object.keys(w).length) e = 0;
     const tgt = {}; for (const s in w) tgt[s] = w[s] * e;
+    // 눌림목 / 과열 조절 (상승장 점수 2개 이상일 때만)
+    if (!opt.fixed && (opt.dip || opt.hot) && regime(D, i) >= 0.6) {
+      for (const s in tgt) {
+        const p = px(D, s, i), m20 = sma(D, s, i, 20);
+        let hi20 = 0; for (let q = i - 19; q <= i; q++) hi20 = Math.max(hi20, px(D, s, q) || 0);
+        if (opt.dip && p <= hi20 * 0.93 && Math.abs(p / m20 - 1) <= 0.03) { tgt[s] *= 1.5; dipDays++; }
+        else if (opt.hot && p >= m20 * 1.15) { tgt[s] *= 0.5; hotDays++; }
+      }
+      const sum = Object.values(tgt).reduce((a, b) => a + b, 0);
+      if (sum > opt.cap) for (const s in tgt) tgt[s] *= opt.cap / sum;
+    }
     const curE = Object.values(pos).reduce((a, b) => a + b, 0);
     let turn = 0; for (const s of new Set([...Object.keys(pos), ...Object.keys(tgt)])) turn += Math.abs((tgt[s] || 0) - (pos[s] || 0));
     if (opt.fixed ? (i === i0) : (turn > 0.2 * Math.max(curE, 0.25) || (e === 0 && curE > 0))) { eq *= 1 - turn * COST; pos = tgt; trades++; }
@@ -114,7 +123,7 @@ function sim(D, i0, i1, opt) {
     peak = Math.max(peak, eq); mdd = Math.max(mdd, (peak - eq) / peak);
     curve.push([D.days[i + 1], eq, E]);
   }
-  return { final: eq, mdd: mdd * 100, trades, liq, avgExp: sumExp / Math.max(1, i1 - i0), maxExp, curve, expo };
+  return { dipDays, hotDays, final: eq, mdd: mdd * 100, trades, liq, avgExp: sumExp / Math.max(1, i1 - i0), maxExp, curve, expo };
 }
 
 function chart(curve) {
@@ -139,25 +148,26 @@ const pc = v => `<span class="${v >= 0 ? "up" : "dn"}">${v >= 0 ? "+" : ""}${v.t
 load().then(D => {
   const n = D.days.length, idxAt = t => D.days.findIndex(x => x >= t), now = D.days[n - 1];
   const P = [["2년 전체", idxAt(now - 730 * 864e5), n - 1], ["앞 1년 (2년 전 ~ 1년 전)", idxAt(now - 730 * 864e5), idxAt(now - 365 * 864e5)], ["최근 1년", idxAt(now - 365 * 864e5), n - 1]];
+  const base = { cap: 3, vol: true, brake: false, tv: 1.0 };
   const V = [
-    ["스마트 3배 (전부 적용)", { cap: 3, vol: true, brake: true }],
-    ["스마트 3배 − 계좌 브레이크 없이", { cap: 3, vol: true, brake: false }],
-    ["스마트 3배 − 변동성 맞추기 없이", { cap: 3, vol: false, brake: true }],
+    ["기본 (목표 변동성 100% · 브레이크 없음)", base],
+    ["+ 눌림목 매수", { ...base, dip: true }],
+    ["+ 과열 정리", { ...base, hot: true }],
+    ["+ 눌림목 매수 + 과열 정리", { ...base, dip: true, hot: true }],
     ["비교: 세 코인 현물 1배 그냥 보유", { fixed: 1, cap: 1, spot: true }],
-    ["비교: 처음에 3배 꽉 채워 사고 그대로", { fixed: 3, cap: 3 }],
   ];
   st(`마지막 일봉 ${dstr(now)}`);
   let h = "";
   for (const [pn, i0, i1] of P) {
-    h += `<h3>${pn} <span class="mut" style="font-size:13px">${dstr(D.days[i0])} ~ ${dstr(D.days[i1])}</span></h3><table><tr><th>방식</th><th>최종 잔고</th><th>수익률</th><th>최대 낙폭</th><th>수익률 ÷ 낙폭</th><th>평균 노출</th><th>최대 노출</th><th>매매한 날</th><th></th></tr>`;
+    h += `<h3>${pn} <span class="mut" style="font-size:13px">${dstr(D.days[i0])} ~ ${dstr(D.days[i1])}</span></h3><table><tr><th>방식</th><th>최종 잔고</th><th>수익률</th><th>최대 낙폭</th><th>수익률 ÷ 낙폭</th><th>평균 노출</th><th>최대 노출</th><th>매매한 날</th><th>눌림목 / 과열 발동</th><th></th></tr>`;
     for (const [vn, v] of V) {
       const r = sim(D, i0, i1, v), ret = (r.final / 50000 - 1) * 100;
-      h += `<tr><td>${vn}</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.mdd.toFixed(1)}%</td><td>${r.mdd > 0.01 ? (ret / r.mdd).toFixed(2) : "-"}</td><td>${r.avgExp.toFixed(2)}배</td><td>${r.maxExp.toFixed(2)}배</td><td>${r.trades}</td><td class="dn">${r.liq ? "강제청산 " + r.liq : ""}</td></tr>`;
+      h += `<tr><td>${vn}</td><td>${f(r.final)}</td><td>${pc(ret)}</td><td>${r.mdd.toFixed(1)}%</td><td>${r.mdd > 0.01 ? (ret / r.mdd).toFixed(2) : "-"}</td><td>${r.avgExp.toFixed(2)}배</td><td>${r.maxExp.toFixed(2)}배</td><td>${r.trades}</td><td>${r.dipDays} / ${r.hotDays}</td><td class="dn">${r.liq ? "강제청산 " + r.liq : ""}</td></tr>`;
     }
     h += `</table>`;
   }
-  const R = sim(D, idxAt(now - 730 * 864e5), n - 1, V[0][1]);
-  h += `<h3>스마트 3배 · 2년 잔고(파란선)와 노출(주황선)</h3><div class="mut">노출 = 전체 포지션 크기 ÷ 계좌 잔고. 3배 선이 최대치. 잔고는 로그 눈금</div>` + chart(R.curve);
+  const R = sim(D, idxAt(now - 730 * 864e5), n - 1, { ...base, dip: true, hot: true });
+  h += `<h3>눌림목 매수 + 과열 정리 · 2년 잔고(파란선)와 노출(주황선)</h3><div class="mut">노출 = 전체 포지션 크기 ÷ 계좌 잔고. 3배 선이 최대치. 잔고는 로그 눈금</div>` + chart(R.curve);
   const T = Date.UTC(2025, 9, 10), x = R.expo.get(T);
   if (x) {
     const ti = D.days.indexOf(T);

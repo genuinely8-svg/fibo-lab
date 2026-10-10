@@ -4,13 +4,13 @@
      (방문자 브라우저가 바이낸스에 분봉을 수백 번 요청하지 않게)
    - 롱+숏 / 롱만 / 숏만 세 가지를 같이 계산해서 { both, long, short } 로 돌려줌 */
 const db = require("./_lib/db");
-const L = require("../lowsig-core");
+const L = require("./_lib/lowsig-core");
 
 const BASE = "https://fapi.binance.com";
 const SYMS = { BTC: "BTCUSDT", ETH: "ETHUSDT" };             // 비트·이더만
 const H12 = 12 * 3600e3;
 const START = Date.UTC(2020, 0, 1);
-const keyOf = c => `lowsig:${c.toLowerCase()}:v2`, lockOf = c => `lowsig:${c.toLowerCase()}:lock`;
+const keyOf = c => `lowsig:${c.toLowerCase()}:v3`, lockOf = c => `lowsig:${c.toLowerCase()}:lock`;
 
 async function jget(path) {
   const res = await fetch(BASE + path, { signal: AbortSignal.timeout(8000) });
@@ -52,7 +52,11 @@ async function compute(SYM, now) {
     try { const v = await minuteBars(SYM, b); fine.set(b.t, v); return v; } catch (e) { return null; }
   };
   // 3) 1분봉으로 다시 정확히 계산
-  const out = { v: 1, sym: SYM, lastT: bars[bars.length - 1].t, at: now, startT: START };
+  // 화면 차트용 기준선: 2020년 이후 12시간봉마다 한 값 (계산 재료가 아닌 결과 값만)
+  const I = L.calc(bars);
+  const ma = [];
+  bars.forEach((b, i) => { if (b.t >= START - 30 * H12 && Number.isFinite(I.ma[i])) ma.push([b.t, +I.ma[i].toPrecision(8)]); });
+  const out = { v: 1, sym: SYM, lastT: bars[bars.length - 1].t, at: now, startT: START, capital: L.P.capital, ma };
   for (const dir of dirs) {
     const r = await L.run(bars, { dir, startT: START, tight: true, fine: getFine });
     out[dir] = {

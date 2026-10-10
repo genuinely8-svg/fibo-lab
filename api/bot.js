@@ -9,7 +9,7 @@ const A = require("./_lib/auth");
 const B = require("./_lib/binance");
 const { sync } = require("./_lib/sync");
 const E = require("../paper-engine");
-const C = require("../bot-core");
+const C = require("./_lib/bot-core");
 
 module.exports = async (req, res) => {
   try {

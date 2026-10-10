@@ -1,0 +1,10 @@
+# 사이트에 올리지 않는 파일 (저장소에는 남아 있어요)
+research/
+README.md
+alert.js
+alert-workflow.yml
+server.js
+start.bat
+bump.js
+hooks/
+.github/

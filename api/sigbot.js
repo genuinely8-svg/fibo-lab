@@ -14,8 +14,8 @@ const A = require("./_lib/auth");
 const B = require("./_lib/binance");
 const { sync } = require("./_lib/sync");
 const E = require("../paper-engine");
-const F = require("../fib-core");
-const C = require("../sigbot-core");
+const F = require("./_lib/fib-core");
+const C = require("./_lib/sigbot-core");
 
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const HOUR = 3600e3;

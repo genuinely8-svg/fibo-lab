@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010115515"></script>
+<script src="theme.js?v=20261010210408"></script>
 <title>Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -218,7 +218,7 @@
     .legend{font-size:11px;gap:4px 10px}
   }
 </style>
-<link rel="stylesheet" href="gwave-ui.css?v=20261010115515">
+<link rel="stylesheet" href="gwave-ui.css?v=20261010210408">
 </head>
 <body>
 <div class="wrap">
@@ -244,7 +244,7 @@
           <option value="15">15분</option>
         </select>
       </label>
-      <label>스윙 민감도 (좌우 봉 수)
+      <label>신호 민감도
         <input id="n" type="number" min="2" max="30" value="5">
       </label>
       <label>터치 후 관찰 봉 수
@@ -252,9 +252,9 @@
       </label>
       <label>진입 깊이
         <select id="ratio">
-          <option value="0.5">A · 얕게 (신호 많음)</option>
-          <option value="0.618">B · 중간</option>
-          <option value="1" selected>C · 깊게 (기본)</option>
+          <option value="a">A · 얕게 (신호 많음)</option>
+          <option value="b">B · 중간</option>
+          <option value="c" selected>C · 깊게 (기본)</option>
         </select>
       </label>
       <label>분석할 캔들 수
@@ -352,27 +352,25 @@
     <div id="chart"></div>
     <div id="tv" hidden></div>
     <div class="legend" id="legend">
-      <span><i style="background:var(--up)"></i>H 스윙 고점</span>
-      <span><i style="background:var(--down)"></i>L 스윙 저점</span>
       <span><i style="background:var(--accent)"></i>진입 가격 · <span id="legExp">예상 반등가</span>(점선)</span>
       <span style="color:var(--accent)"><span class="arr">▲</span> 과거 진입가 터치</span>
-      <span style="color:var(--accent)"><span class="arr">▲</span> 진입 = 지금 스윙에서 진입가에 닿은 봉</span>
+      <span style="color:var(--accent)"><span class="arr">▲</span> 진입 = 이번 신호에서 진입가에 닿은 봉</span>
     </div>
   </div></div>
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="fib-core.js?v=20261010115515"></script>
-<script src="chart.js?v=20261010115515"></script>
-<script src="nav.js?v=20261010115515"></script>
-<script src="meta.js?v=20261010115515"></script>
+<script src="sig-live.js?v=20261010210408"></script>
+<script src="chart.js?v=20261010210408"></script>
+<script src="nav.js?v=20261010210408"></script>
+<script src="meta.js?v=20261010210408"></script>
 <script>
 "use strict";
 // ── 거래소 설정 ─────────────────────────────────────────────────
 // 바이낸스는 브라우저에서 직접 요청 (서버 필요 없음)
 // ── Signals RWA: signals-rwa.html 로 열면 같은 화면이 바이낸스 선물의 토큰화 주식·원자재 등(코인이 아닌 상품)을 스캔
-//    계산 규칙은 코인과 똑같고, 기본 진입 깊이만 B(-0.618). 설정·관심목록은 코인 Signals 와 따로 저장
+//    계산 규칙은 코인과 똑같고, 기본 진입 깊이만 B. 설정·관심목록은 코인 Signals 와 따로 저장
 const RWA = /signals-rwa(\.html)?$/i.test(location.pathname);
 const LSK = k => (RWA ? k + "-rwa" : k);
 const EX = {
@@ -435,7 +433,24 @@ function fetchCandles(ex, coin, unit, count) {
   return binanceCandles(ex, coin, unit, count);
 }
 
-// ── 캔들 저장소: 이미 받은 캔들은 기억해두고, 다음엔 새 캔들만 받아서 이어붙임 ──
+// ── 서버 신호 계산 (api/fib) ─────────────────────────────────────────
+// 계산 방법은 서버 안에만 있고, 여기서는 결과(진입가·상태·통계)만 받아요
+async function serverSignals(ex, unit, count, n, k, syms) {
+  const qs = new URLSearchParams({ ex, iv: BINANCE_INTERVAL[unit], count, n, k, d: $("ratio").value, dir, syms: syms.join(",") });
+  let last = "";
+  for (let i = 0; i < 3; i++) {
+    let res;
+    try { res = await fetch("api/fib?" + qs); } catch (e) { last = "서버에 연결이 안 돼요"; await sleep(1500); continue; }
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray(j.rows)) return j.rows;
+    last = j.error || "서버 응답 오류 " + res.status;
+    if (res.status < 500) break;
+    await sleep(1500);
+  }
+  throw new Error(last);
+}
+
+// ── 캔들 저장소 (펼친 차트 그릴 때만 씀): 이미 받은 캔들은 기억해두고, 다음엔 새 캔들만 받아서 이어붙임 ──
 // 첫 분석: 2000개 전부 받음 (2번 요청)
 // 그 다음부터: 최신 200개만 받음 (1번 요청) → 자동 새로고침해도 요청 제한에 안 걸림
 const store = new Map();
@@ -518,6 +533,7 @@ function saveSettings() {
 function loadSettings() {
   try {
     const o = JSON.parse(localStorage.getItem(LSK("main-settings-v1")) || "null");
+    if (o && !["a", "b", "c"].includes(o.ratio)) delete o.ratio;   // 예전 형식으로 저장된 값은 기본값으로
     if (o) { for (const id of SETTINGS) if (o[id] != null) $(id).value = o[id]; if (o.mode) mode = o.mode; if (o.dir === "long" || o.dir === "short") dir = o.dir; if (o.autoV !== 2) $("auto").value = "close"; }   // 예전에 저장된 재계산 주기는 새 기본값(봉 마감 시)으로
     const w = JSON.parse(localStorage.getItem(LSK("watch-v1")) || "null");
     if (Array.isArray(w) && w.length) watch = w;
@@ -570,25 +586,24 @@ async function runOnce() {
   }
   const out = new Array(coins.length);
   let done = 0, next = 0;
-  // 4개씩 동시에 분석 (너무 많이 한꺼번에 보내면 요청 제한에 걸림)
+  // 진입가 계산은 서버에서 (결과만 받음). 10개씩 묶어서 3묶음씩 동시에
+  const BATCH = 10, batches = [];
+  for (let i = 0; i < coins.length; i += BATCH) batches.push(i);
   async function worker() {
-    while (next < coins.length) {
-      const i = next++, m = coins[i];
+    while (next < batches.length) {
+      const from = batches[next++], part = coins.slice(from, from + BATCH);
       try {
-        const candles = await getCandles(ex, m, unit, count);
-        if (candles.length < 100) throw new Error(`상장된 지 얼마 안 돼서 데이터가 부족해요 (캔들 ${candles.length}개)`);
-        out[i] = { market: m, candles };
+        const rows = await serverSignals(ex, unit, count, n, k, part);
+        rows.forEach((r, j) => out[from + j] = r);
       } catch (e) {
-        out[i] = { market: m, error: e.message };
+        part.forEach((m, j) => out[from + j] = { market: m, error: e.message });
       }
-      done++;
+      done += part.length;
       $("status").textContent = `분석 중… ${done}/${coins.length} · ${EX[ex].name}`;
     }
   }
-  await Promise.all([worker(), worker(), worker(), worker()]);
+  await Promise.all([worker(), worker(), worker()]);
   await logosReady;            // 로고가 준비될 때까지 (보통 즉시)
-  // 계산은 캔들을 다 받은 뒤 "지금 모드"로 (받는 도중에 LONG/SHORT 를 바꿔도 맞게)
-  for (let i = 0; i < out.length; i++) if (out[i] && !out[i].error) out[i] = { ...out[i], ...FibCore.analyze(out[i].candles, { n, k, ratio: +$("ratio").value || 1, direction: dir }) };
   // 자동 스캔에서는 데이터가 부족한 코인은 조용히 빼고 개수만 알려줌
   lastSkipped = mode === "scan" ? out.filter(r => r.error).length : 0;
   results = mode === "scan" ? out.filter(r => !r.error) : out;
@@ -616,7 +631,7 @@ const pct = v => v == null ? "-" : v.toFixed(2) + "%";
 const err = v => v == null ? "" : ` <span class="err">±${v.toFixed(2)}</span>`;
 
 function badge(cur) {
-  const l = FibCore.label(cur);
+  const l = SigLive.label(cur);
   const cls = { "진입 구간": "b-hit", "진입 근접": "b-near", "이탈": "b-out", "대기": "b-wait" }[l];
   const txt = KO ? l : ({ "진입 구간": "In zone", "진입 근접": "Near entry", "이탈": "Broken", "대기": "Waiting" }[l] || l);
   return `<span class="badge ${cls}">${txt}</span>`;
@@ -625,12 +640,12 @@ function badge(cur) {
 // 순위: ① 진입 구간 → ② 진입 근접 → ③ 이탈 → ④ 대기 (진입가에 가까운 순, 진입가 없는 건 맨 뒤) → ⑤ 오류
 function rankKey(r) {
   if (r.error) return 4e9;
-  const c = r.current, l = FibCore.label(c);
+  const c = r.current, l = SigLive.label(c);
   const d = c?.level ? c.distance : 1e5;
   return { "진입 구간": 0, "진입 근접": 1e6, "이탈": 2e6, "대기": 3e6 }[l] + d;
 }
 const feeVal = () => { const v = parseFloat($("fee").value); return isFinite(v) && v >= 0 ? v : 0.1; };
-const evOf = r => r.error ? null : FibCore.expectancy(r.stats, feeVal());
+const evOf = r => r.error ? null : SigLive.expectancy(r.stats, feeVal());
 const LOW_N = 15, LOW_TIP = "표본 부족 (과거 터치 15회 미만)", ROW_TIP = "누르면 차트가 펼쳐져요";
 const isLow = r => !r.error && r.stats.count < LOW_N;
 function sortedRows() {
@@ -653,7 +668,7 @@ let lastSummary = "";
 if (!KO) $("live").querySelector("b").textContent = "Getting ready";
 function renderSummary() {
   const ok = results.filter(r => !r.error && r.current?.level);
-  const cnt = l => ok.filter(r => FibCore.label(r.current) === l).length;
+  const cnt = l => ok.filter(r => SigLive.label(r.current) === l).length;
   const ev = $("sort").value === "ev";
   const html = KO
     ? `<span class="modetag">${dir.toUpperCase()} 모드 ·</span><span>분석 <b>${results.length}</b>개</span>
@@ -721,14 +736,14 @@ function renderTable() {
   $("chartHolder").appendChild(chartPanel);   // 표를 새로 그리기 전에 차트 묶음을 안전한 곳으로 옮김
   const rows = sortedRows();
   shownOrder = rows.map(r => r.market).join(",");
-  shownLabels = new Map(rows.map(r => [r.market, r.error ? "!" : FibCore.label(r.current)]));
+  shownLabels = new Map(rows.map(r => [r.market, r.error ? "!" : SigLive.label(r.current)]));
   shownAt = Date.now();
   shownSet = setKey(rows);
   renderSummary();
   let rank = 0;
   setHtmlKeepLogos($("tbody"), rows.map(r => {
     // 코인 이름을 누르면 바로 아래 차트가 펼쳐지고, more 를 누르면 상세 페이지로 (지금 설정 그대로 넘김)
-    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&d=${$("ratio").value}`;
     const logo = logoHtml(r.market);
     const name = `<div class="ncell"><span class="name">${logo}<span>${r.market}<small>${r.market}USDT</small></span>${rankTag(r.market)}<span class="caret">▾</span></span>`
       + `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a></div>`;
@@ -752,7 +767,7 @@ mq.addEventListener("change", () => { chartPanel.style.width = ""; renderTable()
 // 카드 한 장 안의 숫자 부분 (카드를 새로 그릴 때와 숫자만 바꿀 때 같이 씀)
 function cardParts(r) {
   const s = r.stats, c = r.current;
-  const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
+  const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&d=${$("ratio").value}`;
   const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a>`;
   const dist = `<span class="dist ${c?.level && c.distance <= 5 ? "up" : ""}">${c?.level ? `(${pct(c.distance)})` : ""}</span>`;
   return {
@@ -770,7 +785,7 @@ function cardParts(r) {
 function renderCards(rows) {
   let rank = 0;
   setHtmlKeepLogos($("cards"), rows.filter(r => !r.error || mode === "watch").map(r => {
-    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&r=${$("ratio").value}`;
+    const href = `coin.html?s=${encodeURIComponent(r.market)}&ex=${curEx}&n=${$("n").value}&k=${$("k").value}&d=${$("ratio").value}`;
     const more = `<a class="more" href="${href}" onclick="event.stopPropagation()">more ›</a>`;
     if (r.error) return `<div class="ccard"${NT}><div class="c1"><span class="rk">-</span>${logoHtml(r.market)}<b>${r.market}</b>${rankTag(r.market)}</div>
       <div class="c3">${r.error}${more}</div></div>`;
@@ -812,12 +827,19 @@ function tvSymbol(m) {
   return `BINANCE:${m}USDT.P`;            // .P = 무기한 선물
 }
 
-function drawChart() {
+let chartReq = 0;
+async function drawChart() {
   const r = results.find(x => x.market === openCoin);
   if (!r || r.error) return;
   $("chartTitleText").textContent = `${r.market} · ${EX[curEx].name} · 과거 진입가 터치 ${r.stats.count}회`;
-  if (view === "lw") FiboChart.draw($("chart"), r, { krw: false });
-  else FiboChart.tradingView($("tv"), tvSymbol(r.market), $("unit").value);
+  if (view !== "lw") { GwChart.tradingView($("tv"), tvSymbol(r.market), $("unit").value); return; }
+  if (!r.candles) {                                      // 차트용 캔들은 펼칠 때만 받음
+    const my = ++chartReq;
+    try { r.candles = await getCandles(curEx, r.market, $("unit").value, +$("count").value); }
+    catch (e) { $("chartTitleText").textContent += ` · 차트를 못 불러왔어요 (${e.message})`; return; }
+    if (my !== chartReq || openCoin !== r.market || !results.includes(r)) return;   // 그 사이 다른 코인을 열었거나 새로 분석됨
+  }
+  GwChart.draw($("chart"), r, { krw: false });
 }
 
 function setView(v) {
@@ -940,16 +962,12 @@ function applyDirUI() {
   for (const a of document.querySelectorAll("#legend .arr")) a.textContent = L.mark;
   if (location.hash.slice(1).toLowerCase() !== dir) history.replaceState(null, "", location.pathname + location.search + "#" + dir);
 }
-// 전환: 설정은 그대로, 캔들은 다시 받지 않고 저장된 것으로 바로 다시 계산 (실시간 웹소켓도 그대로)
+// 전환: 설정은 그대로, 서버에서 반대 방향 결과를 받아 옴 (실시간 웹소켓도 그대로)
 function setDir(d) {
   if (d === dir) return;
   dir = d; applyDirUI(); saveSettings(); updateSetSum();
   if (!results.length) return;
-  const n = +$("n").value, k = +$("k").value;
-  results = results.map(r => r.error ? r : { market: r.market, candles: r.candles, ...FibCore.analyze(r.candles, { n, k, ratio: +$("ratio").value || 1, direction: dir }) });
-  Live.applyLatest();
-  if (!(openCoin && refreshInPlace())) renderTable();
-  if (openCoin && view === "lw") drawChart();
+  run();                                   // 서버에서 반대 방향 결과를 받아 옴 (방금 계산된 건 금방 와요)
 }
 for (const b of $("dir").querySelectorAll("button")) b.onclick = () => setDir(b.dataset.v);
 addEventListener("hashchange", () => { const h = hashDir(); if (h) setDir(h); });
@@ -1004,7 +1022,7 @@ $("fee").addEventListener("input", () => { saveSettings(); if (results.length &&
 $("sort").addEventListener("change", () => { saveSettings(); if (results.length) renderTable(); });
 
 // ── 실시간 가격 (바이낸스 웹소켓) ─────────────────────────────────
-// 무거운 계산(스윙·진입가·통계)은 몇 분마다, 가격은 바이낸스가 바뀔 때마다 보내주는 걸 받아서 즉시 반영
+// 무거운 계산(진입가·통계)은 서버에서, 가격은 바이낸스가 바뀔 때마다 보내주는 걸 받아서 즉시 반영
 const Live = (() => {
   // 선물은 2026년 4월부터 주소가 /market 으로 바뀜 (예전 주소는 폐지)
   const URLS = {
@@ -1068,8 +1086,8 @@ const Live = (() => {
     sock.onerror = () => {};                                   // onclose 에서 처리
   }
 
-  // 새 가격으로 한 코인의 거리·상태 다시 계산 (fib-core.js 의 규칙 그대로: 진입가는 고정, 롱/숏 공용)
-  function applyPrice(r, px) { FibCore.applyPrice(r, px); }
+  // 새 가격으로 한 코인의 거리·상태 다시 계산 (진입가는 고정, 롱/숏 공용)
+  function applyPrice(r, px) { SigLive.applyPrice(r, px); }
 
   function applyLatest() {
     if (curLiveEx !== $("ex").value) return;
@@ -1094,7 +1112,7 @@ const Live = (() => {
       const before = r.price, oldBadge = badge(r.current);
       applyPrice(r, px);
       if (px === before) continue;
-      if (coin === openCoin && view === "lw") FiboChart.live(r, px, unitMs());   // 펼쳐 둔 차트의 마지막 캔들 실시간 갱신
+      if (coin === openCoin && view === "lw") GwChart.live(r, px, unitMs());   // 펼쳐 둔 차트의 마지막 캔들 실시간 갱신
       changed = true;
       const c = r.current, dir = px > before ? 1 : -1, newBadge = badge(c);
       const targets = [$("tbody").querySelector(`tr[data-m="${coin}"]`), $("cards").querySelector(`.ccard[data-m="${coin}"]`)];
@@ -1123,7 +1141,7 @@ const Live = (() => {
   setInterval(() => {
     if (!results.length || running || openCoin || curEx !== curLiveEx) return;   // 차트를 펼쳐 보는 중엔 줄이 안 움직이게
     if (sortedRows().map(r => r.market).join(",") === shownOrder) return;
-    const moved = results.some(r => shownLabels.get(r.market) !== (r.error ? "!" : FibCore.label(r.current)));
+    const moved = results.some(r => shownLabels.get(r.market) !== (r.error ? "!" : SigLive.label(r.current)));
     if (moved || Date.now() - shownAt >= 30000) renderTable();
   }, 3000);
 
@@ -1145,10 +1163,10 @@ const Live = (() => {
 })();
 
 // ── 시작: 설정 불러오고 바로 분석 ─────────────────────────────────
-if (RWA) {                                   // RWA 탭 기본값: 바이낸스 선물만(현물엔 없음), 진입 깊이 -0.618, 시총 필터 없음
+if (RWA) {                                   // RWA 탭 기본값: 바이낸스 선물만(현물엔 없음), 진입 깊이 B, 시총 필터 없음
   document.title = "Stock · Gwave";
   $("ex").value = "futures"; $("ex").querySelector('option[value="binance"]').remove();
-  $("ratio").value = "0.618";
+  $("ratio").value = "b";
   $("mcapLbl").style.display = "none";
 }
 loadSettings();
