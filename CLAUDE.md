@@ -2,14 +2,16 @@
 
 사이트: https://gwave-lab.vercel.app (Vercel 프로젝트 `fibo-lab`, 팀 ath-200-m, main 에 푸시하면 자동 배포)
 
-## 어디서 작업하나 — 집 PC 연결 없이도 항상 가능하게
-- 사용자는 폰·밖에서 수정 요청을 자주 함. **집 PC(Documents\fibo-lab)와 연결돼 있지 않다고 작업을 멈추지 말 것.**
-- 기본 작업 장소는 GitHub 저장소 `genuinely8-svg/fibo-lab` 를 클라우드 작업 공간에 클론한 것.
-  저장소 연결은 push 권한으로 붙이고(add_repo, access "push"), 바뀐 내용은 GitHub 에 푸시 → Vercel 이 배포.
-- 집 PC 폴더는 사용자가 직접 PC 에서 작업할 때만 씀. PC 에서 시작하기 전에는 항상 `git pull` (start.bat 이 자동으로 함).
+## 어디서 작업하나 — 집 PC든 밖(폰·클라우드)이든 똑같이
+- 사용자는 집 PC(Documents\fibo-lab)와 밖(Claude 앱 → 클라우드 작업 공간)에서 번갈아 작업함. **GitHub 의 main 이 항상 유일한 최신본.**
+- 사용자에게 `git pull`·`git push`·"PC 연결" 같은 확인이나 절차를 절대 요구하지 말 것. Claude 가 알아서 맞춤:
+  - 작업 시작: 최신 main 받기 (`.claude/settings.json` 의 SessionStart 훅이 자동으로 git pull. 실패하면 로컬 변경을 커밋하고 `git pull --rebase` 로 합친 뒤 진행)
+  - 작업 끝: 커밋하고 `git push origin main` 까지 (묻지 말고). 로컬에만 남겨 두지 않기.
+  - 푸시가 막히면(다른 쪽이 먼저 올림) `git pull --rebase` 후 다시 푸시.
+- 집 PC 연결이 안 돼 있어도 작업을 멈추지 말 것: 클라우드에서는 저장소 `genuinely8-svg/fibo-lab` 를 push 권한으로 붙여(add_repo, access "push") 클론해서 작업.
 
 ## 바꾸는 순서
-1. 새 브랜치에서 수정 → 푸시하면 Vercel 이 테스트 주소(Preview)를 만들어 줌. 화면이 바뀌는 수정은 테스트 주소에서 확인.
+1. 화면이 크게 바뀌는 수정은 새 브랜치에서 → 푸시하면 Vercel 이 테스트 주소(Preview)를 만들어 줌. 화면이 바뀌는 수정은 테스트 주소에서 확인.
 2. 확인되면 main 에 합쳐서 푸시 (실제 사이트 반영). 아주 작은 수정(문구·정렬 등)은 바로 main 도 괜찮음.
 3. 커밋 전에 `node bump.js` (html 안의 js/css 주소에 새 버전 번호 → 브라우저 캐시 문제 방지).
 

@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git pull --ff-only --quiet 2>&1 && echo '[자동] GitHub 최신 버전으로 맞춤 완료.' || echo '[자동] git pull 실패 — 이 PC에 커밋 안 된 변경이 있음. 먼저 커밋하고 git pull --rebase 후 푸시해서 맞출 것.'; echo '[규칙] 이 저장소는 집 PC와 클라우드(폰) 양쪽에서 작업함. 수정이 끝나면 사용자에게 묻지 말고 커밋 후 git push origin main 까지 할 것. 사용자에게 git pull/push 를 하라고 안내하지 말 것.'"
+          }
+        ]
+      }
+    ]
+  }
+}
