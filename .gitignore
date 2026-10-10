@@ -4,3 +4,4 @@ test.js
 .env
 .env.*
 .vercel
+CLAUDE.local.md
