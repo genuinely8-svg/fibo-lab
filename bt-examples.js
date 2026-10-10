@@ -1,116 +1,173 @@
-/* bt-examples.js — 백테스트 탭 예시 스크립트 + AI 에게 줄 작성 규칙 */
-window.BT_SPEC = `Gwave 백테스트 스크립트 작성 규칙 (자바스크립트, 브라우저에서 실행)
+/* bt-examples.js — Backtest tab: example scripts + rules to give an AI */
+window.BT_SPEC = `Gwave backtest script rules (JavaScript, runs in the browser)
 
-쓸 수 있는 것 (await 사용 가능):
-- await candles(sym, interval, from, opts)
-    → [{t, o, h, l, c, v}] 오래된 것부터, 마감된 봉만. t 는 ms 시각(UTC)
-    sym: "BTC", "ETH" 처럼 USDT 를 뺀 기호 / interval: "1m","5m","15m","30m","1h","2h","4h","6h","12h","1d","1w"
-    from: "2020-01-01" 또는 ms / opts.market: "futures"(바이낸스 선물, 기본) 또는 "spot"
+The settings panel is passed in as \`config\` (read-only):
+  config.symbol     e.g. "BTC" (no USDT)        config.interval  "1m","5m","15m","30m","1h","2h","4h","6h","12h","1d","1w"
+  config.from       start date "2020-01-01"     config.capital   starting capital (USDT)
+  config.leverage   e.g. 10                     config.sizePct   % of equity used as margin per trade
+  config.margin     "isolated" | "cross"        config.direction "long" | "short" | "both"
+  config.fee        fee per fill in % (e.g. 0.05)
+
+Available (await allowed):
+- await candles(config.symbol, config.interval, config.from)
+    → [{t, o, h, l, c, v}] oldest first, closed candles only, t = UTC time in ms (Binance futures)
+    other coins: await candles("ETH", "1h", "2020-01-01")
 - ta.sma(arr, n), ta.ema(arr, n), ta.rsi(arr, n), ta.atr(candles, n), ta.highest(arr, n), ta.lowest(arr, n)
-    → 입력과 같은 길이의 배열 (앞부분은 NaN)
-- stats(equity, seed) → { 시작, 최종, 수익률, 최대 낙폭 }
-- log(...) 진행 상황 글자, progress(0~1) 진행 막대
+  ta.macd(arr, 12, 26, 9) → { macd, signal, hist }
+    → arrays with the same length as the input (NaN while warming up)
+- const acct = new Account(config)   (uses capital, leverage, sizePct, fee, margin, direction from the panel)
+    acct.update(candle)                         call FIRST on every candle: handles stop loss / take profit / liquidation, records equity
+    acct.open("long" | "short", price, t, { sl, tp, note })   ignored if a position is open or the direction is disabled
+    acct.close(price, t, "reason")
+    acct.pos (null or { side, entry, qty, margin, sl, tp }), acct.side, acct.canLong, acct.canShort, acct.dead (account blown)
+    return acct.result()                        → summary, equity curve and trade list for the screen
+- stats(equity, seed), log(...) text in the log box, progress(0..1) progress bar
 
-마지막에 결과를 return 하세요:
-return {
-  summary: { "수익률": "12.3%", ... },     // 위쪽 숫자 카드 (키: 이름, 값: 글자나 숫자)
-  equity: [[t, 자산], ...],                 // 자산 곡선 (선 그래프, 연도별 손익은 자동 계산)
-  trades: [{ 시각: t, 구분: "매수", 가격: 123, ... }, ...]   // 매매 기록 표 (최대 1000줄 표시)
-};
-
-규칙:
-- 맨 위에 SEED, 수수료, 비중, 손절 % 같은 설정 숫자를 const 로 모아 둘 것 (사용자가 숫자만 바꿔 다시 돌림)
-- 수수료는 체결 금액의 0.05% 로 계산, 같은 봉 안에서 손절·익절이 둘 다 가능하면 손절이 먼저라고 가정
-- 화면 접근(document, window, localStorage)은 안 됨. 외부 라이브러리 없이 순수 자바스크립트로`;
+Rules:
+- Put strategy-only numbers (indicator lengths, stop %, take-profit %) at the top as const.
+  Capital, leverage, position size, margin mode, direction and fee come from config — do not hard-code them.
+- Act on candle close (use candle i to decide, fill at its close or put sl/tp for later candles). No look-ahead.
+- Loop: for each candle → acct.update(c) → if (acct.dead) break → your entry / exit logic.
+- No document, window or localStorage. Plain JavaScript, no external libraries.
+- End with: return acct.result();`;
 
 window.BT_EXAMPLES = [
-{ name: "예시 1 · 비트코인 이평선 교차 (4시간봉)", code: `// 비트코인 4시간봉: 빠른 이평이 느린 이평을 위로 뚫으면 매수, 아래로 뚫으면 매도 (현물처럼 레버리지 없음)
-const SEED = 10000;      // 시작 금액 (USDT)
-const FEE = 0.0005;      // 수수료 0.05%
-const FAST = 50, SLOW = 200;
-const START = "2020-01-01";
+{ name: "Example 1 · Moving average crossover", code: `// EMA crossover: fast EMA crosses above slow EMA → long, crosses below → short (or close).
+// Capital, leverage, position size, margin mode, direction and fee come from the panel on the right.
+const FAST = 50;          // fast EMA length
+const SLOW = 200;         // slow EMA length
 
-const cs = await candles("BTC", "4h", START);
-const c = cs.map(x => x.c), f = ta.ema(c, FAST), s = ta.ema(c, SLOW);
-let cash = SEED, qty = 0, entry = 0;
-const trades = [], equity = [];
+const cs = await candles(config.symbol, config.interval, config.from);
+const close = cs.map(c => c.c);
+const fast = ta.ema(close, FAST), slow = ta.ema(close, SLOW);
+const acct = new Account(config);
+
 for (let i = 1; i < cs.length; i++) {
-  const p = c[i];
-  if (!qty && f[i - 1] <= s[i - 1] && f[i] > s[i]) {
-    qty = cash * (1 - FEE) / p; entry = p; cash = 0;
-    trades.push({ 시각: cs[i].t, 구분: "매수", 가격: p });
-  } else if (qty && f[i - 1] >= s[i - 1] && f[i] < s[i]) {
-    cash = qty * p * (1 - FEE);
-    trades.push({ 시각: cs[i].t, 구분: "매도", 가격: p, 수익률: ((p / entry - 1) * 100).toFixed(2) + "%" });
-    qty = 0;
+  const c = cs[i];
+  acct.update(c);
+  if (acct.dead) break;
+  const crossUp = fast[i - 1] <= slow[i - 1] && fast[i] > slow[i];
+  const crossDown = fast[i - 1] >= slow[i - 1] && fast[i] < slow[i];
+  if (crossUp) {
+    if (acct.side === "short") acct.close(c.c, c.t, "EMA cross up");
+    if (!acct.pos) acct.open("long", c.c, c.t);
+  } else if (crossDown) {
+    if (acct.side === "long") acct.close(c.c, c.t, "EMA cross down");
+    if (!acct.pos) acct.open("short", c.c, c.t);
   }
-  if (i % 6 === 0 || i === cs.length - 1) equity.push([cs[i].t, cash + qty * p]);
+  if (i % 2000 === 0) progress(i / cs.length);
 }
-const sells = trades.filter(t => t.구분 === "매도");
-return {
-  summary: { ...stats(equity, SEED), "매매 수": sells.length, "승률": (sells.filter(t => parseFloat(t.수익률) > 0).length / (sells.length || 1) * 100).toFixed(0) + "%" },
-  equity, trades,
-};` },
-{ name: "예시 2 · 비트·이더·솔라나 교차 물타기 (RSI 진입)", code: `// 비트코인 1시간봉 RSI 가 기준 아래로 내려가면 시작 → 비트코인을 3번 나눠 물타기,
-// 비트코인 1차 때 이더 1차 / 2차 때 이더 2차 + 솔라나 1차 / 3차 때 이더 3차 + 솔라나 2차.
-// 익절은 비트코인 기준으로 셋 다 같이, 손절은 비트코인 첫 진입가 기준으로 셋 다 분할.
-const SEED = 56000;
-const FEE = 0.0005;
-const BTC_QTY = [0.1, 0.2, 0.4];      // 비트코인 1·2·3차 수량 (이더·솔라나도 같은 금액 비율 1:2:4)
-const ADD_AT = [0, 1.5, 3];           // 1·2·3차 가격: 첫 진입가에서 몇 % 아래 (0 = 바로)
-const TP = 2;                         // 익절: 첫 진입가 +2% 에 셋 다 정리
-const CUTS = [3, 4, 5];               // 첫 진입가 -3%·-4%·-5% 에서 각각 10% 씩 정리
-const CUT_FRAC = 0.1;
-const ALL_OUT = 6;                    // -6% 에서 전부 손절
-const RSI_N = 14, RSI_IN = 25;        // 진입 조건: RSI(14) 25 아래
-const START = "2020-01-01";
+return acct.result();` },
+{ name: "Example 2 · Moving average + RSI", code: `// Trend filter + pullback: trade only in the direction of the 200 EMA,
+// enter when RSI comes back out of oversold (long) / overbought (short). Fixed stop loss and take profit.
+const TREND = 200;        // trend EMA length
+const RSI_LEN = 14;
+const RSI_LOW = 30;       // long when RSI crosses back above this (price above the EMA)
+const RSI_HIGH = 70;      // short when RSI crosses back below this (price below the EMA)
+const STOP = 2;           // stop loss % from entry
+const TAKE = 4;           // take profit % from entry
 
-log("가격 데이터 받는 중…");
-const btc = await candles("BTC", "1h", START), eth = await candles("ETH", "1h", START), sol = await candles("SOL", "1h", START);
-const E = new Map(eth.map(x => [x.t, x.c])), S = new Map(sol.map(x => [x.t, x.c]));
-const rsi = ta.rsi(btc.map(x => x.c), RSI_N);
+const cs = await candles(config.symbol, config.interval, config.from);
+const close = cs.map(c => c.c);
+const ema = ta.ema(close, TREND), rsi = ta.rsi(close, RSI_LEN);
+const acct = new Account(config);
 
-let cash = SEED, pos = {}, cyc = null;
-const trades = [], equity = [];
-const buy = (s, q, p) => { const P = pos[s] || (pos[s] = { q: 0, cost: 0 }); P.q += q; P.cost += q * p; cash -= q * p * FEE; };
-const sellFrac = (s, frac, p) => { const P = pos[s]; if (!P) return 0; const q = P.q * frac, avg = P.cost / P.q, pnl = q * (p - avg) - q * p * FEE;
-  cash += pnl; P.q -= q; P.cost -= q * avg; if (P.q < 1e-12) delete pos[s]; return pnl; };
-const priceOf = (s, t, btcPx) => s === "BTC" ? btcPx : (s === "ETH" ? E : S).get(t);
-const closeAll = (frac, t, btcPx) => { let sum = 0; for (const s of Object.keys(pos)) { const p = priceOf(s, t, btcPx); if (p) sum += sellFrac(s, frac, p); } return sum; };
+for (let i = 1; i < cs.length; i++) {
+  const c = cs[i];
+  acct.update(c);
+  if (acct.dead) break;
+  if (acct.pos) continue;
+  if (c.c > ema[i] && rsi[i - 1] < RSI_LOW && rsi[i] >= RSI_LOW)
+    acct.open("long", c.c, c.t, { sl: c.c * (1 - STOP / 100), tp: c.c * (1 + TAKE / 100) });
+  else if (c.c < ema[i] && rsi[i - 1] > RSI_HIGH && rsi[i] <= RSI_HIGH)
+    acct.open("short", c.c, c.t, { sl: c.c * (1 + STOP / 100), tp: c.c * (1 - TAKE / 100) });
+  if (i % 2000 === 0) progress(i / cs.length);
+}
+return acct.result();` },
+{ name: "Example 3 · Moving average + MACD", code: `// MACD signal-line cross in the direction of the 100 EMA trend.
+// Exit on the opposite MACD cross, with an ATR-based stop loss.
+const TREND = 100;        // trend EMA length
+const ATR_LEN = 14;
+const ATR_STOP = 2;       // stop loss = entry ∓ ATR × 2
 
-for (let i = 1; i < btc.length; i++) {
-  const b = btc[i], t = b.t;
-  if (!cyc && rsi[i - 1] < RSI_IN) cyc = { t, L: b.o, k: 0, c: 0, pnl: 0 };
-  if (cyc) {
-    // 불리한 가격부터 차례대로 (물타기·분할손절·전량손절)
-    const ev = [];
-    for (let k = cyc.k; k < 3; k++) ev.push([cyc.L * (1 - ADD_AT[k] / 100), "add", k]);
-    for (let c = cyc.c; c < CUTS.length; c++) ev.push([cyc.L * (1 - CUTS[c] / 100), "cut", c]);
-    ev.push([cyc.L * (1 - ALL_OUT / 100), "all"]);
-    ev.sort((a, z) => z[0] - a[0]);
-    for (const [p0, ty, k] of ev) {
-      if (b.l > p0) continue;
-      const p = Math.min(p0, b.o);
-      if (ty === "add" && k === cyc.k) {
-        const usd = BTC_QTY[0] * p * (BTC_QTY[k] / BTC_QTY[0]);
-        buy("BTC", BTC_QTY[k], p);
-        if (E.get(t)) buy("ETH", usd / E.get(t), E.get(t));
-        if (k >= 1 && S.get(t)) buy("SOL", BTC_QTY[0] * p * (BTC_QTY[k - 1] / BTC_QTY[0]) / S.get(t), S.get(t));
-        cyc.k++;
-      } else if (ty === "cut" && k === cyc.c && cyc.k) { cyc.pnl += closeAll(CUT_FRAC, t, p); cyc.c++; }
-      else if (ty === "all" && cyc.k) { cyc.pnl += closeAll(1, t, p); cyc.out = "손절"; break; }
+const cs = await candles(config.symbol, config.interval, config.from);
+const close = cs.map(c => c.c);
+const ema = ta.ema(close, TREND), m = ta.macd(close, 12, 26, 9), atr = ta.atr(cs, ATR_LEN);
+const acct = new Account(config);
+
+for (let i = 1; i < cs.length; i++) {
+  const c = cs[i];
+  acct.update(c);
+  if (acct.dead) break;
+  const up = m.macd[i - 1] <= m.signal[i - 1] && m.macd[i] > m.signal[i];
+  const down = m.macd[i - 1] >= m.signal[i - 1] && m.macd[i] < m.signal[i];
+  if (acct.side === "long" && down) acct.close(c.c, c.t, "MACD cross down");
+  if (acct.side === "short" && up) acct.close(c.c, c.t, "MACD cross up");
+  if (!acct.pos && isFinite(atr[i])) {
+    if (up && c.c > ema[i]) acct.open("long", c.c, c.t, { sl: c.c - atr[i] * ATR_STOP });
+    else if (down && c.c < ema[i]) acct.open("short", c.c, c.t, { sl: c.c + atr[i] * ATR_STOP });
+  }
+  if (i % 2000 === 0) progress(i / cs.length);
+}
+return acct.result();` },
+{ name: "Example 4 · MACD + RSI + Elliott wave (simplified)", code: `// Simplified Elliott "wave 3" entry using a ZigZag:
+//   wave 1 = swing from a low to a high, wave 2 = pullback that holds above the wave 1 start
+//   and retraces 30–80% of wave 1. Enter long when price breaks the wave 1 high (start of wave 3)
+//   while MACD histogram > 0 and RSI > 50. Stop at the wave 2 low, target = wave 1 length × 1.6.
+//   Shorts are the mirror image. Swings are only used once confirmed (no look-ahead).
+const ZZ = 4;             // ZigZag: a swing is confirmed after a 4% reversal
+const RET_MIN = 0.3, RET_MAX = 0.8;   // wave 2 retracement range of wave 1
+const EXT = 1.6;          // wave 3 target = wave 1 length × 1.6
+const RSI_LEN = 14;
+
+const cs = await candles(config.symbol, config.interval, config.from);
+const close = cs.map(c => c.c);
+const m = ta.macd(close, 12, 26, 9), rsi = ta.rsi(close, RSI_LEN);
+const acct = new Account(config);
+
+// ZigZag built candle by candle: piv = confirmed swing points [{type: "H"|"L", price}]
+const piv = [];
+let dir = 0, ext = cs[0].c;
+let armed = null;         // current wave-3 setup waiting for a breakout
+
+for (let i = 1; i < cs.length; i++) {
+  const c = cs[i];
+  acct.update(c);
+  if (acct.dead) break;
+
+  // 1) entry: breakout of the wave 1 extreme
+  if (!acct.pos && armed) {
+    if (armed.side === "long" && c.h > armed.trigger && m.hist[i] > 0 && rsi[i] > 50) {
+      const px = Math.max(armed.trigger, c.o);
+      acct.open("long", px, c.t, { sl: armed.stop, tp: px + armed.len * EXT, note: "Wave 3 up" }); armed = null;
+    } else if (armed.side === "short" && c.l < armed.trigger && m.hist[i] < 0 && rsi[i] < 50) {
+      const px = Math.min(armed.trigger, c.o);
+      acct.open("short", px, c.t, { sl: armed.stop, tp: px - armed.len * EXT, note: "Wave 3 down" }); armed = null;
     }
-    if (!cyc.out && b.h >= cyc.L * (1 + TP / 100)) { cyc.pnl += closeAll(1, t, cyc.L * (1 + TP / 100)); cyc.out = cyc.c ? "분할손절 후 익절" : "익절"; }
-    if (cyc.out) { trades.push({ 시작: cyc.t, 끝: t, 물타기: cyc.k + "차", 결과: cyc.out, 손익: Math.round(cyc.pnl) }); cyc = null; pos = {}; }
   }
-  if (cash <= 0) { equity.push([t, 0]); log("계좌 잔고가 0 이 되어 여기서 끝 (청산)"); break; }
-  if (i % 24 === 0) { let u = 0; for (const s in pos) { const p = priceOf(s, t, b.c); if (p) u += pos[s].q * (p - pos[s].cost / pos[s].q); } equity.push([t, cash + u]); }
-  if (i % 5000 === 0) progress(i / btc.length);
+  // 2) setup broken: price goes past the wave 2 extreme
+  if (armed && (armed.side === "long" ? c.l < armed.stop : c.h > armed.stop)) armed = null;
+
+  // 3) update the ZigZag with this candle
+  if (dir >= 0) {
+    if (c.h > ext) ext = c.h;
+    else if (c.l <= ext * (1 - ZZ / 100)) { piv.push({ type: "H", price: ext }); dir = -1; ext = c.l; onPivot(); }
+  }
+  if (dir < 0) {
+    if (c.l < ext) ext = c.l;
+    else if (c.h >= ext * (1 + ZZ / 100)) { piv.push({ type: "L", price: ext }); dir = 1; ext = c.h; onPivot(); }
+  }
+  if (i % 2000 === 0) progress(i / cs.length);
 }
-const win = trades.filter(x => x.손익 > 0), lose = trades.filter(x => x.손익 <= 0);
-const avg = a => Math.round(a.reduce((s, x) => s + x.손익, 0) / (a.length || 1));
-return {
-  summary: { ...stats(equity, SEED), "매매 수": trades.length, "승률": (win.length / (trades.length || 1) * 100).toFixed(0) + "%", "평균 수익": avg(win), "평균 손실": avg(lose) },
-  equity, trades,
-};` },
+
+function onPivot() {
+  if (piv.length < 3) return;
+  const [a, b, c] = piv.slice(-3);              // a = wave 1 start, b = wave 1 end, c = wave 2 end
+  const len = Math.abs(b.price - a.price), ret = Math.abs(b.price - c.price) / len;
+  if (a.type === "L" && b.type === "H" && c.type === "L" && c.price > a.price && ret >= RET_MIN && ret <= RET_MAX)
+    armed = { side: "long", trigger: b.price, stop: c.price, len };
+  else if (a.type === "H" && b.type === "L" && c.type === "H" && c.price < a.price && ret >= RET_MIN && ret <= RET_MAX)
+    armed = { side: "short", trigger: b.price, stop: c.price, len };
+}
+return acct.result();` },
 ];
