@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010222850"></script>
+<script src="theme.js?v=20261010223942"></script>
 <title>백테스트 · Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261010222850">
+<link rel="stylesheet" href="common.css?v=20261010223942">
 <style>
   .bthead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
   .bthead select{flex:1;min-width:0;max-width:420px}
@@ -39,7 +39,7 @@
   #results[hidden]{display:none}
   @media (max-width:700px){ #code{min-height:260px;font-size:12px} .tile .v{font-size:17px} #eqchart{height:240px} }
 </style>
-<link rel="stylesheet" href="gwave-ui.css?v=20261010222850">
+<link rel="stylesheet" href="gwave-ui.css?v=20261010223942">
 </head>
 <body>
 <div class="wrap">
@@ -85,9 +85,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261010222850"></script>
-<script src="nav.js?v=20261010222850"></script>
-<script src="bt-examples.js?v=20261010222850"></script>
+<script src="common.js?v=20261010223942"></script>
+<script src="nav.js?v=20261010223942"></script>
+<script src="bt-examples.js?v=20261010223942"></script>
 <script>
 "use strict";
 (() => {
@@ -186,7 +186,7 @@
     const list = rows.slice(0, max), cols = [];
     for (const r of list) for (const k of Object.keys(r)) if (!cols.includes(k) && cols.length < 20) cols.push(k);
     return `<table><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>`
-      + list.map(r => `<tr>${cols.map(c => `<td class="${/손익|수익|pnl|PnL/i.test(c) ? signCls(r[c]) : ""}">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("") + "</tbody></table>";
+      + list.map(r => `<tr>${cols.map(c => `<td class="${/손익|수익|pnl|profit|return|ret\b|gain|loss/i.test(c) ? signCls(r[c]) : ""}">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("") + "</tbody></table>";
   }
   let chart = null, line = null;
   function show(r) {
