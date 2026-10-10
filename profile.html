@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
+<script src="theme.js?v=20261010115515"></script>
+<title>Profile · Gwave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css?v=20261010115515">
+<style>
+  /*
+    profile.html — 내 프로필
+    - 위쪽 Join / Sign in 으로 가입·로그인하면 이 화면으로 와요
+    - 보여 주는 것: 아이디·가입일 / 모의투자 성적 / 모의투자 매매 내역
+    - 데이터: /api/paper {action:"state"} (모의투자 탭과 같은 계정·같은 로그인)
+  */
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .g{color:var(--gw)} .r{color:#E5484D}
+  :root[data-theme="dark"] .r{color:#F0625A}
+  .pf-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:6px 0 18px}
+  .pf-id{display:flex;align-items:center;gap:14px;min-width:0}
+  .pf-av{width:56px;height:56px;border-radius:6px;background:var(--gw);color:#fff;display:grid;place-items:center;font:700 26px "Space Grotesk",system-ui,sans-serif;flex:none}
+  .pf-id h2{margin:0;font:700 28px/1.1 "Space Grotesk",system-ui,sans-serif;letter-spacing:-.01em;overflow-wrap:anywhere}
+  .pf-id p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+  .pf-tag{display:inline-block;margin-left:8px;padding:2px 7px;border:1px solid var(--line);border-radius:4px;font:600 11px "IBM Plex Mono",monospace;color:var(--muted);vertical-align:middle}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;border-radius:6px;font:600 13px "IBM Plex Mono",ui-monospace,monospace;cursor:pointer;text-decoration:none;white-space:nowrap}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:color-mix(in srgb,var(--gw) 50%,var(--line))}
+  .btn.pri{background:var(--gw);color:#fff;border:1px solid transparent}
+  .pf-acts{display:flex;gap:8px}
+
+  .box{background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .box .bh{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);
+           font:500 11.5px "IBM Plex Mono",monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .box .bh i{font-style:normal;color:var(--gw)}
+  .box .bb{padding:16px}
+
+
+  .tiles{grid-template-columns:repeat(6,minmax(0,1fr))}
+  @media (max-width:1000px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  .tile{border-radius:6px}
+  .tile .k{font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.05em;font-size:11px}
+  .tile .v{font-size:20px}
+
+  table.th{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+  table.th th{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;font:500 11px "IBM Plex Mono",monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+  table.th td{padding:10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  table.th th.l,table.th td.l{text-align:left}
+  table.th tr:last-child td{border-bottom:0}
+  .side{display:inline-block;padding:1px 6px;border-radius:3px;font:600 11px "IBM Plex Mono",monospace}
+  .side.long{background:color-mix(in srgb,var(--gw) 14%,transparent);color:var(--gw)}
+  .side.short{background:color-mix(in srgb,#E5484D 14%,transparent);color:#E5484D}
+  .sym{font-weight:700}
+  .dep td{color:var(--muted);font-style:italic}
+  .more{display:block;margin:0 auto;padding:12px;width:100%;border:0;border-top:1px solid var(--line);background:transparent;color:var(--gw);font:600 13px "IBM Plex Mono",monospace;cursor:pointer}
+  .empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:14px}
+
+  .gate{max-width:440px;margin:40px auto;text-align:center}
+  .gate h2{font:700 30px/1.15 "Space Grotesk",system-ui,sans-serif;margin:0 0 10px}
+  .gate p{color:var(--muted);margin:0 0 22px;line-height:1.6}
+  .gate .pf-acts{justify-content:center}
+
+  @media (max-width:700px){
+    .tiles{grid-template-columns:1fr 1fr}
+    .pf-id h2{font-size:23px}
+    .pf-av{width:46px;height:46px;font-size:21px}
+    /* 표 → 카드 */
+    table.th thead{display:none}
+    table.th tr{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+    table.th tr:last-child{border-bottom:0}
+    table.th td{padding:0;border:0;text-align:left;font-size:12.5px}
+    table.th td.c-sym{grid-column:1}
+    table.th td.c-pnl{grid-column:2;grid-row:1;text-align:right;font-weight:700}
+    table.th td.c-px,table.th td.c-why{color:var(--muted)}
+    table.th td.c-t{grid-column:2;text-align:right;color:var(--muted)}
+    table.th td.c-px{grid-column:1}
+    table.th td.c-why{grid-column:2;text-align:right}
+    table.th td.c-lev{display:none}
+    .dep td{grid-column:1/-1}
+  }
+</style>
+<link rel="stylesheet" href="gwave-ui.css?v=20261010115515">
+</head>
+<body>
+<div class="wrap">
+  <h1 class="brand">Gwave</h1>
+  <nav id="nav"></nav>
+  <main id="app"><p class="muted mono">~/gwave $ loading profile…</p></main>
+</div>
+<script src="paper-engine.js?v=20261010115515"></script>
+<script src="nav.js?v=20261010115515"></script>
+<script>
+(function () {
+  "use strict";
+  const E = window.PaperEngine;
+  const app = document.getElementById("app");
+  const K = { token: "paper-token-v1", nick: "paper-nick-v1" };
+  const ls = {
+    get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  };
+  const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const usd = (v, d = 2) => (v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const sgn = (v, d = 2) => (v > 0 ? "+" : "") + usd(v, d);
+  const pc = v => v > 0 ? "g" : v < 0 ? "r" : "";
+  const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(4) : v.toPrecision(4);
+  const dt = t => t ? new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "-";
+  const day = t => t ? new Date(t).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "-";
+
+  function gate() {
+    app.innerHTML = `<div class="gate">
+      <p class="mono muted">~/gwave $ profile</p>
+      <h2>Sign in to see your profile</h2>
+      <p>Your paper trading results and full trade history live here.</p>
+      <div class="pf-acts"><button class="btn ghost" data-a="signin">Sign in</button><button class="btn pri" data-a="join">Join</button></div></div>`;
+    for (const b of app.querySelectorAll("[data-a]")) b.onclick = () => window.GwaveAuth && GwaveAuth.open(b.dataset.a);
+  }
+
+  async function load() {
+    const token = ls.get(K.token);
+    if (!token) return gate();
+    let j;
+    try {
+      const res = await fetch("/api/paper", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ action: "state" }) });
+      j = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) { window.GwaveAuth && GwaveAuth.signOut(); location.reload(); return; }
+      if (!res.ok) throw new Error(j.error || "Could not load your profile");
+    } catch (e) {
+      app.innerHTML = `<div class="gate"><h2>Couldn't load your profile</h2><p>${esc(e.message)}</p><button class="btn ghost" onclick="location.reload()">Try again</button></div>`;
+      return;
+    }
+    let prices = {};
+    if (j.st.pos.length) {                                  // 열린 포지션 평가손익용 현재가 (실패하면 진입가로)
+      try { for (const x of await (await fetch("https://fapi.binance.com/fapi/v1/ticker/price")).json()) prices[x.symbol] = +x.price; } catch (e) {}
+    }
+    render(j, prices);
+  }
+
+  function render(j, prices) {
+    const st = j.st, s = st.st, rp = s.rp;
+    const nick = j.nick;
+    const upnl = st.pos.reduce((a, p) => a + E.pnlOf(p.side, p.entry, prices[p.sym] || p.entry, p.qty), 0);
+    const margin = st.pos.reduce((a, p) => a + p.margin, 0);
+    const equity = st.bal + margin + upnl, ret = st.dep ? (equity - st.dep) / st.dep * 100 : 0;
+
+    const trades = st.th;
+    const row = t => t.kind === "deposit"
+      ? `<tr class="dep"><td class="l c-sym" colspan="7">${esc(t.note || "Deposit")} · ${usd(t.amount)}</td><td class="c-t">${dt(t.t)}</td></tr>`
+      : `<tr><td class="l c-sym"><span class="sym">${esc(t.sym.replace(/USDT$/, ""))}</span> <span class="side ${t.side}">${t.side === "short" ? "SHORT" : "LONG"}</span></td>
+          <td class="c-lev mono">${t.lev}x</td>
+          <td class="c-px mono">${px(t.entry)} → ${px(t.exit)}</td>
+          <td class="c-why l">${esc(t.reason)}</td>
+          <td class="c-pnl mono ${pc(t.pnl)}">${sgn(t.pnl)}</td>
+          <td class="c-lev mono ${pc(t.roe)}">${(t.roe > 0 ? "+" : "") + t.roe.toFixed(1)}%</td>
+          <td class="c-lev mono">${t.ot ? dt(t.ot) : "-"}</td>
+          <td class="c-t mono">${dt(t.t)}</td></tr>`;
+    const PAGE = 25;
+    let shown = PAGE;
+
+    app.innerHTML = `
+      <div class="pf-head">
+        <div class="pf-id"><div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>
+          <div><h2>${esc(nick)}${j.admin ? '<span class="pf-tag">ADMIN</span>' : ""}</h2><p class="mono">Joined ${day(j.c)} · Paper trading account</p></div></div>
+        <div class="pf-acts"><a class="btn ghost" href="paper.html">Paper Trading</a><button class="btn ghost" id="out">Sign out</button></div>
+      </div>
+
+      <section class="box" style="margin-bottom:14px">
+          <div class="bh"><span>Paper trading</span><i>● ${st.pos.length} OPEN</i></div>
+          <div class="bb"><div class="tiles">
+            <div class="tile"><div class="k">Equity</div><div class="v">${usd(equity)}</div><div class="s">Principal ${usd(st.dep)}</div></div>
+            <div class="tile"><div class="k">Total return</div><div class="v ${pc(ret)}">${(ret > 0 ? "+" : "") + ret.toFixed(2)}%</div><div class="s">Incl. open positions</div></div>
+            <div class="tile"><div class="k">Realized PnL</div><div class="v ${pc(rp)}">${sgn(rp)}</div><div class="s">Fees ${usd(s.fee)}</div></div>
+            <div class="tile"><div class="k">Trades</div><div class="v">${s.n.toLocaleString("en-US")}</div><div class="s">${s.w}W · ${s.n - s.w}L</div></div>
+            <div class="tile"><div class="k">Win rate</div><div class="v">${s.n ? (s.w / s.n * 100).toFixed(1) + "%" : "-"}</div><div class="s">Closed positions</div></div>
+            <div class="tile"><div class="k">Open PnL</div><div class="v ${pc(upnl)}">${st.pos.length ? sgn(upnl) : "-"}</div><div class="s">${st.pos.length} position${st.pos.length === 1 ? "" : "s"}</div></div>
+          </div></div>
+      </section>
+
+      <section class="box" style="margin-bottom:14px">
+        <div class="bh"><span>Trade history</span><i>${trades.filter(t => t.kind !== "deposit").length} RECORDS</i></div>
+        ${trades.length ? `<table class="th"><thead><tr><th class="l">Symbol</th><th>Lev</th><th>Entry → Exit</th><th class="l">Close</th><th>PnL</th><th>ROE</th><th>Opened</th><th>Closed</th></tr></thead><tbody id="rows"></tbody></table>
+          <button class="more" id="more" hidden>Show more</button>`
+          : `<div class="empty">No trades yet. <a href="paper.html" class="g">Open your first paper trade →</a></div>`}
+      </section>`;
+
+    const rows = app.querySelector("#rows"), more = app.querySelector("#more");
+    const paint = () => { if (!rows) return; rows.innerHTML = trades.slice(0, shown).map(row).join(""); if (more) more.hidden = shown >= trades.length; };
+    paint();
+    if (more) more.onclick = () => { shown += PAGE; paint(); };
+    app.querySelector("#out").onclick = () => { window.GwaveAuth && GwaveAuth.signOut(); location.href = "home.html"; };
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

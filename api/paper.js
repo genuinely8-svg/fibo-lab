@@ -82,7 +82,7 @@ module.exports = async (req, res) => {
     if (now - (user.la || 0) > LA_EVERY) { user.la = now; dirty = true; }     // 마지막 접속은 10분에 한 번만 기록 (명령 절약)
     if (dirty) await db.setJSON(key, user);
     res.status(200).json({
-      nick: user.nick, admin: A.isAdminKey(key), st: user.st, now, events: sy.events, info,
+      nick: user.nick, admin: A.isAdminKey(key), c: user.c || null, st: user.st, now, events: sy.events, info,
       behind: !!sy.behind, syncError: !!sy.error,
     });
   } catch (e) {

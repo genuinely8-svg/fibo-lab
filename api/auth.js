@@ -1,4 +1,5 @@
-/* POST /api/auth  {nick, pin, create?}  → 로그인 / 새 계정 */
+/* POST /api/auth  {nick, pin, create?, join?}  → 로그인 / 새 계정
+   join: 위쪽 Join 버튼에서 가입 — 이미 있는 아이디면 로그인하지 않고 "이미 있는 아이디"로 알려 줌 */
 const db = require("./_lib/db");
 const A = require("./_lib/auth");
 const E = require("../paper-engine");
@@ -11,9 +12,11 @@ module.exports = async (req, res) => {
     const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const nick = A.checkNick(b.nick);
     const pin = String(b.pin || "");
-    if (pin.length < 4 || pin.length > 32) throw A.fail(400, "PIN must be at least 4 digits");
+    if (pin.length < 4 || pin.length > 32) throw A.fail(400, "Password must be 4–32 characters");
     const key = A.userKey(nick);
     const user = await db.getJSON(key);
+
+    if (user && b.join) throw A.fail(409, "That ID is already taken. Try another one, or sign in");
 
     if (!user) {
       // 오타로 계정이 만들어지지 않게, 한 번 물어본 뒤에만 만듦

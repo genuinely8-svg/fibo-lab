@@ -140,6 +140,49 @@
   const brand = document.querySelector("h1.brand");
   const LOGO = '<svg viewBox="0 0 617.1 100" role="img" aria-label="Gwave"><defs><linearGradient id="gwg-nav" x1="0" y1="0" x2="1" y2="0.6"><stop offset="0" stop-color="#3FB06E"/><stop offset="1" stop-color="#2E8A85"/></linearGradient></defs><path fill-rule="evenodd" fill="url(#gwg-nav)" d="M4.1,18.3L1.4,24.6L0.0,31.7L0.0,70.0L2.7,78.9L5.4,83.8L11.6,91.0L17.3,95.2L24.0,98.1L34.4,100.0L102.4,99.8L110.5,97.9L116.2,95.2L123.2,89.5L127.5,83.8L130.3,77.6L131.7,70.8L131.7,40.2L131.0,38.9L74.9,38.7L73.0,39.4L71.7,40.6L63.0,54.8L62.1,58.1L63.0,60.6L72.5,61.4L105.6,61.6L106.3,62.4L106.0,70.5L103.3,74.3L99.2,76.8L96.0,77.3L38.1,77.3L34.6,76.8L31.1,75.2L26.7,71.1L25.4,68.6L24.6,64.9L24.4,37.9L25.2,31.7L28.3,27.0L32.5,23.8L37.6,22.4L115.9,22.1L118.9,19.0L129.4,1.7L128.7,0.0L32.1,0.0L21.7,2.9L16.5,5.7L8.3,12.7Z"/><path fill-rule="evenodd" fill="currentColor" d="M522.4,41.0L521.4,45.4L521.6,97.9L522.2,99.2L615.6,99.5L617.0,98.7L617.1,79.0L615.7,77.8L546.7,77.6L545.6,76.5L545.6,61.7L546.8,60.0L607.0,59.7L608.1,58.1L608.1,40.2L607.3,39.0L527.8,38.7L524.6,39.2ZM522.7,21.4L523.3,21.9L599.0,21.9L612.5,21.0L615.1,20.3L616.0,18.6L617.0,1.6L615.7,0.2L536.3,0.3L534.1,1.6L523.0,19.8ZM386.2,0.8L386.3,2.7L438.3,97.6L440.2,99.4L461.0,99.5L464.3,97.6L479.7,70.0L485.9,57.6L517.0,2.1L517.0,0.8L515.9,0.2L490.6,0.3L488.6,1.7L463.7,47.0L452.1,69.0L451.0,69.5L439.5,49.5L414.0,1.4L411.9,0.2L387.0,0.2ZM285.9,98.4L287.0,99.5L311.1,99.5L312.5,99.0L322.4,82.2L325.7,75.1L340.8,48.6L349.8,31.3L351.1,29.7L351.9,29.7L373.7,71.0L389.0,98.6L390.6,99.5L414.8,99.5L416.2,99.0L412.2,90.0L379.8,29.8L377.0,26.7L373.5,26.3L373.5,25.2L374.9,23.3L374.4,20.0L365.9,4.0L364.1,1.7L360.2,0.2L342.7,0.2L339.5,1.4L337.9,3.0L327.3,21.4ZM199.0,0.5L198.7,1.9L205.1,15.7L228.7,63.2L244.4,96.3L247.1,98.9L250.0,99.7L262.2,99.7L264.4,99.0L266.0,97.5L271.0,87.5L274.6,81.6L303.2,26.2L311.1,12.2L316.2,2.1L316.0,0.6L314.8,0.2L291.3,0.2L288.9,1.6L286.7,4.9L256.8,62.9L255.7,63.5L225.6,1.6L222.5,0.2ZM143.8,0.3L143.3,2.2L168.3,49.8L191.3,96.5L193.3,98.9L194.8,99.4L208.7,99.7L211.0,99.2L214.4,94.9L223.2,77.6L210.0,77.6L207.9,75.7L182.1,22.7L170.6,1.0L168.9,0.2Z"/></svg>';
   if (brand) brand.innerHTML = `<a href="home.html" title="Home">${LOGO}</a>`;
+  // ── 로고 옆 사이트 메뉴 버튼 (☰): 누르면 모든 탭·인사이트 목록 ──
+  (function () {
+    if (!brand) return;
+    const st2 = document.createElement("style");
+    st2.textContent = `
+      h1.brand{display:flex;align-items:center;gap:10px}
+      .sitemenu{position:relative;display:inline-flex}
+      .smbtn{display:inline-grid;place-items:center;width:32px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);cursor:pointer}
+      .smbtn:hover,.sitemenu.open .smbtn{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+      .smbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+      .smpanel{position:absolute;left:0;top:calc(100% + 8px);z-index:80;width:260px;max-height:min(75vh,560px);overflow:auto;padding:6px;
+               background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:0 18px 40px rgba(0,0,0,.28);
+               font:500 13.5px/1.3 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.01em;
+               opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .16s,transform .16s,visibility 0s linear .16s}
+      .sitemenu.open .smpanel{opacity:1;visibility:visible;transform:none;transition:opacity .16s,transform .16s}
+      .smpanel .sh{padding:10px 10px 4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+      .smpanel a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:4px;color:var(--text);text-decoration:none}
+      .smpanel a:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+      .smpanel a.on{color:var(--accent)}
+      .smpanel a.on::before{content:"›";margin-left:-4px}
+      .smpanel a .dot{width:7px;height:7px;border-radius:2px;flex:none}
+      .smpanel hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+      @media (max-width:700px){ .smbtn{width:30px;height:28px} .smpanel{position:fixed;left:16px;right:16px;top:64px;width:auto} }`;
+    document.head.appendChild(st2);
+    const box = document.createElement("span");
+    box.className = "sitemenu notranslate"; box.translate = false;
+    const link = (href, name, extra = "") => `<a href="${href}"${href === here ? ' class="on" aria-current="page"' : ""}>${extra}${name}</a>`;
+    const logged = (() => { try { return !!localStorage.getItem("paper-token-v1"); } catch (e) { return false; } })();
+    box.innerHTML = `<button type="button" class="smbtn" aria-haspopup="true" aria-expanded="false" title="Menu" aria-label="Site menu">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="smpanel" role="menu">
+        <div class="sh">Gwave</div>${link("home.html", "Home")}${TABS.map(([h, n]) => link(h, n)).join("")}
+        <hr><div class="sh">Insights</div>${INSIGHTS.map(x => link(x[0], x[2], `<span class="dot" style="background:${x[6]}"></span>`)).join("")}
+        <hr>${logged ? link("profile.html", "My Profile") : '<a href="#" data-auth="signin">Sign in</a><a href="#" data-auth="join">Join</a>'}
+      </div>`;
+    brand.appendChild(box);
+    const b = box.querySelector(".smbtn");
+    const set = v => { box.classList.toggle("open", v); b.setAttribute("aria-expanded", String(v)); };
+    b.addEventListener("click", e => { e.stopPropagation(); set(!box.classList.contains("open")); });
+    for (const a of box.querySelectorAll("[data-auth]")) a.addEventListener("click", e => { e.preventDefault(); set(false); window.GwaveAuth && GwaveAuth.open(a.dataset.auth); });
+    document.addEventListener("click", e => { if (!box.contains(e.target)) set(false); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") set(false); });
+  })();
   // ── 인사이트: PC(마우스)는 올리면 펼침, 휴대폰(터치)은 누르면 시트 ──
   (function () {
     const grp = wrap.querySelector(".navgrp"), panel = wrap.querySelector(".navpanel");
@@ -306,7 +349,7 @@
   const prev = nav.previousElementSibling;
   // 다크/라이트 스위치를 언어 버튼 오른쪽에 붙임
   const tb = nav.querySelector("button.themebtn");
-  const ctl = document.createElement("div"); ctl.style.cssText = "display:flex;align-items:center;gap:10px;flex:none";
+  const ctl = document.createElement("div"); ctl.className = "topctl"; ctl.style.cssText = "display:flex;align-items:center;gap:10px;flex:none";
   ctl.append(box); if (tb) ctl.append(tb);
   if (prev && prev.tagName === "H1") {
     const row = document.createElement("div"); row.className = "toprow";
@@ -365,4 +408,155 @@
   const s = document.createElement("script");
   s.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
   document.body.appendChild(s);
+})();
+
+// ── 계정: 오른쪽 위 Join / Sign in (로그인하면 내 프로필 버튼) ─────────────
+// 모의투자 계정과 같은 계정 (아이디 + 비밀번호). 로그인 정보는 모의투자 탭과 같이 써요 (paper-token-v1)
+(function () {
+  const nav = document.getElementById("nav");
+  if (!nav) return;
+  const K = { token: "paper-token-v1", nick: "paper-nick-v1" };
+  const ls = {
+    get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} },
+    del: k => { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+  const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const style = document.createElement("style");
+  style.textContent = `
+    .acct{display:flex;align-items:center;gap:8px;flex:none;font-family:"IBM Plex Mono",ui-monospace,monospace}
+    .acct button,.acct a.me{font:600 13px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.01em;padding:8px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+    .acct .si{background:transparent;color:var(--text);border:1px solid var(--line)}
+    .acct .si:hover{border-color:color-mix(in srgb,var(--gw,var(--accent)) 50%,var(--line))}
+    .acct .jn{background:var(--gw,var(--accent));color:#fff;border:1px solid transparent}
+    .acct .jn:hover{filter:brightness(1.08)}
+    .acct a.me{display:inline-flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border:1px solid var(--line);color:var(--text);text-decoration:none;max-width:200px}
+    .acct a.me:hover{border-color:color-mix(in srgb,var(--gw,var(--accent)) 50%,var(--line))}
+    .acct .av{width:22px;height:22px;border-radius:4px;display:grid;place-items:center;background:var(--gw,var(--accent));color:#fff;font-size:12px;flex:none}
+    .acct .nm{overflow:hidden;text-overflow:ellipsis}
+    @media (max-width:700px){
+      .acct .jn{display:none}
+      .acct button,.acct a.me{padding:7px 10px;font-size:12px}
+      .acct .nm{display:none} .acct a.me{padding:4px}
+      .langbtn > span:not(.cv){display:none}
+      .topctl{gap:8px!important}
+    }
+    .gwa-bg{position:fixed;inset:0;z-index:120;background:rgba(5,8,13,.6);display:grid;place-items:center;padding:16px;
+            opacity:0;transition:opacity .18s}
+    .gwa-bg.on{opacity:1}
+    .gwa{width:min(380px,100%);background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 60px rgba(0,0,0,.4);
+         font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;transform:translateY(8px);transition:transform .18s}
+    .gwa-bg.on .gwa{transform:none}
+    .gwa .bar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);
+              font:12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
+    .gwa .bar b{color:var(--gw,var(--accent));font-weight:600}
+    .gwa .x{background:transparent;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 4px}
+    .gwa .bd{padding:18px}
+    .gwa .seg{display:flex;border:1px solid var(--line);border-radius:6px;padding:3px;margin-bottom:16px}
+    .gwa .seg button{flex:1;padding:8px;border:0;border-radius:4px;background:transparent;color:var(--muted);font:600 13px "IBM Plex Mono",ui-monospace,monospace;cursor:pointer}
+    .gwa .seg button.on{background:color-mix(in srgb,var(--gw,var(--accent)) 14%,transparent);color:var(--text)}
+    .gwa h2{margin:0 0 4px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+    .gwa p.sub{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5}
+    .gwa label{display:block;font:600 11px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px}
+    .gwa input{width:100%;box-sizing:border-box;padding:11px 12px;margin:0 0 14px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);
+               font:15px "IBM Plex Mono",ui-monospace,monospace}
+    .gwa input:focus{outline:none;border-color:var(--gw,var(--accent));box-shadow:0 0 0 3px color-mix(in srgb,var(--gw,var(--accent)) 20%,transparent)}
+    .gwa .go{width:100%;padding:12px;border:0;border-radius:6px;background:var(--gw,var(--accent));color:#fff;font:700 14px "IBM Plex Mono",ui-monospace,monospace;cursor:pointer}
+    .gwa .go:disabled{opacity:.6;cursor:default}
+    .gwa .err{min-height:18px;margin:10px 0 0;color:#E5484D;font-size:13px;line-height:1.4}
+    .gwa .err button{margin-left:6px;padding:0;border:0;background:none;color:var(--gw,var(--accent));font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}
+    .gwa .perk{margin:14px 0 0;padding:10px 12px;border:1px dashed var(--line);border-radius:6px;font-size:12.5px;color:var(--muted);line-height:1.5}
+    .gwa .perk b{color:var(--text)}
+`;
+  document.head.appendChild(style);
+
+  const token = ls.get(K.token), nick = ls.get(K.nick);
+  const box = document.createElement("div");
+  box.className = "acct notranslate"; box.translate = false;
+  if (token && nick) {
+    box.innerHTML = `<a class="me" href="profile.html" title="My profile"><span class="av">${esc(nick.slice(0, 1).toUpperCase())}</span><span class="nm">${esc(nick)}</span></a>`;
+  } else {
+    box.innerHTML = '<button type="button" class="si">Sign in</button><button type="button" class="jn">Join</button>';
+    box.querySelector(".si").onclick = () => open("signin");
+    box.querySelector(".jn").onclick = () => open("join");
+  }
+  const place = () => {
+    const ctl = document.querySelector(".topctl");
+    if (ctl) { ctl.prepend(box); return true; }
+    return false;
+  };
+  if (!place()) addEventListener("DOMContentLoaded", place);
+
+  // ── 가입 / 로그인 창 ──
+  let bg = null, mode = "join", gone = null;
+  function open(m) {
+    clearTimeout(gone);
+    mode = m === "signin" ? "signin" : "join";
+    if (!bg) build();
+    paint();
+    document.body.appendChild(bg);
+    requestAnimationFrame(() => bg.classList.add("on"));
+    setTimeout(() => bg.querySelector("#gwa-id").focus(), 60);
+  }
+  function close() { if (!bg || !bg.isConnected) return; bg.classList.remove("on"); gone = setTimeout(() => bg.remove(), 180); }
+  function build() {
+    bg = document.createElement("div");
+    bg.className = "gwa-bg notranslate"; bg.translate = false;
+    bg.innerHTML = `<form class="gwa" role="dialog" aria-modal="true" aria-labelledby="gwa-h" novalidate>
+      <div class="bar"><span>~/gwave $ <b class="cmd">join</b></span><button type="button" class="x" aria-label="Close">×</button></div>
+      <div class="bd">
+        <div class="seg"><button type="button" data-m="join">Join</button><button type="button" data-m="signin">Sign in</button></div>
+        <h2 id="gwa-h"></h2><p class="sub"></p>
+        <label for="gwa-id">ID</label>
+        <input id="gwa-id" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" placeholder="2–16 letters or numbers">
+        <label for="gwa-pw">Password</label>
+        <input id="gwa-pw" name="password" type="password" maxlength="32" placeholder="4+ characters">
+        <button class="go" type="submit"></button>
+        <div class="err" role="alert"></div>
+        <p class="perk">Paper trading starts with <b>10,000 USDT</b>.</p>
+      </div></form>`;
+    bg.addEventListener("click", e => { if (e.target === bg) close(); });
+    bg.querySelector(".x").onclick = close;
+    for (const b of bg.querySelectorAll(".seg button")) b.onclick = () => { mode = b.dataset.m; paint(); };
+    bg.querySelector("form").onsubmit = e => { e.preventDefault(); submit(false); };
+    document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+  }
+  function paint() {
+    const j = mode === "join";
+    for (const b of bg.querySelectorAll(".seg button")) b.classList.toggle("on", b.dataset.m === mode);
+    bg.querySelector(".cmd").textContent = j ? "join" : "signin";
+    bg.querySelector("#gwa-h").textContent = j ? "Create your account" : "Welcome back";
+    bg.querySelector(".sub").textContent = j ? "Just pick an ID and a password — that's it." : "Sign in with your ID and password.";
+    bg.querySelector("#gwa-pw").autocomplete = j ? "new-password" : "current-password";
+    bg.querySelector(".go").textContent = j ? "Join Gwave" : "Sign in";
+    bg.querySelector(".err").textContent = "";
+  }
+  async function submit(create) {
+    const id = bg.querySelector("#gwa-id").value.trim(), pw = bg.querySelector("#gwa-pw").value;
+    const err = bg.querySelector(".err"), go = bg.querySelector(".go");
+    err.textContent = "";
+    if (!/^[0-9A-Za-z_\-가-힣ㄱ-ㅎ]{2,16}$/u.test(id)) { err.textContent = "ID must be 2–16 characters (letters, numbers, _ -)"; return; }
+    if (pw.length < 4) { err.textContent = "Password must be at least 4 characters"; return; }
+    const join = mode === "join";
+    go.disabled = true;
+    try {
+      const res = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nick: id, pin: pw, create: join || create, join }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "Something went wrong. Please try again");
+      if (j.needCreate) {                                   // Sign in 했는데 없는 아이디 → 이 아이디로 바로 만들 수 있게
+        err.innerHTML = `No account with that ID yet.<button type="button">Create it</button>`;
+        err.querySelector("button").onclick = () => submit(true);
+        return;
+      }
+      ls.set(K.token, j.token); ls.set(K.nick, j.nick);
+      location.href = "profile.html";                       // 가입·로그인하면 내 프로필로
+    } catch (e) { err.textContent = e.message; }
+    finally { go.disabled = false; }
+  }
+  window.GwaveAuth = {
+    open,
+    signOut() { ls.del(K.token); ls.del(K.nick); },
+    token: () => ls.get(K.token),
+  };
 })();
