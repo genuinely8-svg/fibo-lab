@@ -171,7 +171,8 @@
   function checkDeposits() {
     const deps = S.st.th.filter(t => t.kind === "deposit"), key = K.dep + S.nick, saved = ls.get(key);
     const last = saved == null ? -1 : +saved, max = deps.reduce((m, t) => Math.max(m, t.id), last < 0 ? 0 : last);
-    for (const d of deps.slice().reverse()) if (d.id > last && (saved != null || Date.now() - d.t < 86400e3)) notify("ok", "Deposit received", `+${fu(d.amount)} USDT`);
+    for (const d of deps.slice().reverse()) if (d.id > last && (saved != null || Date.now() - d.t < 86400e3))
+      d.amount >= 0 ? notify("ok", "Deposit received", `+${fu(d.amount)} USDT`) : notify("warn", "Balance deducted by admin", `-${fu(-d.amount)} USDT`);
     if (String(max) !== saved) ls.set(key, String(max));
   }
   async function sendAction(body, quiet) {
@@ -754,7 +755,8 @@
   const ORD_HEADS = [{ h: "Symbol", c: "l" }, { h: "Type" }, { h: "Price" }, { h: "Size" }, { h: "Value" }, { h: "Margin" }, { h: "Last price" }, { h: "TP / SL" }, { h: "Time" }, { h: "", c: "full" }];
   const OL_HEADS = [{ h: "Symbol", c: "l" }, { h: "Type" }, { h: "Price" }, { h: "Size" }, { h: "Value" }, { h: "Status" }, { h: "Time" }];
   const TH_HEADS = [{ h: "Symbol", c: "l" }, { h: "Size" }, { h: "Entry price" }, { h: "Exit price" }, { h: "Exit value" }, { h: "PnL (ROE)" }, { h: "Fee" }, { h: "Reason" }, { h: "Opened" }, { h: "Closed" }];
-  const depRow = t => ({ dep: `<b class="g">Admin deposit +${fu(t.amount)} USDT</b> <span class="muted small">${mdhm(t.t)}</span>` });
+  const depTxt = t => t.amount >= 0 ? `<b class="g">Admin deposit +${fu(t.amount)} USDT</b>` : `<b class="r">Admin deduction -${fu(-t.amount)} USDT</b>`;
+  const depRow = t => ({ dep: `${depTxt(t)} <span class="muted small">${mdhm(t.t)}</span>` });
 
   let sig = "";
   function tabHtml() {
@@ -1043,7 +1045,7 @@
         ${u.bl ? '<span class="tag short">Blocked</span>' : ""}${u.admin ? '<span class="tag long">Admin</span>' : ""}<br>
         <span class="muted small">Joined ${dt(u.c)} · Last seen ${dt(u.la)}<br>Balance ${ut(u.bal)} · ${u.n} trades · ${u.pos} positions</span></div>
       <b class="${pc(u.ret)}">${sg(u.ret)}%</b>
-      <input inputmode="decimal" placeholder="USDT" data-n="${esc(u.nick)}"><button class="mini" data-adm="charge" data-n="${esc(u.nick)}">Deposit</button>
+      <input inputmode="decimal" placeholder="± USDT" title="Positive = deposit, negative = deduct (e.g. -10000)" data-n="${esc(u.nick)}" data-amt="1"><button class="mini" data-adm="charge" data-n="${esc(u.nick)}">Deposit</button>
       <button class="ghost mini" data-adm="reset" data-n="${esc(u.nick)}">Reset</button>
       ${u.admin ? "" : `<button class="ghost mini" data-adm="${u.bl ? "unblock" : "block"}" data-n="${esc(u.nick)}">${u.bl ? "Unblock" : "Block"}</button>
       <button class="ghost mini r" data-adm="delete" data-n="${esc(u.nick)}">Delete</button>`}</div>`).join("") || '<div class="empty">No users</div>';
@@ -1062,7 +1064,7 @@
   function renderAdminDetail() {
     const d = adminView;
     const ord = d.ol.map(o => `<div class="lrow"><span><b class="cl" data-sym="${o.sym}" title="Open chart">${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${esc(L(o.kind))}</span><span>${fq(o.qty)} @ ${fp(o.price)} · <b>${esc(L(o.status))}</b></span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
-    const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span><b class="g">Admin deposit +${fu(t.amount)}</b> USDT</span><span class="m">${mdhm(t.t)}</span></div>`
+    const th = d.th.map(t => t.kind === "deposit" ? `<div class="lrow"><span>${depTxt(t)}</span><span class="m">${mdhm(t.t)}</span></div>`
       : `<div class="lrow"><span><b class="cl" data-sym="${t.sym}" title="Open chart">${esc(base(t.sym))}</b> <span class="${t.side === "long" ? "g" : "r"}">${sideTxt(t.side)} ${t.lev}x</span> · ${esc(L(t.reason))}</span><span class="${pc(t.pnl)}"><b>${sg(t.pnl)} USDT</b> (${sg(t.roe)}%)</span>
         <span class="m">${admTradeInfo(t)}</span></div>`).join("") || '<div class="empty">None</div>';
     const open = d.ord.map(o => `<div class="lrow"><span><b class="cl" data-sym="${o.sym}" title="Open chart">${esc(base(o.sym))}</b> <span class="${o.side === "long" ? "g" : "r"}">${sideTxt(o.side)} ${o.lev}x</span> ${o.ro ? "Limit close" : "Limit"}</span><span>${fq(o.qty)} @ ${fp(o.price)}</span><span class="m">${mdhm(o.t)}</span></div>`).join("") || '<div class="empty">None</div>';
@@ -1106,6 +1108,12 @@
   }
   setInterval(() => { if (adminView && S.tab === "adm" && !document.hidden) paintAdminLive(); }, 1000);
   setInterval(reloadAdminView, 10000);
+  // 관리자 금액 칸: 음수를 넣으면 버튼이 "Deduct"(빨강)로 바뀜
+  $("tabbody").addEventListener("input", e => {
+    const el = e.target.closest("input[data-amt]"); if (!el) return;
+    const b = el.nextElementSibling, neg = num(el.value) < 0;
+    if (b) { b.textContent = neg ? "Deduct" : "Deposit"; b.classList.toggle("neg", neg); }
+  });
   $("tabbody").addEventListener("click", async e => {
     const b = e.target.closest("[data-adm]"); if (!b) return;
     const act = b.dataset.adm, nick = b.dataset.n;
@@ -1115,8 +1123,8 @@
       let r;
       if (act === "charge") {
         const amt = num(b.parentElement.querySelector("input").value);
-        if (!(amt > 0)) return notify("warn", "Deposit", "Enter an amount");
-        if (!(await ask(`Deposit ${fu(amt)} USDT to ${nick}?`))) return;
+        if (!(amt > 0 || amt < 0)) return notify("warn", "Deposit / Deduct", "Enter an amount (negative to deduct, e.g. -10000)");
+        if (!(await ask(amt > 0 ? `Deposit ${fu(amt)} USDT to ${nick}?` : `Deduct ${fu(-amt)} USDT from ${nick}'s balance?`))) return;
         r = await post("/api/admin", { action: "charge", nick, amount: amt });
       } else if (act === "reset") {
         if (!(await ask(`Clear all of ${nick}'s balance, positions and history and reset to 10,000 USDT?`))) return;

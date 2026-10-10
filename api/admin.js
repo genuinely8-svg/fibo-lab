@@ -1,4 +1,4 @@
-/* POST /api/admin  {action: "list" | "detail" | "charge" | "reset" | "block" | "unblock" | "delete", nick, amount}
+/* POST /api/admin  {action: "list" | "detail" | "charge"(amount 음수면 차감) | "reset" | "block" | "unblock" | "delete", nick, amount}
    관리자(환경변수 ADMIN_NICKNAME 의 닉네임)만 가능 — 요청마다 서버에서 다시 확인해요
    관리자 행동은 Redis 목록 "adminlog" 에 시간과 함께 남겨요 (최근 200개) */
 const db = require("./_lib/db");
@@ -44,14 +44,20 @@ module.exports = async (req, res) => {
       try { await sync(s, now); E.mergeAll(s); } catch (e) {}
       return res.status(200).json({ nick: target.nick, c: target.c, la: target.la || null, bl: !!target.bl, pos: s.pos, ord: s.ord, ol: s.ol.slice(0, 50), th: s.th.slice(0, 50), stats: s.st, bal: s.bal, dep: s.dep, at: now });
     }
-    if (b.action === "charge") {
+    if (b.action === "charge") {                    // 양수 = 입금, 음수 = 차감 (예: -10000)
       const amt = Math.round(Number(b.amount) * 100) / 100;
-      if (!(amt > 0 && amt <= 10000000)) throw A.fail(400, "Amount must be > 0 and ≤ 10,000,000");
+      if (!(amt !== 0 && Math.abs(amt) <= 10000000)) throw A.fail(400, "Amount must be non-zero and within ±10,000,000");
       const s = target.st;
-      s.bal += amt; s.dep += amt;                       // 충전금은 원금으로 → 수익률이 부풀려지지 않음
-      E.logTrade(s, { id: s.seq++, t: now, kind: "deposit", amount: amt, note: `Admin deposit +${amt}` });
-      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds(`Deposit +${amt} USDT`)]);
-      return res.status(200).json({ ok: true, msg: `Deposited ${amt} USDT to ${target.nick}` });
+      try { await sync(s, now); E.mergeAll(s); } catch (e) {}     // 차감 전에 체결·청산을 먼저 반영해서 정확한 잔고 기준으로
+      if (amt < 0) {
+        const max = Math.floor(E.available(s) * 100) / 100;      // 포지션 증거금·미체결 주문에 묶인 돈은 뺄 수 없음
+        if (-amt > max + 1e-9) throw A.fail(400, `Can deduct at most ${max.toLocaleString("en-US")} USDT (free balance)`);
+      }
+      s.bal += amt; s.dep = Math.max(1, s.dep + amt);   // 원금도 같이 → 수익률이 부풀거나 줄지 않음
+      const sign = amt > 0 ? "+" : "-", abs = Math.abs(amt);
+      E.logTrade(s, { id: s.seq++, t: now, kind: "deposit", amount: amt, note: amt > 0 ? `Admin deposit +${abs}` : `Admin deduction -${abs}` });
+      await db.pipeline([["SET", tkey, JSON.stringify(target)], ...logCmds(amt > 0 ? `Deposit +${abs} USDT` : `Deduct -${abs} USDT`)]);
+      return res.status(200).json({ ok: true, msg: amt > 0 ? `Deposited ${abs} USDT to ${target.nick}` : `Deducted ${abs} USDT from ${target.nick}` });
     }
     if (b.action === "reset") {
       target.st = E.newState(now);

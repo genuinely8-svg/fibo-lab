@@ -39,11 +39,11 @@ async function getRows(url) {
     let r;
     try { r = await fetch(url); } catch (e) { await sleep(2000); continue; }
     if (r.ok) return r.json();
-    if (r.status === 400) throw new Error("없는 코인이거나 잘못된 봉 단위예요");
+    if (r.status === 400) throw new Error("Unknown coin or invalid interval");
     if (r.status === 451 || r.status === 403) throw Object.assign(new Error("blocked"), { blocked: true });
     await sleep(r.status === 429 || r.status === 418 ? 15000 : 3000);
   }
-  throw new Error("바이낸스에서 데이터를 못 받았어요. 잠시 뒤 다시 실행해 주세요");
+  throw new Error("Could not get data from Binance. Please try again in a moment");
 }
 
 async function download(market, sym, iv, from, to, label) {
@@ -54,7 +54,7 @@ async function download(market, sym, iv, from, to, label) {
     if (!rows.length) break;
     for (const x of rows) if (x[0] + ms <= Date.now()) out.push([x[0], +x[1], +x[2], +x[3], +x[4], +x[5]]);
     start = rows[rows.length - 1][0] + ms;
-    send("dl", `${label} 받는 중… ${new Date(Math.min(start, Date.now())).toISOString().slice(0, 10)}`);
+    send("dl", `Downloading ${label}… ${new Date(Math.min(start, Date.now())).toISOString().slice(0, 10)}`);
     if (rows.length < 1000) break;
     await sleep(150);
   }
@@ -67,11 +67,11 @@ async function download(market, sym, iv, from, to, label) {
 */
 async function candles(sym, interval = "1h", from = "2020-01-01", opts = {}) {
   sym = String(sym).toUpperCase().replace(/USDT$/, "");
-  if (!/^[A-Z0-9]{1,20}$/.test(sym)) throw new Error("코인 기호가 이상해요: " + sym);
-  if (!IV_MS[interval]) throw new Error("봉 단위는 " + Object.keys(IV_MS).join(", ") + " 중 하나");
+  if (!/^[A-Z0-9]{1,20}$/.test(sym)) throw new Error("Invalid coin symbol: " + sym);
+  if (!IV_MS[interval]) throw new Error("interval must be one of " + Object.keys(IV_MS).join(", "));
   let market = opts.market === "spot" ? "spot" : "futures";
   const t0 = typeof from === "number" ? from : Date.parse(from);
-  if (!isFinite(t0)) throw new Error('시작일 형식: "2020-01-01"');
+  if (!isFinite(t0)) throw new Error('from must look like "2020-01-01"');
   const ms = IV_MS[interval], now = Date.now();
   const load = async mk => {
     const key = `${mk}|${sym}|${interval}`;
@@ -85,7 +85,7 @@ async function candles(sym, interval = "1h", from = "2020-01-01", opts = {}) {
   try { rows = await load(market); }
   catch (e) {
     if (!e.blocked || market === "spot") throw e;
-    log(`이 지역에서 선물 데이터가 막혀서 현물 데이터로 대신 받아요 (${sym})`);
+    log(`Futures data is blocked in this region, using spot data instead (${sym})`);
     rows = await load(market = "spot");
   }
   const arr = [];
@@ -121,16 +121,17 @@ function stats(equity, seed) {
   let peak = -Infinity, mdd = 0;
   for (const [, v] of equity) { peak = Math.max(peak, v); if (peak > 0) mdd = Math.max(mdd, (peak - v) / peak); }
   const end = equity[equity.length - 1][1];
-  return { "시작 자산": Math.round(s), "최종 자산": Math.round(end), "수익률": ((end / s - 1) * 100).toFixed(1) + "%", "최대 낙폭": (mdd * 100).toFixed(1) + "%" };
+  return { "Start": Math.round(s), "Final equity": Math.round(end), "Return": ((end / s - 1) * 100).toFixed(1) + "%", "Max drawdown": (mdd * 100).toFixed(1) + "%" };
 }
 
 /*
-  Account — uses the account settings on the right panel (config):
+  Account — uses the config object written at the top of the script:
     capital, leverage, sizePct (% of equity used as margin for ONE whole trade, all split entries together),
     fee (%), margin ("isolated" | "cross"), direction ("long" | "short" | "both")
   Split entries (scale-in / averaging) and partial exits are supported, and several coins can be held at once.
-    acct.open("long" | "short", price, t, { sym, share, sl, tp, note })  new position. share = part of the trade budget (0..1, default 1)
-    acct.add(price, t, { sym, share, sl, tp, note })                   add to the open position (average entry is recalculated)
+    acct.open("long" | "short", price, t, { sym, share, usd, lev, sl, tp, note })  new position. share = part of the trade budget (0..1, default 1),
+                                                usd = exact margin in USDT, lev = leverage for this fill (default config.leverage)
+    acct.add(price, t, { sym, share, usd, lev, sl, tp, note })         add to the open position (average entry is recalculated)
     acct.close(price, t, reason, { sym, frac })                          close all (frac 1) or part (e.g. frac 0.1 = 10%)
     acct.setStop(sl, tp, { sym })                                        move stop loss / take profit
     acct.update(candle, sym)   call once per candle FIRST (main coin: sym can be omitted) → SL / TP / liquidation + equity
@@ -140,7 +141,6 @@ function stats(equity, seed) {
   The trade budget is fixed when the account goes from flat to the first position: equity × sizePct %.
 */
 const MMR = 0.005;
-const REASON = { "Stop loss": "손절", "Take profit": "익절", "Liquidation": "청산", "Signal": "신호" };
 class Account {
   constructor(cfg = {}) {
     this.cfg = cfg;
@@ -157,6 +157,7 @@ class Account {
   get canShort() { return this.cfg.direction !== "long"; }
   position(sym) { return this.ps[String(sym || this.main).toUpperCase()] || null; }
   get pos() { return this.position(); }
+  get equity() { return this.equityAt(); }
   get side() { const p = this.pos; return p ? p.side : null; }
   get open_() { return Object.keys(this.ps).length; }
   upnl(p, px) { return (p.side === "long" ? 1 : -1) * p.qty * (px - p.entry); }
@@ -173,10 +174,11 @@ class Account {
     const W = this.cash + other - MMR * notional;
     return p.side === "long" ? (p.qty * p.entry - W) / (p.qty * (1 - MMR)) : (W + p.qty * p.entry) / (p.qty * (1 + MMR));
   }
-  _fill(p, price, share) {
-    const margin = this.budget * Math.max(0, +share || 0);
+  _fill(p, price, o) {
+    const margin = o.usd != null ? Math.max(0, +o.usd || 0) : this.budget * Math.max(0, o.share == null ? 1 : +o.share || 0);
     if (!(margin > 0) || margin > this.cash + 1e-9) return false;
-    const notional = margin * this.lev, qty = notional / price, fee = notional * this.fee;
+    const lev = o.lev != null ? Math.min(125, Math.max(1, +o.lev || 1)) : this.lev;
+    const notional = margin * lev, qty = notional / price, fee = notional * this.fee;
     this.cash -= fee; p.fees += fee;
     p.entry = (p.entry * p.qty + price * qty) / (p.qty + qty); p.qty += qty; p.margin += margin; p.mTotal += margin; p.entries++;
     return true;
@@ -188,14 +190,14 @@ class Account {
     if (side === "short" && !this.canShort) return false;
     if (!this.open_) this.budget = this.cash * this.sizePct / 100;
     const p = { sym, side, entry: price, qty: 0, margin: 0, mTotal: 0, entries: 0, fees: 0, realized: 0, t, sl: o.sl || null, tp: o.tp || null, note: o.note || "" };
-    if (!this._fill(p, price, o.share == null ? 1 : o.share)) return false;
+    if (!this._fill(p, price, o)) return false;
     this.ps[sym] = p; this.marks[sym] = price;
     return true;
   }
   add(price, t, o = {}) {
     const p = this.position(o.sym);
     if (!p || this.dead || !(price > 0)) return false;
-    if (!this._fill(p, price, o.share == null ? 1 : o.share)) return false;
+    if (!this._fill(p, price, o)) return false;
     if (o.sl !== undefined) p.sl = o.sl; if (o.tp !== undefined) p.tp = o.tp; if (o.note) p.note = o.note;
     return true;
   }
@@ -210,8 +212,8 @@ class Account {
     if (this.cash <= 1e-9) { this.cash = 0; this.dead = true; }
     if (all || p.qty <= 1e-12) {
       const net = p.realized - p.fees;
-      this.trades.push({ "코인": p.sym, "진입 시각": p.t, "청산 시각": t, "방향": p.side === "long" ? "롱" : "숏", "진입 횟수": p.entries, "평단": p.entry, "청산가": price,
-        "손익": Math.round(net * 100) / 100, "수익률": (net / (p.mTotal || 1) * 100).toFixed(2) + "%", "사유": REASON[reason] || reason, ...(p.note ? { "메모": p.note } : {}) });
+      this.trades.push({ "Coin": p.sym, "Entry time": p.t, "Exit time": t, "Side": p.side === "long" ? "Long" : "Short", "Entries": p.entries, "Avg entry": p.entry, "Exit": price,
+        "PnL": Math.round(net * 100) / 100, "Return": (net / (p.mTotal || 1) * 100).toFixed(2) + "%", "Balance": Math.round(this.cash * 100) / 100, "Reason": reason, ...(p.note ? { "Note": p.note } : {}) });
       delete this.ps[p.sym];
     } else p.partial = (p.partial || 0) + 1;
     return pnl;
@@ -232,7 +234,7 @@ class Account {
           const before = this.cash, mg = p.margin, fees = p.fees, done = p.realized, tot = p.mTotal;
           this.close(liq, c.t, "Liquidation", { sym });
           this.cash = Math.max(0, before - mg); if (this.cash <= 1e-9) this.dead = true;
-          const tr = this.trades[this.trades.length - 1]; const net = done - mg - fees; tr["손익"] = Math.round(net * 100) / 100; tr["수익률"] = (net / (tot || 1) * 100).toFixed(2) + "%";
+          const tr = this.trades[this.trades.length - 1]; const net = done - mg - fees; tr["PnL"] = Math.round(net * 100) / 100; tr["Return"] = (net / (tot || 1) * 100).toFixed(2) + "%"; tr["Balance"] = Math.round(this.cash * 100) / 100;
         }
       } else if (p.tp && (L ? c.h >= p.tp : c.l <= p.tp)) this.close(L ? Math.max(p.tp, c.o) : Math.min(p.tp, c.o), c.t, "Take profit", { sym });
     }
@@ -242,26 +244,19 @@ class Account {
   result(extra = {}) {
     const step = Math.max(1, Math.ceil(this.eq.length / 3000));
     const equity = this.eq.filter((_, i) => i % step === 0 || i === this.eq.length - 1);
-    const w = this.trades.filter(x => x["손익"] > 0), l = this.trades.filter(x => x["손익"] <= 0);
-    const sum = a => a.reduce((s, x) => s + x["손익"], 0), gw = sum(w), gl = -sum(l);
+    const w = this.trades.filter(x => x["PnL"] > 0), l = this.trades.filter(x => x["PnL"] <= 0);
+    const sum = a => a.reduce((s, x) => s + x["PnL"], 0), gw = sum(w), gl = -sum(l);
     return {
-      summary: { ...stats(this.eq, this.capital), "매매 수": this.trades.length, "승률": (w.length / (this.trades.length || 1) * 100).toFixed(0) + "%",
-        "평균 수익": Math.round(gw / (w.length || 1)), "평균 손실": -Math.round(gl / (l.length || 1)), "손익비(PF)": gl ? (gw / gl).toFixed(2) : "-",
-        "청산 횟수": this.liqs, ...extra },
+      summary: { ...stats(this.eq, this.capital), "Trades": this.trades.length, "Win rate": (w.length / (this.trades.length || 1) * 100).toFixed(0) + "%",
+        "Avg win": Math.round(gw / (w.length || 1)), "Avg loss": -Math.round(gl / (l.length || 1)), "Profit factor": gl ? (gw / gl).toFixed(2) : "-",
+        "Liquidations": this.liqs, ...extra },
       equity, trades: this.trades,
     };
   }
 }
 
-// input("Label", default) → value from the "전략 설정" fields on the panel (the page reads these calls from the script)
-let INPUTS = {};
-function input(label, def) {
-  const v = INPUTS[String(label)];
-  if (v === undefined || v === null || v === "") return def;
-  if (typeof def === "number") { const n = +v; return isFinite(n) ? n : def; }
-  if (typeof def === "boolean") return v === true || v === "true";
-  return String(v);
-}
+// input("Label", default) → just returns the default (kept so older scripts still run)
+const input = (label, def) => def;
 
 const log = (...a) => send("log", a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" ").slice(0, 2000));
 const progress = f => send("prog", Math.max(0, Math.min(1, +f || 0)));
@@ -270,16 +265,17 @@ const report = r => { reported = r; };
 
 onmessage = async ev => {
   const code = String(ev.data && ev.data.code || "");
-  const config = Object.freeze({ ...(ev.data && ev.data.config || {}) });
-  INPUTS = (ev.data && ev.data.inputs) || {};
   try {
+    if (/\brequire\s*\(|^\s*import\s/m.test(code)) throw new Error("This runs in the browser, so require()/import are not available. Use \"Copy AI prompt\" and ask the AI for a Gwave backtest script");
     const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-    const fn = new AsyncFn("config", "input", "candles", "ta", "stats", "Account", "log", "progress", "report", code);
-    const ret = await fn(config, input, candles, ta, stats, Account, log, progress, report);
+    const fn = new AsyncFn("input", "candles", "ta", "stats", "Account", "log", "progress", "report", code);
+    const ret = await fn(input, candles, ta, stats, Account, log, progress, report);
     const r = reported || ret;
-    if (!r || typeof r !== "object") throw new Error("결과가 없어요. 스크립트 끝에서 return acct.result(); 또는 return { summary, equity, trades } 를 해 주세요");
+    if (!r || typeof r !== "object") throw new Error("No result. End the script with: return acct.result();");
     send("done", JSON.parse(JSON.stringify(r)));
   } catch (e) {
-    send("error", (e && e.message) || String(e));
+    let m = (e && e.message) || String(e);
+    if (/config is not defined/.test(m)) m = "config is not defined — put a config object at the top of the script (see the example)";
+    send("error", m);
   }
 };
