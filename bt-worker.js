@@ -125,77 +125,119 @@ function stats(equity, seed) {
 }
 
 /*
-  Account — one position at a time, uses the settings panel (config):
-    capital, leverage, sizePct (% of equity used as margin per trade), fee (%), margin ("isolated" | "cross"), direction
-  acct.open("long" | "short", price, t, { sl, tp, note })   acct.close(price, t, reason)
-  acct.update(candle)  ← call once per candle BEFORE your signals: handles SL / TP / liquidation and records equity
-  acct.pos (null or {side, entry, qty, margin, sl, tp}), acct.dead (balance gone), acct.result()
+  Account — uses the account settings on the right panel (config):
+    capital, leverage, sizePct (% of equity used as margin for ONE whole trade, all split entries together),
+    fee (%), margin ("isolated" | "cross"), direction ("long" | "short" | "both")
+  Split entries (scale-in / averaging) and partial exits are supported, and several coins can be held at once.
+    acct.open("long" | "short", price, t, { sym, share, sl, tp, note })  new position. share = part of the trade budget (0..1, default 1)
+    acct.add(price, t, { sym, share, sl, tp, note })                   add to the open position (average entry is recalculated)
+    acct.close(price, t, reason, { sym, frac })                          close all (frac 1) or part (e.g. frac 0.1 = 10%)
+    acct.setStop(sl, tp, { sym })                                        move stop loss / take profit
+    acct.update(candle, sym)   call once per candle FIRST (main coin: sym can be omitted) → SL / TP / liquidation + equity
+    acct.pos / acct.position(sym) → null or { side, entry (average), qty, margin, entries, sl, tp }
+    acct.side, acct.canLong, acct.canShort, acct.dead, acct.budget (margin budget of the current trade)
+    return acct.result()
+  The trade budget is fixed when the account goes from flat to the first position: equity × sizePct %.
 */
 const MMR = 0.005;
 const REASON = { "Stop loss": "손절", "Take profit": "익절", "Liquidation": "청산", "Signal": "신호" };
 class Account {
   constructor(cfg = {}) {
     this.cfg = cfg;
+    this.main = String(cfg.symbol || "BTC").toUpperCase();
     this.capital = +cfg.capital > 0 ? +cfg.capital : 10000;
     this.lev = Math.min(125, Math.max(1, +cfg.leverage || 1));
     this.sizePct = Math.min(100, Math.max(0.1, +cfg.sizePct || 100));
     this.fee = Math.max(0, cfg.fee == null ? 0.05 : +cfg.fee) / 100;
     this.cross = cfg.margin === "cross";
-    this.cash = this.capital; this.pos = null; this.dead = false;
+    this.cash = this.capital; this.ps = {}; this.marks = {}; this.dead = false; this.budget = 0;
     this.trades = []; this.eq = []; this.liqs = 0;
   }
   get canLong() { return this.cfg.direction !== "short"; }
   get canShort() { return this.cfg.direction !== "long"; }
-  get side() { return this.pos ? this.pos.side : null; }
-  equityAt(px) { const p = this.pos; return this.cash + (p ? (p.side === "long" ? 1 : -1) * p.qty * (px - p.entry) : 0); }
-  liqPrice() {
-    const p = this.pos; if (!p) return null;
-    if (!this.cross) return p.side === "long" ? p.entry * (1 - 1 / this.lev + MMR) : p.entry * (1 + 1 / this.lev - MMR);
-    return p.side === "long" ? (p.qty * p.entry - this.cash) / (p.qty * (1 - MMR)) : (this.cash + p.qty * p.entry) / (p.qty * (1 + MMR));
+  position(sym) { return this.ps[String(sym || this.main).toUpperCase()] || null; }
+  get pos() { return this.position(); }
+  get side() { const p = this.pos; return p ? p.side : null; }
+  get open_() { return Object.keys(this.ps).length; }
+  upnl(p, px) { return (p.side === "long" ? 1 : -1) * p.qty * (px - p.entry); }
+  equityAt(px) {                                       // px = main coin price, other coins use their last price
+    let e = this.cash;
+    for (const s in this.ps) { const m = s === this.main && px != null ? px : this.marks[s]; if (m) e += this.upnl(this.ps[s], m); }
+    return e;
   }
-  open(side, price, t, o = {}) {
-    if (this.pos || this.dead || !(price > 0)) return false;
-    if (side === "long" && !this.canLong) return false;
-    if (side === "short" && !this.canShort) return false;
-    const margin = this.cash * this.sizePct / 100;
-    if (!(margin > 0)) return false;
-    const notional = margin * this.lev, fee = notional * this.fee;
-    this.cash -= fee;
-    this.pos = { side, entry: price, qty: notional / price, margin, t, fee, sl: o.sl || null, tp: o.tp || null, note: o.note || "" };
+  liqPrice(sym) {
+    const p = this.position(sym); if (!p) return null;
+    if (!this.cross) return p.side === "long" ? (p.qty * p.entry - p.margin) / (p.qty * (1 - MMR)) : (p.qty * p.entry + p.margin) / (p.qty * (1 + MMR));
+    let other = 0, notional = 0;                       // cross: whole balance, other positions at their last price
+    for (const s in this.ps) if (s !== p.sym) { const q = this.ps[s], m = this.marks[s] || q.entry; other += this.upnl(q, m); notional += q.qty * m; }
+    const W = this.cash + other - MMR * notional;
+    return p.side === "long" ? (p.qty * p.entry - W) / (p.qty * (1 - MMR)) : (W + p.qty * p.entry) / (p.qty * (1 + MMR));
+  }
+  _fill(p, price, share) {
+    const margin = this.budget * Math.max(0, +share || 0);
+    if (!(margin > 0) || margin > this.cash + 1e-9) return false;
+    const notional = margin * this.lev, qty = notional / price, fee = notional * this.fee;
+    this.cash -= fee; p.fees += fee;
+    p.entry = (p.entry * p.qty + price * qty) / (p.qty + qty); p.qty += qty; p.margin += margin; p.mTotal += margin; p.entries++;
     return true;
   }
-  close(price, t, reason = "Signal") {
-    const p = this.pos; if (!p) return 0;
-    const g = (p.side === "long" ? 1 : -1) * p.qty * (price - p.entry), fee = p.qty * price * this.fee;
-    let pnl = g - fee;
-    if (!this.cross && pnl < -p.margin) pnl = -p.margin;                      // isolated: can't lose more than the margin
-    this.cash += pnl;
-    if (this.cash <= 1e-9) { this.cash = 0; this.dead = true; }
-    const net = pnl - p.fee;
-    this.trades.push({ "진입 시각": p.t, "청산 시각": t, "방향": p.side === "long" ? "롱" : "숏", "진입가": p.entry, "청산가": price,
-      "손익": Math.round(net * 100) / 100, "수익률": (net / p.margin * 100).toFixed(2) + "%", "사유": REASON[reason] || reason, ...(p.note ? { "메모": p.note } : {}) });
-    this.pos = null;
-    return net;
+  open(side, price, t, o = {}) {
+    const sym = String(o.sym || this.main).toUpperCase();
+    if (this.dead || this.ps[sym] || !(price > 0)) return false;
+    if (side === "long" && !this.canLong) return false;
+    if (side === "short" && !this.canShort) return false;
+    if (!this.open_) this.budget = this.cash * this.sizePct / 100;
+    const p = { sym, side, entry: price, qty: 0, margin: 0, mTotal: 0, entries: 0, fees: 0, realized: 0, t, sl: o.sl || null, tp: o.tp || null, note: o.note || "" };
+    if (!this._fill(p, price, o.share == null ? 1 : o.share)) return false;
+    this.ps[sym] = p; this.marks[sym] = price;
+    return true;
   }
-  update(c) {
-    const p = this.pos;
+  add(price, t, o = {}) {
+    const p = this.position(o.sym);
+    if (!p || this.dead || !(price > 0)) return false;
+    if (!this._fill(p, price, o.share == null ? 1 : o.share)) return false;
+    if (o.sl !== undefined) p.sl = o.sl; if (o.tp !== undefined) p.tp = o.tp; if (o.note) p.note = o.note;
+    return true;
+  }
+  setStop(sl, tp, o = {}) { const p = this.position(o.sym); if (p) { if (sl !== undefined) p.sl = sl; if (tp !== undefined) p.tp = tp; } }
+  close(price, t, reason = "Signal", o = {}) {
+    const p = this.position(o.sym); if (!p || !(price > 0)) return 0;
+    const frac = Math.min(1, Math.max(0, o.frac == null ? 1 : +o.frac)), all = frac >= 0.999999;
+    const q = p.qty * (all ? 1 : frac), m = p.margin * (all ? 1 : frac);
+    let pnl = (p.side === "long" ? 1 : -1) * q * (price - p.entry) - q * price * this.fee;
+    if (!this.cross && pnl < -m) pnl = -m;                                     // isolated: can't lose more than the margin
+    this.cash += pnl; p.realized += pnl; p.qty -= q; p.margin -= m; this.marks[p.sym] = price;
+    if (this.cash <= 1e-9) { this.cash = 0; this.dead = true; }
+    if (all || p.qty <= 1e-12) {
+      const net = p.realized - p.fees;
+      this.trades.push({ "코인": p.sym, "진입 시각": p.t, "청산 시각": t, "방향": p.side === "long" ? "롱" : "숏", "진입 횟수": p.entries, "평단": p.entry, "청산가": price,
+        "손익": Math.round(net * 100) / 100, "수익률": (net / (p.mTotal || 1) * 100).toFixed(2) + "%", "사유": REASON[reason] || reason, ...(p.note ? { "메모": p.note } : {}) });
+      delete this.ps[p.sym];
+    } else p.partial = (p.partial || 0) + 1;
+    return pnl;
+  }
+  _closeAll(t, reason) { for (const s of Object.keys(this.ps)) this.close(this.marks[s] || this.ps[s].entry, t, reason, { sym: s }); }
+  update(c, sym) {
+    sym = String(sym || this.main).toUpperCase();
+    const p = this.ps[sym];
     if (p) {
-      const L = p.side === "long", liq = this.liqPrice(), adv = L ? c.l : c.h;
-      const hit = (x, price) => x && (L ? price <= x : price >= x);
-      const slFirst = hit(p.sl, adv) && (!liq || (L ? p.sl >= liq : p.sl <= liq));
-      if (slFirst) this.close(L ? Math.min(p.sl, c.o) : Math.max(p.sl, c.o), c.t, "Stop loss");
-      else if (liq && (L ? adv <= liq : adv >= liq)) {
+      const L = p.side === "long", adv = L ? c.l : c.h, liq = this.liqPrice(sym);
+      const hit = x => x && (L ? adv <= x : adv >= x);
+      const liqHit = liq > 0 && (L ? adv <= liq : adv >= liq);
+      if (hit(p.sl) && (!liqHit || (L ? p.sl >= liq : p.sl <= liq))) this.close(L ? Math.min(p.sl, c.o) : Math.max(p.sl, c.o), c.t, "Stop loss", { sym });
+      else if (liqHit) {
         this.liqs++;
-        if (this.cross) { this.close(liq, c.t, "Liquidation"); this.cash = 0; this.dead = true; }
-        else {                                                                 // isolated: the whole margin is lost
-          const before = this.cash, m = p.margin + p.fee; this.close(liq, c.t, "Liquidation");
-          const extra = Math.max(0, p.margin - (before - this.cash));
-          this.cash = Math.max(0, this.cash - extra); if (this.cash <= 1e-9) this.dead = true;
-          const tr = this.trades[this.trades.length - 1]; tr["손익"] = Math.round(-m * 100) / 100; tr["수익률"] = (-m / p.margin * 100).toFixed(2) + "%";
+        if (this.cross) { this.marks[sym] = liq; this._closeAll(c.t, "Liquidation"); this.cash = 0; this.dead = true; }
+        else {                                                                 // isolated: the whole margin of this position is lost
+          const before = this.cash, mg = p.margin, fees = p.fees, done = p.realized, tot = p.mTotal;
+          this.close(liq, c.t, "Liquidation", { sym });
+          this.cash = Math.max(0, before - mg); if (this.cash <= 1e-9) this.dead = true;
+          const tr = this.trades[this.trades.length - 1]; const net = done - mg - fees; tr["손익"] = Math.round(net * 100) / 100; tr["수익률"] = (net / (tot || 1) * 100).toFixed(2) + "%";
         }
-      } else if (p.tp && (L ? c.h >= p.tp : c.l <= p.tp)) this.close(L ? Math.max(p.tp, c.o) : Math.min(p.tp, c.o), c.t, "Take profit");
+      } else if (p.tp && (L ? c.h >= p.tp : c.l <= p.tp)) this.close(L ? Math.max(p.tp, c.o) : Math.min(p.tp, c.o), c.t, "Take profit", { sym });
     }
-    this.eq.push([c.t, Math.max(0, this.equityAt(c.c))]);
+    this.marks[sym] = c.c;
+    if (sym === this.main) this.eq.push([c.t, Math.max(0, this.equityAt(c.c))]);
   }
   result(extra = {}) {
     const step = Math.max(1, Math.ceil(this.eq.length / 3000));
@@ -211,6 +253,16 @@ class Account {
   }
 }
 
+// input("Label", default) → value from the "전략 설정" fields on the panel (the page reads these calls from the script)
+let INPUTS = {};
+function input(label, def) {
+  const v = INPUTS[String(label)];
+  if (v === undefined || v === null || v === "") return def;
+  if (typeof def === "number") { const n = +v; return isFinite(n) ? n : def; }
+  if (typeof def === "boolean") return v === true || v === "true";
+  return String(v);
+}
+
 const log = (...a) => send("log", a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" ").slice(0, 2000));
 const progress = f => send("prog", Math.max(0, Math.min(1, +f || 0)));
 let reported = null;
@@ -219,10 +271,11 @@ const report = r => { reported = r; };
 onmessage = async ev => {
   const code = String(ev.data && ev.data.code || "");
   const config = Object.freeze({ ...(ev.data && ev.data.config || {}) });
+  INPUTS = (ev.data && ev.data.inputs) || {};
   try {
     const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-    const fn = new AsyncFn("config", "candles", "ta", "stats", "Account", "log", "progress", "report", code);
-    const ret = await fn(config, candles, ta, stats, Account, log, progress, report);
+    const fn = new AsyncFn("config", "input", "candles", "ta", "stats", "Account", "log", "progress", "report", code);
+    const ret = await fn(config, input, candles, ta, stats, Account, log, progress, report);
     const r = reported || ret;
     if (!r || typeof r !== "object") throw new Error("결과가 없어요. 스크립트 끝에서 return acct.result(); 또는 return { summary, equity, trades } 를 해 주세요");
     send("done", JSON.parse(JSON.stringify(r)));

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
-<script src="theme.js?v=20261010225638"></script>
+<script src="theme.js?v=20261010230450"></script>
 <title>백테스트 · Gwave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="common.css?v=20261010225638">
+<link rel="stylesheet" href="common.css?v=20261010230450">
 <style>
   html,body{overflow-x:hidden}
   @media (pointer:coarse){ input,select,textarea{font-size:16px!important} }
@@ -58,6 +58,13 @@
   #prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
   #status{font-size:12.5px;color:var(--muted);margin-top:8px;min-height:1.3em;overflow-wrap:anywhere}
   #status.bad{color:var(--sell)}
+  #inBox{border-top:1px dashed var(--line);padding-top:10px;margin-top:2px}
+  .inttl{font-size:13px;font-weight:700;margin-bottom:8px}
+  .inttl small{font-weight:400;color:var(--muted);font-size:11px;margin-left:4px}
+  #inputs label{margin-bottom:8px}
+  #inputs input[type=text],#inputs input[type=number]{width:100%;box-sizing:border-box}
+  #inputs .chk{flex-direction:row;align-items:center;gap:8px;color:var(--text);font-size:13px}
+  #inputs .chk input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
   .hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:10px}
 
   /* results */
@@ -85,7 +92,7 @@
     #eqchart{height:240px}
   }
 </style>
-<link rel="stylesheet" href="gwave-ui.css?v=20261010225638">
+<link rel="stylesheet" href="gwave-ui.css?v=20261010230450">
 </head>
 <body>
 <div class="wrap">
@@ -123,10 +130,11 @@
       <div class="quick" id="lquick"><button class="ghost" data-l="1">1x</button><button class="ghost" data-l="5">5x</button><button class="ghost" data-l="10">10x</button><button class="ghost" data-l="20">20x</button><button class="ghost" data-l="50">50x</button><button class="ghost" data-l="100">100x</button></div>
       <div class="seg" id="dir"><button data-d="long">롱만</button><button data-d="short">숏만</button><button data-d="both" class="on">롱+숏</button></div>
       <label>시작 자산 (USDT)<input id="cap" type="number" min="10" step="100" value="10000" inputmode="decimal"></label>
-      <div class="levrow"><span class="lt">진입 비중 (자산의 몇 %를 증거금으로)</span><span style="flex:1"></span><input id="pctn" type="number" min="1" max="100" step="1" value="10" inputmode="numeric"><span class="xs">%</span></div>
+      <div class="levrow"><span class="lt">진입 비중 (매매 1번에 쓸 증거금, 분할 합계 · 자산의 %)</span><span style="flex:1"></span><input id="pctn" type="number" min="1" max="100" step="1" value="10" inputmode="numeric"><span class="xs">%</span></div>
       <input id="pct" type="range" min="1" max="100" step="1" value="10" aria-label="진입 비중">
       <div class="quick" id="pquick"><button class="ghost" data-p="5">5%</button><button class="ghost" data-p="10">10%</button><button class="ghost" data-p="25">25%</button><button class="ghost" data-p="50">50%</button><button class="ghost" data-p="100">100%</button></div>
       <label>수수료 (체결당 %)<input id="fee" type="number" min="0" max="1" step="0.01" value="0.05" inputmode="decimal"></label>
+      <div id="inBox" hidden><div class="inttl">전략 설정 <small>스크립트에서 자동으로 만든 칸</small></div><div id="inputs"></div></div>
       <div class="info">
         <div><span>1회 증거금</span><b id="iMargin">-</b></div>
         <div><span>포지션 규모</span><b id="iNotional">-</b></div>
@@ -150,9 +158,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="common.js?v=20261010225638"></script>
-<script src="nav.js?v=20261010225638"></script>
-<script src="bt-examples.js?v=20261010225638"></script>
+<script src="common.js?v=20261010230450"></script>
+<script src="nav.js?v=20261010230450"></script>
+<script src="bt-examples.js?v=20261010230450"></script>
 <script>
 "use strict";
 (() => {
@@ -216,7 +224,7 @@
     if (/^e\d+$/.test(v)) { $("code").value = BT_EXAMPLES[+v.slice(1)].code; $("saveName").value = ""; }
     else if (/^s\d+$/.test(v) && mine[+v.slice(1)]) { $("code").value = mine[+v.slice(1)].code; $("saveName").value = mine[+v.slice(1)].name; }
     $("del").hidden = !/^s/.test(v);
-    ls.set(LK, $("code").value);
+    ls.set(LK, $("code").value); paintInputs();
   };
   $("save").onclick = () => {
     const name = $("saveName").value.trim().slice(0, 40), code = $("code").value;
@@ -242,7 +250,39 @@
     if (e.key !== "Tab") return;
     e.preventDefault(); const t = e.target; t.setRangeText("  ", t.selectionStart, t.selectionEnd, "end");
   });
-  $("code").addEventListener("input", () => ls.set(LK, $("code").value));
+  $("code").addEventListener("input", () => { ls.set(LK, $("code").value); clearTimeout(inT); inT = setTimeout(paintInputs, 400); });
+
+  // ── 전략 설정: 스크립트 안의 input("이름", 기본값) 을 읽어서 칸을 만듦 (값은 이 브라우저에 기억) ──
+  const IK = "bt-inputs-v1";
+  let inT = null, inVals = {};
+  try { inVals = JSON.parse(ls.get(IK) || "{}") || {}; } catch (e) { inVals = {}; }
+  function parseInputs(code) {
+    const out = [], seen = new Set(), re = /\binput\(\s*(["'])((?:(?!\1).){1,60})\1\s*,\s*("([^"]*)"|'([^']*)'|true|false|-?\d+(?:\.\d+)?)/g;
+    let m;
+    while ((m = re.exec(code)) && out.length < 30) {
+      const label = m[2]; if (seen.has(label)) continue; seen.add(label);
+      const raw = m[3], def = raw === "true" ? true : raw === "false" ? false : /^["']/.test(raw) ? (m[4] ?? m[5] ?? "") : +raw;
+      out.push({ label, def });
+    }
+    return out;
+  }
+  let curInputs = [];
+  function paintInputs() {
+    curInputs = parseInputs($("code").value);
+    $("inBox").hidden = !curInputs.length;
+    $("inputs").innerHTML = curInputs.map((x, i) => {
+      const v = Object.prototype.hasOwnProperty.call(inVals, x.label) ? inVals[x.label] : x.def;
+      if (typeof x.def === "boolean") return `<label class="chk"><input type="checkbox" data-i="${i}"${v === true || v === "true" ? " checked" : ""}>${esc(x.label)}</label>`;
+      return `<label>${esc(x.label)}<input type="${typeof x.def === "number" ? "number" : "text"}" step="any" data-i="${i}" value="${esc(v)}" placeholder="${esc(x.def)}"></label>`;
+    }).join("");
+  }
+  $("inputs").addEventListener("input", e => {
+    const el = e.target.closest("input[data-i]"); if (!el) return;
+    const x = curInputs[+el.dataset.i]; if (!x) return;
+    inVals[x.label] = el.type === "checkbox" ? el.checked : el.value;
+    ls.set(IK, JSON.stringify(inVals));
+  });
+  function inputValues() { const o = {}; for (const x of curInputs) if (Object.prototype.hasOwnProperty.call(inVals, x.label)) o[x.label] = inVals[x.label]; return o; }
 
   // ── run in an isolated Web Worker ──
   let worker = null, t0 = 0;
@@ -270,7 +310,7 @@
       else if (m.type === "done") { setProg(1); stop(`완료 · ${((performance.now() - t0) / 1000).toFixed(1)}초`); show(m.data); }
     };
     worker.onerror = e => { e.preventDefault(); stop("오류: " + (e.message || "스크립트 실행 실패"), true); };
-    worker.postMessage({ code, config: config() });
+    paintInputs(); worker.postMessage({ code, config: config(), inputs: inputValues() });
   };
 
   // ── results (everything from the script is shown as plain text only) ──
@@ -326,6 +366,7 @@
   const last = ls.get(LK);
   $("code").value = last && last.trim() ? last : BT_EXAMPLES[0].code;
   if (!last) $("pick").value = "e0";
+  paintInputs();
 })();
 </script>
 </body>

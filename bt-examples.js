@@ -1,41 +1,50 @@
-/* bt-examples.js — Backtest tab: example scripts + rules to give an AI */
+/* bt-examples.js — Backtest tab: example scripts + rules to give an AI (code stays in English) */
 window.BT_SPEC = `Gwave backtest script rules (JavaScript, runs in the browser)
 
-The settings panel is passed in as \`config\` (read-only):
-  config.symbol     e.g. "BTC" (no USDT)        config.interval  "1m","5m","15m","30m","1h","2h","4h","6h","12h","1d","1w"
-  config.from       start date "2020-01-01"     config.capital   starting capital (USDT)
-  config.leverage   e.g. 10                     config.sizePct   % of equity used as margin per trade
-  config.margin     "isolated" | "cross"        config.direction "long" | "short" | "both"
+ACCOUNT SETTINGS come from the right panel as \`config\` (read-only):
+  config.symbol     main coin, e.g. "BTC" (no USDT)   config.interval  "1m","5m","15m","30m","1h","2h","4h","6h","12h","1d","1w"
+  config.from       start date "2020-01-01"           config.capital   starting capital (USDT)
+  config.leverage   e.g. 10                           config.sizePct   % of equity used as margin for ONE whole trade (all split entries together)
+  config.margin     "isolated" | "cross"              config.direction "long" | "short" | "both"
   config.fee        fee per fill in % (e.g. 0.05)
+  Do not hard-code these.
 
-Available (await allowed):
-- await candles(config.symbol, config.interval, config.from)
-    → [{t, o, h, l, c, v}] oldest first, closed candles only, t = UTC time in ms (Binance futures)
-    other coins: await candles("ETH", "1h", "2020-01-01")
+STRATEGY SETTINGS: use input("Label", default) for every strategy number. The page reads these calls and
+creates a field on the panel for each one, so the user can change values without touching code.
+  const FAST = input("Fast EMA", 50);   const SPLITS = input("Split ratio", "1,2,4");   const USE_RSI = input("Use RSI filter", true);
+  (label must be a plain string literal, default a number, string or true/false; write each input() once, at the top)
+
+DATA & INDICATORS (await allowed):
+- await candles(config.symbol, config.interval, config.from) → [{t, o, h, l, c, v}] oldest first, closed candles only, t = UTC ms
+  other coins: await candles("ETH", config.interval, config.from)   (Binance USDT-M futures)
 - ta.sma(arr, n), ta.ema(arr, n), ta.rsi(arr, n), ta.atr(candles, n), ta.highest(arr, n), ta.lowest(arr, n)
-  ta.macd(arr, 12, 26, 9) → { macd, signal, hist }
-    → arrays with the same length as the input (NaN while warming up)
-- const acct = new Account(config)   (uses capital, leverage, sizePct, fee, margin, direction from the panel)
-    acct.update(candle)                         call FIRST on every candle: handles stop loss / take profit / liquidation, records equity
-    acct.open("long" | "short", price, t, { sl, tp, note })   ignored if a position is open or the direction is disabled
-    acct.close(price, t, "reason")
-    acct.pos (null or { side, entry, qty, margin, sl, tp }), acct.side, acct.canLong, acct.canShort, acct.dead (account blown)
-    return acct.result()                        → summary, equity curve and trade list for the screen
-- stats(equity, seed), log(...) text in the log box, progress(0..1) progress bar
+  ta.macd(arr, 12, 26, 9) → { macd, signal, hist }      (same length as input, NaN while warming up)
 
-Rules:
-- Put strategy-only numbers (indicator lengths, stop %, take-profit %) at the top as const.
-  Capital, leverage, position size, margin mode, direction and fee come from config — do not hard-code them.
-- Act on candle close (use candle i to decide, fill at its close or put sl/tp for later candles). No look-ahead.
-- Loop: for each candle → acct.update(c) → if (acct.dead) break → your entry / exit logic.
-- No document, window or localStorage. Plain JavaScript, no external libraries.
-- End with: return acct.result();`;
+ACCOUNT SIMULATOR: const acct = new Account(config)
+- The trade budget = equity × sizePct % is fixed when the account goes from flat to its first position.
+- acct.open("long" | "short", price, t, { sym, share, sl, tp, note })  new position; share = part of the budget (0..1, default 1)
+- acct.add(price, t, { sym, share, sl, tp })      split entry / averaging into the open position (average entry recalculated)
+- acct.close(price, t, "reason", { sym, frac })   close all (frac 1) or a part (frac 0.1 = 10% of the position)
+- acct.setStop(sl, tp, { sym })                   move stop loss / take profit
+- acct.update(candle, sym)                        call FIRST on every candle for every coin you hold (main coin: sym can be omitted)
+                                                  → stop loss / take profit / liquidation (isolated or cross) and the equity curve
+- acct.pos / acct.position("ETH") → null or { side, entry (average), qty, margin, entries, sl, tp }
+- acct.side, acct.canLong, acct.canShort (direction setting), acct.dead (balance gone), acct.budget
+- sym defaults to config.symbol. Several coins can be held at the same time (one position per coin).
+- End with: return acct.result();
+
+RULES:
+- Decide on candle close, no look-ahead. Loop: for each candle → acct.update(...) for held coins → if (acct.dead) break → logic.
+- When a stop and a target could both be hit in the same candle, assume the stop first (acct.update already does).
+- Other coins: build a Map by time (new Map(eth.map(c => [c.t, c])) and look up the same t as the main candle.
+- log(...) writes to the log box, progress(0..1) moves the progress bar.
+- No document, window or localStorage. Plain JavaScript, no external libraries.`;
 
 window.BT_EXAMPLES = [
 { name: "예시 1 · 이동평균선 교차", code: `// EMA crossover: fast EMA crosses above slow EMA → long, crosses below → short (or close).
-// Capital, leverage, position size, margin mode, direction and fee come from the panel on the right.
-const FAST = 50;          // fast EMA length
-const SLOW = 200;         // slow EMA length
+// Account settings (capital, leverage, size, margin mode, direction, fee) come from the panel.
+const FAST = input("Fast EMA", 50);
+const SLOW = input("Slow EMA", 200);
 
 const cs = await candles(config.symbol, config.interval, config.from);
 const close = cs.map(c => c.c);
@@ -58,14 +67,14 @@ for (let i = 1; i < cs.length; i++) {
   if (i % 2000 === 0) progress(i / cs.length);
 }
 return acct.result();` },
-{ name: "예시 2 · 이동평균선 + RSI", code: `// Trend filter + pullback: trade only in the direction of the 200 EMA,
+{ name: "예시 2 · 이동평균선 + RSI", code: `// Trend filter + pullback: trade only in the direction of the trend EMA,
 // enter when RSI comes back out of oversold (long) / overbought (short). Fixed stop loss and take profit.
-const TREND = 200;        // trend EMA length
-const RSI_LEN = 14;
-const RSI_LOW = 30;       // long when RSI crosses back above this (price above the EMA)
-const RSI_HIGH = 70;      // short when RSI crosses back below this (price below the EMA)
-const STOP = 2;           // stop loss % from entry
-const TAKE = 4;           // take profit % from entry
+const TREND = input("Trend EMA", 200);
+const RSI_LEN = input("RSI length", 14);
+const RSI_LOW = input("RSI oversold", 30);
+const RSI_HIGH = input("RSI overbought", 70);
+const STOP = input("Stop loss %", 2);
+const TAKE = input("Take profit %", 4);
 
 const cs = await candles(config.symbol, config.interval, config.from);
 const close = cs.map(c => c.c);
@@ -84,11 +93,11 @@ for (let i = 1; i < cs.length; i++) {
   if (i % 2000 === 0) progress(i / cs.length);
 }
 return acct.result();` },
-{ name: "예시 3 · 이동평균선 + MACD", code: `// MACD signal-line cross in the direction of the 100 EMA trend.
+{ name: "예시 3 · 이동평균선 + MACD", code: `// MACD signal-line cross in the direction of the trend EMA.
 // Exit on the opposite MACD cross, with an ATR-based stop loss.
-const TREND = 100;        // trend EMA length
-const ATR_LEN = 14;
-const ATR_STOP = 2;       // stop loss = entry ∓ ATR × 2
+const TREND = input("Trend EMA", 100);
+const ATR_LEN = input("ATR length", 14);
+const ATR_STOP = input("Stop = ATR x", 2);
 
 const cs = await candles(config.symbol, config.interval, config.from);
 const close = cs.map(c => c.c);
@@ -115,18 +124,18 @@ return acct.result();` },
 //   and retraces 30–80% of wave 1. Enter long when price breaks the wave 1 high (start of wave 3)
 //   while MACD histogram > 0 and RSI > 50. Stop at the wave 2 low, target = wave 1 length × 1.6.
 //   Shorts are the mirror image. Swings are only used once confirmed (no look-ahead).
-const ZZ = 4;             // ZigZag: a swing is confirmed after a 4% reversal
-const RET_MIN = 0.3, RET_MAX = 0.8;   // wave 2 retracement range of wave 1
-const EXT = 1.6;          // wave 3 target = wave 1 length × 1.6
-const RSI_LEN = 14;
+const ZZ = input("ZigZag reversal %", 4);
+const RET_MIN = input("Wave 2 min retrace", 0.3);
+const RET_MAX = input("Wave 2 max retrace", 0.8);
+const EXT = input("Wave 3 target x wave 1", 1.6);
+const RSI_LEN = input("RSI length", 14);
 
 const cs = await candles(config.symbol, config.interval, config.from);
 const close = cs.map(c => c.c);
 const m = ta.macd(close, 12, 26, 9), rsi = ta.rsi(close, RSI_LEN);
 const acct = new Account(config);
 
-// ZigZag built candle by candle: piv = confirmed swing points [{type: "H"|"L", price}]
-const piv = [];
+const piv = [];           // confirmed swing points [{type: "H"|"L", price}]
 let dir = 0, ext = cs[0].c;
 let armed = null;         // current wave-3 setup waiting for a breakout
 
@@ -168,6 +177,87 @@ function onPivot() {
     armed = { side: "long", trigger: b.price, stop: c.price, len };
   else if (a.type === "H" && b.type === "L" && c.type === "H" && c.price < a.price && ret >= RET_MIN && ret <= RET_MAX)
     armed = { side: "short", trigger: b.price, stop: c.price, len };
+}
+return acct.result();` },
+{ name: "예시 5 · 비트·이더·솔라나 교차 분할매수 (RSI 진입)", code: `// Split-entry cross trade (long only):
+//   BTC RSI drops below the entry level → BTC entry 1 + ETH entry 1
+//   BTC falls "Add 2 at %" from entry 1  → BTC entry 2 + ETH entry 2 + SOL entry 1
+//   BTC falls "Add 3 at %"               → BTC entry 3 + ETH entry 3 + SOL entry 2
+//   Take profit: BTC reaches "Take profit %" above BTC entry 1 → close all coins.
+//   Stop: from BTC entry 1, close "Cut size %" of every coin at each "Cut at %" level, everything at "Full stop %".
+// "Split ratio" splits the trade budget (panel: position size) across coins and entries.
+const COINS = input("Coins (main first)", "BTC,ETH,SOL").split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+const SPLIT = input("Split ratio", "1,2,4").split(",").map(Number);
+const RSI_IN = input("Enter when RSI below", 25);
+const ADD2 = input("Add 2 at % below", 1.5);
+const ADD3 = input("Add 3 at % below", 3);
+const TP = input("Take profit %", 2);
+const CUTS = input("Cut at % (comma)", "3,4,5").split(",").map(Number);
+const CUT_FRAC = input("Cut size %", 10) / 100;
+const FULL_STOP = input("Full stop %", 6);
+
+const main = config.symbol;
+const cs = await candles(main, config.interval, config.from);
+const others = {};
+for (const s of COINS.slice(1)) others[s] = new Map((await candles(s, config.interval, config.from)).map(c => [c.t, c]));
+const rsi = ta.rsi(cs.map(c => c.c), 14);
+const acct = new Account(config);
+
+// budget share of every fill: main coin and coin 2 start at entry 1, coin 3 starts one step later
+const steps = [0, ADD2, ADD3];
+const plan = [];                                   // plan[step] = [{sym, w}]
+COINS.forEach((s, k) => SPLIT.forEach((w, j) => { const step = j + Math.max(0, k - 1); if (step < steps.length) (plan[step] = plan[step] || []).push({ sym: s, w }); }));
+const totalW = plan.flat().reduce((a, x) => a + x.w, 0);
+
+let cyc = null;
+for (let i = 1; i < cs.length; i++) {
+  const c = cs[i];
+  acct.update(c);
+  for (const s in others) { const o = others[s].get(c.t); if (o) acct.update(o, s); }
+  if (acct.dead) break;
+
+  if (cyc && !acct.pos && cyc.step) {             // main coin closed (stop / liquidation) → close the rest, cycle over
+    for (const s in others) { const o = others[s].get(c.t); if (o && acct.position(s)) acct.close(o.c, c.t, "Main coin closed", { sym: s }); }
+    cyc = null;
+  }
+  if (!cyc && !acct.pos && rsi[i - 1] < RSI_IN) cyc = { L: c.o, step: 0, cut: 0 };
+  if (!cyc) continue;
+
+  // adverse first: entries and stop levels between the open and the low, highest price first
+  const ev = [];
+  for (let k = cyc.step; k < steps.length; k++) ev.push([cyc.L * (1 - steps[k] / 100), "add", k]);
+  for (let k = cyc.cut; k < CUTS.length; k++) ev.push([cyc.L * (1 - CUTS[k] / 100), "cut", k]);
+  ev.push([cyc.L * (1 - FULL_STOP / 100), "stop"]);
+  ev.sort((a, b) => b[0] - a[0]);
+  for (const [p0, type, k] of ev) {
+    if (c.l > p0 || !cyc) continue;
+    const px = Math.min(p0, c.o), ratio = px / c.o;             // other coins: assume the same % move within the candle
+    const priceOf = s => s === main ? px : (others[s].get(c.t) ? others[s].get(c.t).o * ratio : null);
+    if (type === "add" && k === cyc.step) {
+      for (const f of plan[k] || []) {
+        const p = priceOf(f.sym); if (!p) continue;
+        const share = f.w / totalW;
+        if (acct.position(f.sym)) acct.add(p, c.t, { sym: f.sym, share }); else acct.open("long", p, c.t, { sym: f.sym, share });
+      }
+      cyc.step++;
+    } else if (type === "cut" && k === cyc.cut && acct.pos) {
+      for (const s of COINS) { const p = priceOf(s); if (p && acct.position(s)) acct.close(p, c.t, "Split stop", { sym: s, frac: CUT_FRAC }); }
+      cyc.cut++;
+    } else if (type === "stop" && acct.pos) {
+      for (const s of COINS) { const p = priceOf(s); if (p && acct.position(s)) acct.close(p, c.t, "Stop loss", { sym: s }); }
+      cyc = null;
+    }
+  }
+  if (cyc && acct.pos && c.h >= cyc.L * (1 + TP / 100)) {
+    const px = Math.max(cyc.L * (1 + TP / 100), c.o), ratio = px / c.o;
+    for (const s of COINS) {
+      const o = s === main ? null : others[s].get(c.t);
+      const p = s === main ? px : (o ? Math.min(o.h, Math.max(o.l, o.o * ratio)) : null);
+      if (p && acct.position(s)) acct.close(p, c.t, "Take profit", { sym: s });
+    }
+    cyc = null;
+  }
+  if (i % 2000 === 0) progress(i / cs.length);
 }
 return acct.result();` },
 ];

@@ -9,7 +9,7 @@
     ["signals-rwa.html", "Stock"],
     ["lowsig.html", "Trading Engine"],
     ["paper.html", "Paper Trading"],
-    ["calc.html", "Calculator"],
+    ["backtest.html", "Backtest"],
   ];
   // "인사이트" 묶음: PC는 마우스를 올리면 아래로 펼쳐지는 패널, 휴대폰은 누르면 아래에서 올라오는 시트
   // [주소, 한글 이름, 영어 이름, 한글 설명, 영어 설명, 아이콘, 색]
@@ -20,7 +20,7 @@
     ["rank.html", "코인순위", "Rankings", "시가총액 순위", "Market cap ranking", "list", "#f59e0b"],
     ["movers.html", "24시간변동률", "Top Movers", "24시간 상승 · 하락 순위", "24h gainers & losers", "move", "#10b981"],
     ["news.html", "주요뉴스", "News", "코인 뉴스 · 거래소 공지", "Crypto news & exchange notices", "news", "#64748b"],
-    ["backtest.html", "백테스트", "Backtest", "전략 스크립트를 붙여넣고 과거 가격으로 검증", "Paste a strategy script and test it on past prices", "code", "#0ea5e9"],
+    ["calc.html", "계산기", "Calculator", "수수료 · 펀딩비 · 물타기 평단 · 청산가 · 복리", "Fees, funding, average entry, liquidation, compounding", "calc", "#0ea5e9"],
   ];
   const ICON = {
     trend: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
@@ -29,7 +29,7 @@
     list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
     move: '<path d="M7 17V5l-4 4M7 5l4 4"/><path d="M17 7v12l4-4M17 19l-4-4"/>',
     news: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/>',
-    code: '<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
+    calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h0M14 11h2M8 15h2M14 15h2M8 18h2M14 18h2"/>',
   };
   const LANG = (() => { try { const v = localStorage.getItem("artha-lang"); if (v) return v; } catch (e) {} const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : "en"; })();
   const KO = LANG === "ko";
@@ -392,8 +392,8 @@
   new MutationObserver(() => { if (!t) t = setTimeout(() => { t = null; mark(); }, 200); }).observe(document.body, { childList: true, subtree: true });
   const holder = document.createElement("div"); holder.id = "gt_el"; document.body.appendChild(holder);
   // 탭 이름은 기계번역이 어색해서("청산히트맵" → "Cheongsan Heatmap") 다른 언어에서는 정해 둔 영어 이름으로
-  const EN = { "index.html": "Crypto", "signals-rwa.html": "Stock", "lowsig.html": "Trading Engine", "paper.html": "Paper Trading", "calc.html": "Calculator", "market.html": "Market Direction",
-               "liquidation.html": "Liquidation Map", "oi.html": "OI", "rank.html": "Rankings", "movers.html": "Top Movers", "news.html": "News" };
+  const EN = { "index.html": "Crypto", "signals-rwa.html": "Stock", "lowsig.html": "Trading Engine", "paper.html": "Paper Trading", "backtest.html": "Backtest", "market.html": "Market Direction",
+               "liquidation.html": "Liquidation Map", "oi.html": "OI", "rank.html": "Rankings", "movers.html": "Top Movers", "news.html": "News", "calc.html": "Calculator" };
   for (const a of nav.querySelectorAll(".navtabs a")) { const n = EN[a.getAttribute("href")]; if (n) { a.textContent = n; a.classList.add("notranslate"); a.translate = false; } }
   // 원래 영어로 만든 페이지(모의투자: <html lang="en">)는 번역하지 않음 → 가격·주문 칸이 계속 바뀌어도 깜빡이지 않게
   if ((document.documentElement.lang || "").toLowerCase().startsWith("en")) return;
