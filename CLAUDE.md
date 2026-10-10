@@ -20,6 +20,10 @@
   브라우저로 계산 코드를 내려보내지 말고, 화면은 `api/fib`·`api/market`·`api/lowsig` 결과만 받아서 그림.
 - 화면 문구·주석·차트에 계산 원리(피보나치, 깊이 비율 숫자, 기준 고점·저점 선, 이평 길이, ATR 배수 등)를 드러내지 않기. 깊이는 A/B/C 로만.
 - 연구용 백테스트 페이지는 `research/` (배포 제외, .vercelignore). 사이트에 새로 올리지 않기.
+- 공개 백테스트 탭(`backtest.html`, Insights 메뉴): 누구나 스크립트를 붙여넣어 실행. 스크립트는 `bt-worker.js`(Web Worker) 안에서만 돌고
+  쓸 수 있는 건 candles·ta·stats·log·progress 뿐. **Gwave 진입 신호 기능은 공개 탭에 절대 넣지 않음** (원리 노출).
+  결과 표시는 반드시 esc() 로 글자만 (스크립트 결과로 화면에 HTML/스크립트가 들어가면 로그인 토큰이 털림).
+  사용자가 백테스트를 부탁하면 대화창에서 돌리지 말고 `bt-examples.js` 의 BT_SPEC 형식 스크립트를 짜서 주기 (토큰 절약).
 - 비밀값(텔레그램 토큰·바이낸스 키·BOT_SECRET·TICK_SECRET·DB 토큰)은 저장소에 절대 넣지 않음 — Vercel 환경변수에만.
 - 봇 타이머는 Upstash QStash (sigbot 5분, bot 15분)가 `fibo-lab-kappa.vercel.app/api/...` 를 부름.
   옛 주소는 화면만 gwave-lab 으로 이동시키고 /api 는 살려 둔 상태이므로 vercel.json 의 그 redirect 규칙을 지우지 말 것.

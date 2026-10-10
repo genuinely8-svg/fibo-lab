@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-title" content="Gwave"><meta name="application-name" content="Gwave"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#FFFFFF">
+<script src="theme.js?v=20261010222623"></script>
+<title>백테스트 · Gwave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css?v=20261010222623">
+<style>
+  .bthead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .bthead select{flex:1;min-width:0;max-width:420px}
+  .bthead .sp{flex:1}
+  #code{width:100%;box-sizing:border-box;min-height:340px;resize:vertical;font:13px/1.55 "IBM Plex Mono",ui-monospace,Consolas,monospace;
+        padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);tab-size:2;white-space:pre;overflow:auto}
+  .btrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .btrow input{flex:1;min-width:120px;max-width:260px}
+  .ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .runbtn{font-weight:700;padding:9px 22px}
+  .stopbtn{color:var(--up)}
+  #prog{height:4px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:10px}
+  #prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  #status{font-size:13px;color:var(--muted);margin-top:8px;min-height:1.3em;overflow-wrap:anywhere}
+  #status.bad{color:var(--up)}
+  #logbox{margin-top:8px;max-height:140px;overflow:auto;font:12px/1.5 "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+  .tile .k{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+  .tile .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px;overflow-wrap:anywhere}
+  #eqchart{height:300px;margin-top:6px}
+  .tw{overflow:auto;max-height:480px;margin-top:6px}
+  .tw table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+  .tw th,.tw td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  .tw th{position:sticky;top:0;background:var(--card);color:var(--muted);font-weight:600}
+  .tw th:first-child,.tw td:first-child{text-align:left}
+  .pos{color:var(--accent)} .neg{color:var(--up)}
+  .help{font-size:13px;color:var(--muted);line-height:1.7}
+  .help code{font:12px "IBM Plex Mono",ui-monospace,monospace;background:var(--bg);padding:1px 5px;border-radius:4px;color:var(--text)}
+  .help b{color:var(--text)}
+  #results[hidden]{display:none}
+  @media (max-width:700px){ #code{min-height:260px;font-size:12px} .tile .v{font-size:17px} #eqchart{height:240px} }
+</style>
+<link rel="stylesheet" href="gwave-ui.css?v=20261010222623">
+</head>
+<body>
+<div class="wrap">
+  <h1 class="brand">Gwave</h1>
+  <nav id="nav"></nav>
+
+  <div class="card">
+    <h2>백테스트</h2>
+    <p class="help" style="margin:0 0 12px">전략 스크립트를 붙여넣고 <b>실행</b>을 누르면 바이낸스 과거 가격으로 계산해서 결과를 보여 줘요.
+      계산은 내 브라우저에서만 하고, 받은 가격 데이터는 브라우저에 저장돼서 두 번째부터는 빨라요.
+      스크립트는 화면·로그인 정보와 분리된 공간에서 실행돼요.</p>
+    <div class="bthead">
+      <select id="pick" aria-label="스크립트 고르기"></select>
+      <span class="sp"></span>
+      <button type="button" class="ghost" id="copySpec" title="AI(Claude·ChatGPT)에게 붙여넣으면 이 탭에 맞는 스크립트를 짜 줘요">AI용 작성 규칙 복사</button>
+    </div>
+    <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="백테스트 스크립트"></textarea>
+    <div class="btrow">
+      <button type="button" class="runbtn" id="run">▶ 실행</button>
+      <button type="button" class="ghost stopbtn" id="stop" disabled>■ 중지</button>
+      <input id="saveName" placeholder="저장할 이름" maxlength="40">
+      <button type="button" class="ghost" id="save">저장</button>
+      <button type="button" class="ghost" id="del" hidden>삭제</button>
+    </div>
+    <div id="prog"><i></i></div>
+    <div id="status"></div>
+    <div id="logbox"></div>
+  </div>
+
+  <div id="results" hidden>
+    <div class="card"><h2>요약</h2><div class="tiles" id="tiles"></div></div>
+    <div class="card" id="eqCard"><h2>자산 곡선</h2><div id="eqchart"></div></div>
+    <div class="card" id="yrCard"><h2>연도별 손익</h2><div class="tw" id="yearly"></div></div>
+    <div class="card" id="trCard"><h2 id="trTitle">매매 기록</h2><div class="tw" id="trades"></div></div>
+  </div>
+
+  <div class="card help">
+    <b>스크립트는 어떻게 만들어요?</b><br>
+    <b>AI용 작성 규칙 복사</b>를 눌러 Claude나 ChatGPT에 붙여넣고, 그 아래에 원하는 전략을 말로 설명하면 이 탭에 맞는 스크립트를 짜 줘요.
+    받은 스크립트를 위 칸에 붙여넣고 실행하면 돼요. 맨 위의 숫자(시작 금액, 수량, 손절 % 등)만 바꿔서 다시 실행해 볼 수 있어요.<br>
+    결과는 과거 가격으로 계산한 참고용이에요. 펀딩비·슬리피지는 스크립트가 따로 넣지 않으면 빠져 있고, 투자 조언이 아니에요.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="common.js?v=20261010222623"></script>
+<script src="nav.js?v=20261010222623"></script>
+<script src="bt-examples.js?v=20261010222623"></script>
+<script>
+"use strict";
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const SK = "bt-saved-v1", LK = "bt-last-v1";
+  const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  const saved = () => { try { return JSON.parse(ls.get(SK) || "[]").filter(x => x && typeof x.name === "string" && typeof x.code === "string"); } catch (e) { return []; } };
+
+  // ── 스크립트 고르기 (예시 + 내가 저장한 것) ──
+  function fillPick(sel) {
+    const mine = saved();
+    $("pick").innerHTML = '<option value="">— 스크립트 고르기 —</option>'
+      + '<optgroup label="예시">' + BT_EXAMPLES.map((x, i) => `<option value="e${i}">${esc(x.name)}</option>`).join("") + "</optgroup>"
+      + (mine.length ? '<optgroup label="내가 저장한 것">' + mine.map((x, i) => `<option value="s${i}">${esc(x.name)}</option>`).join("") + "</optgroup>" : "");
+    $("pick").value = sel || "";
+    $("del").hidden = !/^s/.test($("pick").value);
+  }
+  $("pick").onchange = () => {
+    const v = $("pick").value, mine = saved();
+    if (/^e\d+$/.test(v)) { $("code").value = BT_EXAMPLES[+v.slice(1)].code; $("saveName").value = ""; }
+    else if (/^s\d+$/.test(v) && mine[+v.slice(1)]) { $("code").value = mine[+v.slice(1)].code; $("saveName").value = mine[+v.slice(1)].name; }
+    $("del").hidden = !/^s/.test(v);
+    ls.set(LK, $("code").value);
+  };
+  $("save").onclick = () => {
+    const name = $("saveName").value.trim().slice(0, 40), code = $("code").value;
+    if (!name) { $("saveName").focus(); setStatus("저장할 이름을 적어 주세요", true); return; }
+    if (!code.trim()) { setStatus("저장할 스크립트가 없어요", true); return; }
+    const mine = saved(), i = mine.findIndex(x => x.name === name);
+    if (i >= 0) mine[i].code = code; else mine.push({ name, code });
+    ls.set(SK, JSON.stringify(mine.slice(-50)));
+    fillPick("s" + (i >= 0 ? i : Math.min(mine.length, 50) - 1));
+    setStatus(`"${name}" 저장했어요 (이 브라우저에만 저장돼요)`);
+  };
+  $("del").onclick = () => {
+    const v = $("pick").value; if (!/^s\d+$/.test(v)) return;
+    const mine = saved(), x = mine.splice(+v.slice(1), 1)[0];
+    ls.set(SK, JSON.stringify(mine)); fillPick(""); setStatus(`"${x ? x.name : ""}" 삭제했어요`);
+  };
+  $("copySpec").onclick = async () => {
+    const txt = BT_SPEC + "\n\n원하는 전략:\n";
+    try { await navigator.clipboard.writeText(txt); setStatus("작성 규칙을 복사했어요. AI 대화창에 붙여넣고 아래에 전략을 설명해 주세요"); }
+    catch (e) { $("code").value = "/*\n" + txt + "*/\n"; setStatus("복사가 안 돼서 위 칸에 넣어 뒀어요. 직접 복사해 주세요", true); }
+  };
+  $("code").addEventListener("keydown", e => {               // Tab 키로 들여쓰기
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    const t = e.target, s = t.selectionStart;
+    t.setRangeText("  ", s, t.selectionEnd, "end");
+  });
+  $("code").addEventListener("input", () => ls.set(LK, $("code").value));
+
+  // ── 실행 (분리된 Web Worker 안에서) ──
+  let worker = null, t0 = 0;
+  function setStatus(txt, bad) { $("status").textContent = txt; $("status").classList.toggle("bad", !!bad); }
+  const setProg = f => { $("prog").firstChild.style.width = Math.round(f * 100) + "%"; };
+  function stop(msg, bad) {
+    if (worker) { worker.terminate(); worker = null; }
+    $("run").disabled = false; $("stop").disabled = true;
+    if (msg) setStatus(msg, bad);
+  }
+  $("stop").onclick = () => stop("중지했어요", true);
+  $("run").onclick = () => {
+    const code = $("code").value;
+    if (!code.trim()) { setStatus("스크립트를 먼저 붙여넣어 주세요", true); return; }
+    stop();
+    $("logbox").textContent = ""; setProg(0.02); setStatus("실행 중…");
+    $("run").disabled = true; $("stop").disabled = false; t0 = performance.now();
+    worker = new Worker("bt-worker.js?v=1");
+    worker.onmessage = ev => {
+      const m = ev.data || {};
+      if (m.type === "log") { const box = $("logbox"); box.textContent = (box.textContent + String(m.data) + "\n").slice(-20000); box.scrollTop = box.scrollHeight; }
+      else if (m.type === "dl") setStatus(String(m.data));
+      else if (m.type === "prog") setProg(+m.data || 0);
+      else if (m.type === "error") stop("오류: " + String(m.data), true);
+      else if (m.type === "done") { setProg(1); stop(`완료 · ${((performance.now() - t0) / 1000).toFixed(1)}초`); show(m.data); }
+    };
+    worker.onerror = e => { e.preventDefault(); stop("오류: " + (e.message || "스크립트 실행 실패"), true); };
+    worker.postMessage({ code });
+  };
+
+  // ── 결과 그리기 (스크립트가 보낸 값은 전부 글자로만 표시) ──
+  const isTime = v => typeof v === "number" && v > 1e12 && v < 4.2e12;
+  const fmtTime = v => new Date(v + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ");
+  const fmt = v => {
+    if (v == null) return "";
+    if (isTime(v)) return fmtTime(v);
+    if (typeof v === "number") return isFinite(v) ? v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) >= 100 ? 2 : 6 }) : "-";
+    if (typeof v === "object") return JSON.stringify(v);
+    return String(v);
+  };
+  const signCls = v => { const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[,%$]/g, "")); return !isFinite(n) || n === 0 || isTime(v) ? "" : n > 0 ? "pos" : "neg"; };
+  function table(rows, max) {
+    const list = rows.slice(0, max), cols = [];
+    for (const r of list) for (const k of Object.keys(r)) if (!cols.includes(k) && cols.length < 20) cols.push(k);
+    return `<table><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>`
+      + list.map(r => `<tr>${cols.map(c => `<td class="${/손익|수익|pnl|PnL/i.test(c) ? signCls(r[c]) : ""}">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("") + "</tbody></table>";
+  }
+  let chart = null, line = null;
+  function show(r) {
+    $("results").hidden = false;
+    const sum = r.summary && typeof r.summary === "object" ? r.summary : {};
+    $("tiles").innerHTML = Object.entries(sum).slice(0, 24).map(([k, v]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(fmt(v))}</div></div>`).join("") || '<div class="help">요약(summary)이 없어요</div>';
+    const eq = Array.isArray(r.equity) ? r.equity.filter(p => Array.isArray(p) && isFinite(+p[0]) && isFinite(+p[1])).map(p => [+p[0], +p[1]]).sort((a, b) => a[0] - b[0]) : [];
+    $("eqCard").hidden = !eq.length; $("yrCard").hidden = eq.length < 2;
+    if (eq.length) {
+      if (!window.LightweightCharts) $("eqchart").textContent = "차트 라이브러리를 불러오지 못했어요";
+      else {
+        if (!chart) {
+          chart = LightweightCharts.createChart($("eqchart"), { autoSize: true, layout: { background: { color: css("--card") }, textColor: css("--muted") },
+            grid: { vertLines: { color: css("--line") }, horzLines: { color: css("--line") } }, rightPriceScale: { borderColor: css("--line") }, timeScale: { borderColor: css("--line") } });
+          line = chart.addLineSeries({ color: css("--accent"), lineWidth: 2 });
+        }
+        const seen = new Set();
+        line.setData(eq.map(([t, v]) => ({ time: Math.floor(t / 1000), value: v })).filter(p => !seen.has(p.time) && seen.add(p.time)));
+        chart.timeScale().fitContent();
+      }
+      // 연도별: 그해 마지막 자산 − 전년도 마지막 자산
+      const yr = {}; let prev = eq[0][1];
+      for (const [t, v] of eq) yr[new Date(t).getUTCFullYear()] = v;
+      $("yearly").innerHTML = table(Object.entries(yr).map(([y, v]) => { const row = { 연도: y, "연말 자산": Math.round(v), 손익: Math.round(v - prev), 수익률: ((v / prev - 1) * 100).toFixed(1) + "%" }; prev = v; return row; }), 100);
+    }
+    const tr = Array.isArray(r.trades) ? r.trades.filter(x => x && typeof x === "object") : [];
+    $("trCard").hidden = !tr.length;
+    $("trTitle").textContent = tr.length > 1000 ? `매매 기록 (${tr.length.toLocaleString()}개 중 최근 1,000개)` : `매매 기록 (${tr.length.toLocaleString()}개)`;
+    if (tr.length) $("trades").innerHTML = table(tr.slice(-1000).reverse(), 1000);
+  }
+  addEventListener("themechange", () => { if (chart) { chart.applyOptions({ layout: { background: { color: css("--card") }, textColor: css("--muted") }, grid: { vertLines: { color: css("--line") }, horzLines: { color: css("--line") } } }); line.applyOptions({ color: css("--accent") }); } });
+
+  fillPick("");
+  const last = ls.get(LK);
+  $("code").value = last && last.trim() ? last : BT_EXAMPLES[0].code;
+  if (!last) $("pick").value = "e0";
+})();
+</script>
+</body>
+</html>

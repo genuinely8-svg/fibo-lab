@@ -20,6 +20,7 @@
     ["rank.html", "코인순위", "Rankings", "시가총액 순위", "Market cap ranking", "list", "#f59e0b"],
     ["movers.html", "24시간변동률", "Top Movers", "24시간 상승 · 하락 순위", "24h gainers & losers", "move", "#10b981"],
     ["news.html", "주요뉴스", "News", "코인 뉴스 · 거래소 공지", "Crypto news & exchange notices", "news", "#64748b"],
+    ["backtest.html", "백테스트", "Backtest", "전략 스크립트를 붙여넣고 과거 가격으로 검증", "Paste a strategy script and test it on past prices", "code", "#0ea5e9"],
   ];
   const ICON = {
     trend: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
@@ -28,6 +29,7 @@
     list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
     move: '<path d="M7 17V5l-4 4M7 5l4 4"/><path d="M17 7v12l4-4M17 19l-4-4"/>',
     news: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/>',
+    code: '<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
   };
   const LANG = (() => { try { const v = localStorage.getItem("artha-lang"); if (v) return v; } catch (e) {} const m = document.cookie.match(/(?:^|;\s*)googtrans=\/ko\/([^;]+)/); return m ? decodeURIComponent(m[1]) : "en"; })();
   const KO = LANG === "ko";
