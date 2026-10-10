@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
         const u = JSON.parse(r), s = E.summary(u.st);
         return { nick: u.nick, c: u.c, la: u.la || null, bl: !!u.bl, bal: u.st.bal, equity: s.equity, dep: u.st.dep, ret: s.ret, n: u.st.st.n, pos: u.st.pos.length,
                  admin: A.isAdminKey(A.userKey(u.nick)) };
-      }).sort((a, c) => c.ret - a.ret);
+      }).sort((a, c) => (c.equity - a.equity) || (c.ret - a.ret));   // 시드(총자산) 큰 순서
       return res.status(200).json({ users, log: log.map(x => JSON.parse(x)) });
     }
 
