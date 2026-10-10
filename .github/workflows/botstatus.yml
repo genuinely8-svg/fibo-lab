@@ -13,9 +13,9 @@ jobs:
           BOT_SECRET: ${{ secrets.BOT_SECRET }}
         run: |
           for a in crypto rwa; do
-            curl -sS --max-time 40 -H "Authorization: Bearer $BOT_SECRET" "https://fibo-lab-kappa.vercel.app/api/sigbot?acct=$a" > s_$a.json || true
+            curl -sS --max-time 40 -H "Authorization: Bearer $BOT_SECRET" "https://gwave-lab.vercel.app/api/sigbot?acct=$a" > s_$a.json || true
           done
-          curl -sS --max-time 60 -X POST -H "Authorization: Bearer $BOT_SECRET" "https://fibo-lab-kappa.vercel.app/api/sigbot" > run.json || true
+          curl -sS --max-time 60 -X POST -H "Authorization: Bearer $BOT_SECRET" "https://gwave-lab.vercel.app/api/sigbot" > run.json || true
           node -e '
             const fs=require("fs"); const k=t=>new Date(t+9*3600e3).toISOString().slice(5,16).replace("T"," ");
             for (const a of ["crypto","rwa"]) {

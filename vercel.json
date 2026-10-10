@@ -28,6 +28,17 @@
   ],
   "redirects": [
     {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "fibo-lab-kappa.vercel.app"
+        }
+      ],
+      "destination": "https://gwave-lab.vercel.app/$1",
+      "permanent": true
+    },
+    {
       "source": "/",
       "missing": [
         {

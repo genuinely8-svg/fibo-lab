@@ -15,7 +15,7 @@ const FibCore = require("./api/_lib/fib-core.js");
 
 const CFG = { interval: "1h", count: 2000, n: 5, k: 20, top: 50, near: 0.3 };
 const STATE_FILE = ".alert-state/state.json";
-const SITE = "https://genuinely8-svg.github.io/fibo-lab/";
+const SITE = "https://gwave-lab.vercel.app/";
 const STABLES = new Set(["USDC", "FDUSD", "TUSD", "BUSD", "USDP", "DAI", "EUR", "AEUR", "USDE", "XUSD", "BFUSD", "RLUSD", "USD1", "PYUSD", "EURI"]);
 const COMMODITY_TOKENS = new Set(["PAXG", "XAUT", "XAUM", "KAU", "KAG", "DGX", "PMGT", "XAU", "XAG", "XPT", "XPD"]);
 
