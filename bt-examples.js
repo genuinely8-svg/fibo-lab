@@ -103,6 +103,7 @@ for (let i = 1; i < btc.length; i++) {
     if (!cyc.out && b.h >= cyc.L * (1 + TP / 100)) { cyc.pnl += closeAll(1, t, cyc.L * (1 + TP / 100)); cyc.out = cyc.c ? "분할손절 후 익절" : "익절"; }
     if (cyc.out) { trades.push({ 시작: cyc.t, 끝: t, 물타기: cyc.k + "차", 결과: cyc.out, 손익: Math.round(cyc.pnl) }); cyc = null; pos = {}; }
   }
+  if (cash <= 0) { equity.push([t, 0]); log("계좌 잔고가 0 이 되어 여기서 끝 (청산)"); break; }
   if (i % 24 === 0) { let u = 0; for (const s in pos) { const p = priceOf(s, t, b.c); if (p) u += pos[s].q * (p - pos[s].cost / pos[s].q); } equity.push([t, cash + u]); }
   if (i % 5000 === 0) progress(i / btc.length);
 }
