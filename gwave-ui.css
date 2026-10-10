@@ -49,3 +49,12 @@ td,.tile .v{font-variant-numeric:tabular-nums}
 .gw-sess .gw-live{color:#2FBF85;font-weight:600}
 .gw-sess .gw-clock{font-variant-numeric:tabular-nums;min-width:12ch}
 @media (max-width:700px){ .gw-sess .gw-hide-m{display:none} .gw-sess{margin-bottom:12px} }
+
+/* ── 앱 느낌 (아이폰): 더블탭 확대·당겨서 튕김·탭할 때 회색 번쩍임 없애기 ── */
+html{-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+/* 홈 화면 앱으로 열었을 때 아래쪽 홈 막대에 내용이 가리지 않게 */
+@media (display-mode: standalone){ body{padding-bottom:env(safe-area-inset-bottom)} }
+/* 가로로 눕혔을 때 노치에 글자가 안 가리게 */
+.wrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+@media (max-width:700px){ .wrap{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))} }

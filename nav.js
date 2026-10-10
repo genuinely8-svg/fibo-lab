@@ -563,3 +563,27 @@
     token: () => ls.get(K.token),
   };
 })();
+
+// ── 위쪽 고정 (앱처럼) ─────────────────────────────────────────────
+// 로고 줄 + 탭 메뉴를 한 덩어리(.gw-head)로 묶어서 스크롤해도 화면 맨 위에 붙어 있게.
+// 아이폰 "홈 화면에 추가"로 열면 사파리 주소창·아래 막대 없이 진짜 앱처럼 보임 (manifest: standalone)
+(function () {
+  const nav = document.getElementById("nav");
+  if (!nav || nav.closest(".gw-head")) return;
+  const st = document.createElement("style");
+  st.textContent = `
+    .gw-head{position:sticky;top:0;z-index:70;background:var(--bg);margin:0 -16px 16px;padding:calc(env(safe-area-inset-top) + 6px) 16px 0}
+    .gw-head .navwrap{margin-bottom:0}
+    .gw-head.stuck{box-shadow:0 6px 14px -10px rgba(0,0,0,.35)}
+    @media (max-width:700px){ .gw-head{margin:0 -10px 12px;padding:calc(env(safe-area-inset-top) + 4px) 10px 0} }`;
+  document.head.appendChild(st);
+  const head = document.createElement("div");
+  head.className = "gw-head";
+  const prev = nav.previousElementSibling;
+  nav.before(head);
+  if (prev && (prev.classList.contains("toprow") || prev.classList.contains("langrow") || prev.matches("h1.brand"))) head.append(prev);
+  head.append(nav);
+  // 스크롤했을 때만 아래쪽에 옅은 그림자
+  const onScroll = () => head.classList.toggle("stuck", head.getBoundingClientRect().top <= 0 && scrollY > 4);
+  addEventListener("scroll", onScroll, { passive: true }); onScroll();
+})();
