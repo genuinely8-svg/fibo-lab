@@ -1,8 +1,8 @@
-# ath TEST (참고용)
+# Gwave
 
 바이낸스(현물·선물) 캔들로 자체 진입 가격을 계산하고, 과거에 그 가격에 닿은 뒤 얼마나 반등했는지 통계를 내는 페이지입니다.
 
-- 사이트: https://genuinely8-svg.github.io/fibo-lab/
+- 사이트: https://gwave-lab.vercel.app (작업 규칙은 CLAUDE.md)
 - 설치할 것 없음. 브라우저가 바이낸스 공개 API를 직접 불러서 계산합니다.
 
 ## 내 컴퓨터에서 열기
